@@ -4,6 +4,55 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-18 — Event Log spine + species care fields (DESIGNED, pending sign-off)
+
+The "plan-now so later is easy" spine, distilled from the creative session (see `vision.md`).
+Collapses to ONE migration (`app/migrations/003_event_log_and_care_fields.sql`).
+
+- **Event log = evolve `journal_entry`** (keep the name; no churn): add `event_type` (note/
+  acquired/flowered/fruited/divided/repotted/fed/pest_treated/dormant/woke/measured/died/sold/
+  traded/given_away/crossed), optional `photo_id`, optional `related_plant_id` (other parent in
+  a cross), optional measurement (`measure_label`+`measure_value`+`measure_unit`), optional
+  `cause` (death). `body` (note) becomes nullable — most events need no prose; **specifics like
+  soil mix / fertilizer mixture / which pest go in the note, NOT new fields** (Stephen's call).
+- **Status changes logged as events:** keep `lifecycle_status` on plant (fast filter) AND write
+  a dated event on change → captures death dates + history that can't be backfilled.
+- **One table powers many later VIEWS** (timeline w/ "photos only" filter, phenology, growth
+  measurements, survival analysis, breeding records) — none of which need building now.
+  Offspring↔parent linkage on `plant` is a LATER additive step (when seedlings get entered).
+- **Species care fields:** six plain-text dropdowns (dormancy/water/feeding/light/photoperiod/
+  humidity). Text not enum so options can change without another migration; empty = "No
+  information available".
+- **Security (full-tier):** the new FK columns (`photo_id`, `related_plant_id`) get the same
+  cross-tenant-injection guard as plant/photo — RLS `with check` adds
+  `(... is null or app_owns_photo/plant(...))`. **Run the adversarial security check on this
+  policy change BEFORE applying migration 003.**
+- **Anti-bloat (locked):** progressive disclosure, NO on/off toggle — power features behind a
+  collapsed "▸ Advanced" section. **No blocking popups for optional data** (death cause is an
+  ignorable inline slot, never a popup); only destructive actions (delete) get a confirm gate.
+- **STATUS: signed off 2026-06-18.** Security check done (below). Ready to APPLY migration 003;
+  UI built after.
+
+**Security review of migration 003 (full-tier, isolation focus) — VERDICT: PASS.**
+Attacker model = user A trying to read/affect user B's data via the event log.
+- **Reads siloed:** `using (user_id = auth.uid())` → A only ever sees A's events. ✓
+- **No cross-tenant FK writes:** every link guarded — `app_owns_plant(plant_id)`,
+  `(photo_id is null or app_owns_photo(photo_id))`, `(related_plant_id is null or
+  app_owns_plant(related_plant_id))`. A can't attach an event to B's plant, embed B's photo,
+  or record a "cross" referencing B's plant. ✓
+- **Helpers enforce OWNERSHIP not existence:** `app_owns_*` are `select exists(... where id=p
+  and user_id=auth.uid())`, SECURITY DEFINER + pinned `search_path`; they only ever answer
+  about the caller's own rows, so no existence-oracle about others. ✓
+- **No user_id forgery:** `with check (user_id = auth.uid())` blocks inserting/Updating a row
+  stamped as B; `using` blocks touching B's rows. ✓
+- **Fails closed during swap:** DROP POLICY leaves RLS ENABLED (not disabled) → zero-policy =
+  deny-all; plus the whole migration is wrapped in a transaction (atomic). ✓
+- **Care fields:** plain text columns on species; ride the existing species owner policy; no new
+  FK/read path → isolation unchanged. ✓
+No issues found; mirrors the proven plant/photo guard from the 2026-06-17 review.
+
+---
+
 ## 2026-06-18 — Deployed to GitHub Pages (off file://, now usable on iPhone)
 
 - **Repo:** `github.com/stephend7/plant-collector` (PUBLIC — safe: only app code + the

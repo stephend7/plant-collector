@@ -90,9 +90,22 @@ whitespace (no `"Pinguicula"` vs `"Pinguicula "` rot), and allow one-tap add.
 We capture two by default at entry: one *with* the tag (for reading the label / OCR) and one
 clean shot. Photos and the journal are close cousins — photos *are* a kind of journal.
 
-**Journal entry** — dated text events for one plant (repotting, soil mix tried, observation).
-Heavily used by intense growers, ignorable by casual ones — present but tucked away
-(progressive disclosure) so the core never feels heavy.
+**Journal / Event log** (the spine — design locked 2026-06-18, see `vision.md` + `decisions.md`)
+— one dated timeline of "things that happened" to a plant. Each event carries:
+- a **date** and an **event type** (note / acquired / flowered / fruited / divided / repotted /
+  fed / pest_treated / dormant / woke / measured / died / sold / traded / given_away / crossed)
+- an optional **note** (free text — soil mix, fertilizer mixture, which pest all live here, NOT
+  in separate fields)
+- an optional **photo** (a photo that *is* the event), optional **measurement**
+  (label + value + unit, e.g. "pitcher height" 14 cm), optional **second plant** (the other
+  parent in a cross), optional **cause** (death cause — extensible pick-list, never a popup).
+- **Status changes are logged as events:** the plant keeps its current `lifecycle_status` (fast
+  to read/filter) AND a dated event is written on change — that's what captures death dates +
+  history we can't backfill.
+This one table quietly powers the photo timeline (filter to "photos only"), phenology, growth
+measurements, survival analysis, and breeding records — most of which are just *views* added
+later. Everyday journaling stays in the core; the heavier views live behind "▸ Advanced"
+(progressive disclosure, no toggle).
 
 ### Reference lists (make entry fast)
 
@@ -120,7 +133,13 @@ Heavily used by intense growers, ignorable by casual ones — present but tucked
 - **Lookup anytime:** look up a genus+species care guide directly. If present, show it. If
   not, say **"No information available"** — never leave people guessing. (UX principle:
   always state when something is unavailable.)
-- **Later (roadmap):** crowd-sourced shared care guides; auto-fetch / automated Google search.
+- **Structured care fields (added 2026-06-18, so reminders/dashboard can compute):** six quick
+  dropdowns on the species — **dormancy** (winter cold? months), **water** (rain/distilled vs
+  tap-ok), **feeding** (no/occasional/regular), **light** (full sun/bright/shade),
+  **photoperiod** (day-length sensitivity, e.g. Nepenthes), **humidity** (low/moderate/high).
+  Stored as plain text (UI offers the choices) so options can change without a migration.
+- **Later (roadmap):** crowd-sourced shared care guides; auto-fetch / automated Google search;
+  AI pre-fills the structured fields from imported prose care text (user confirms).
 
 ### The sharing layer (security-sensitive)
 
