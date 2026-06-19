@@ -100,6 +100,56 @@ See `decisions.md` for the confirmed design of this event-log spine once locked.
 
 ---
 
+## Reviewed design — Event Log, Care Guide, anti-bloat (2026-06-18, Stephen)
+
+**North star (Stephen, verbatim intent):** *don't bloat this; if these things are in there,
+they need to be easy.* Every decision below bends to that.
+
+### The Event Log (the spine)
+One dated timeline of "things that happened" to a plant. Each event:
+- **date + type + note** (free text), plus optional **photo**, optional **measurement**
+  (number + unit), optional **second plant** (for a cross).
+- **Specifics go in the note, NOT new fields** — soil mix, fertilizer mixture, which pest.
+  Lean, but queryable by type + date ("when did I last repot / fertilize / see pests?").
+- **Types (starter, extensible):** Acquired · Flowered · Fruited/set seed · Divided ·
+  Repotted · Fed · Pest/disease treated · Went dormant · Woke · Measured · Died ·
+  Sold/Traded/Gave away · Crossed (pollinated) · Note.
+- **Unified timeline with a "Photos only" filter** — default shows everything; flip to see
+  just the dated photos and swipe the progression. (Photo-timeline + journal, one thing.)
+- **Status changes are events:** keep `lifecycle_status` on the plant (fast filter) AND write a
+  dated event when it changes → gives death dates & survival history without complicating reads.
+
+### Death → cause (optional, skippable)
+Marking **Died** offers a quick pick-list — Overwatered · Underwatered · Dried out · Pest
+(thrips/etc.) · Crown rot · **+ add your own** — and can be skipped. Extensible like categories.
+Powers "what actually kills my plants." Pest specifics go in the note.
+
+### Measurements & the Experiments module
+- Measurements = an optional number+unit on a "Measured" event. No setup if unused.
+- **Experiments = a LATER opt-in module**, mostly free because it rides on typed events +
+  measurements: group plants ("fertilizer A vs B"), record treatment, chart the measured outcome.
+  Nothing special to design now — the event spine already makes it possible.
+
+### Care Guide — six structured fields (quick dropdowns)
+Dormancy (needs winter cold? which months) · Water (rain/distilled vs tap-ok) · Feeding
+(no/occasional/regular) · Light (full sun/bright/shade) · **Photoperiod** (day-length sensitive,
+e.g. Nepenthes) · **Humidity** (low/moderate/high). *Enhancement (later):* AI pre-fills these from
+imported/crowdsourced prose care text; user confirms.
+
+### Anti-bloat mechanism — Simple / Detailed mode
+One toggle in Settings (easiest to grok, reversible):
+- **Simple (default):** add plants, photos, quick events (flowered/repotted/pest/died+cause),
+  care guide. Everyday journaling stays here — it's core, not advanced.
+- **Detailed (opt-in):** also shows Measurements, Breeding/lineage tree, Experiments.
+Finer per-feature toggles can come later; one switch is the least-bloat start.
+
+### Upload species per genus (reference-data import)
+The "upload-to-create reference lists" feature: bulk-load species into a genus's dropdown.
+Distinct from importing the actual plant collection. Head start: legacy `Sheet11` = 133 species
+across 8 genera, ready to seed. On the roadmap.
+
+---
+
 ## Favorites to chase (subjective, for sequencing)
 1. Living photo timeline / time-lapse (data's already there; emotional payoff).
 2. Season-aware care reminders (the daily-use hook; very CP-specific).
