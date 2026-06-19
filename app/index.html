@@ -461,6 +461,8 @@
     return fullPath;
   }
   const thumbOf=path=>path.replace(/\.jpg$/,'_thumb.jpg');
+  // today's date in the user's OWN timezone (toISOString() uses UTC and rolls a day early in the Americas)
+  function todayLocal(){const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
 
   /* ---- name auto-detection from filename + photo metadata (ported from the catalog app) ---- */
   // Built-in dictionary so detection works on day one, before the user's genus table is full.
@@ -721,7 +723,7 @@
       resetForm(){
         this.formError=''; this.detectedNote=''; this.clearPendingPhotos();
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
-        this.form={genusId:this.lastGenusId||'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:new Date().toISOString().slice(0,10),acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',categoryIds:[]};
+        this.form={genusId:this.lastGenusId||'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:todayLocal(),acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',categoryIds:[]};
       },
       formRow(){
         return {
@@ -930,7 +932,7 @@
         const csv=[head.join(','),...rows].join('\n');
         const blob=new Blob([csv],{type:'text/csv'});
         const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-        a.download='plant-collection-'+new Date().toISOString().slice(0,10)+'.csv';
+        a.download='plant-collection-'+todayLocal()+'.csv';
         a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
       },
     }));
