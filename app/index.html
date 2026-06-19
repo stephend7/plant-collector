@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Plant Collector</title>
+<style>
+  :root{
+    --bg:#0f1411; --card:#18211c; --ink:#e8f0ea; --muted:#9fb3a6;
+    --line:#2a382f; --pine:#3f7d54; --pine-2:#6fce8f; --danger:#ff9d9d; --chip:#22302a;
+  }
+  *{box-sizing:border-box}
+  [x-cloak]{display:none!important}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);
+    font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-text-size-adjust:100%}
+  .center{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+  .brand{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700}
+  .brand .leaf{font-size:24px}
+  .card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+  h1{font-size:19px;margin:0 0 4px} .sub{color:var(--muted);font-size:14px;margin:0 0 18px}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px}
+  input,select,textarea{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);
+    background:#0e1512;color:var(--ink);font-size:16px;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pine)}
+  button{font-family:inherit}
+  button.primary{width:100%;margin-top:18px;padding:13px;border:0;border-radius:10px;background:var(--pine);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+  button.primary:disabled{opacity:.55;cursor:default}
+  .links{margin-top:16px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .links a{color:var(--pine-2);font-size:13px;cursor:pointer;text-decoration:none}
+  .msg{margin-top:14px;font-size:14px;min-height:18px} .msg.err{color:var(--danger)} .msg.ok{color:var(--pine-2)}
+  .note{margin-top:18px;font-size:12px;color:var(--muted);text-align:center}
+  .app{max-width:680px;margin:0 auto;padding:16px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+  .topbar .acts{display:flex;gap:8px;align-items:center}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);padding:9px 13px;border-radius:10px;font-size:14px;cursor:pointer}
+  button.ghost:disabled{opacity:.5;cursor:default}
+  button.ghost.danger{color:var(--danger);border-color:#5a2f2f}
+  button.add{background:var(--pine);color:#fff;border:0;padding:10px 15px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+  button.filebtn{display:inline-block;margin-top:6px;padding:10px 15px;border-radius:10px;border:1px solid var(--line);background:#0e1512;color:var(--pine-2);font-size:14px;font-weight:600;cursor:pointer}
+  button.filebtn:disabled{opacity:.5;cursor:default}
+  .who{color:var(--muted);font-size:12px;margin:10px 0 0}
+  .empty{margin:34px 0;padding:30px;border:1px dashed var(--line);border-radius:14px;text-align:center;color:var(--muted)}
+  .genusHead{margin:22px 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--pine-2)}
+  .plant{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:center;cursor:pointer}
+  .plant:hover{border-color:var(--pine)}
+  .plant .pic{width:52px;height:52px;border-radius:9px;object-fit:cover;border:1px solid var(--line);flex:0 0 auto;background:#0e1512}
+  .plant .body{flex:1;min-width:0}
+  .plant .name{font-size:16px;font-weight:600}
+  .plant .meta{color:var(--muted);font-size:13px;margin-top:2px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .badge{font-size:11px;padding:1px 7px;border-radius:6px;background:var(--chip);color:var(--muted);text-transform:capitalize}
+  .badge.warn{background:#3a2a1a;color:#e7b07a}
+  .count{color:var(--muted);font-size:13px}
+  .cat-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .cat-chip{background:var(--chip);border:1px solid var(--line);color:var(--muted);padding:5px 11px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit}
+  .cat-chip.selected{background:var(--pine);border-color:var(--pine);color:#fff}
+  .cat-chip:hover:not(.selected){border-color:var(--pine-2);color:var(--ink)}
+  .chev{color:var(--muted);flex:0 0 auto}
+  .formwrap,.detailwrap{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:14px 0}
+  .formwrap h2,.detailwrap h2{font-size:17px;margin:0 0 4px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:520px){.grid2{grid-template-columns:1fr}}
+  .pickrow{display:flex;gap:8px;align-items:flex-end}
+  .pickrow > div:first-child{flex:1}
+  .mini{flex:0 0 auto;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:#0e1512;color:var(--pine-2);font-size:14px;cursor:pointer}
+  .mini:disabled{opacity:.5;cursor:default}
+  .addbox{display:flex;gap:8px;margin-top:6px}
+  .addbox input{flex:1}
+  .addbox .ok{background:var(--pine);color:#fff;border:0;border-radius:10px;padding:0 14px;cursor:pointer}
+  .addbox .no{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:0 12px;cursor:pointer}
+  .formfoot{display:flex;gap:10px;margin-top:18px}
+  .formfoot .primary{margin-top:0}
+  .hint{font-size:12px;color:var(--muted);margin-top:4px}
+  .detected{margin-top:10px;padding:9px 12px;border-radius:10px;background:rgba(63,125,84,.18);border:1px solid var(--pine);color:var(--pine-2);font-size:13px}
+  .thumbs{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
+  .thumb{position:relative;width:88px}
+  .thumb img{width:88px;height:88px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}
+  .thumb select{margin-top:5px;padding:5px 6px;font-size:12px}
+  .thumb .rm{position:absolute;top:-7px;right:-7px;width:23px;height:23px;border-radius:50%;border:0;background:#000;color:#fff;cursor:pointer;font-size:12px;line-height:23px;text-align:center;padding:0}
+  .thumb .cover{position:absolute;bottom:34px;left:5px;background:var(--pine);color:#fff;font-size:10px;padding:1px 6px;border-radius:6px}
+  /* detail */
+  .backbar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .gallery{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 10px}
+  .gphoto{position:relative;width:104px}
+  .gphoto img{width:104px;height:104px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}
+  .gphoto .cover{position:absolute;top:5px;left:5px;background:var(--pine);color:#fff;font-size:10px;padding:1px 6px;border-radius:6px}
+  .gphoto .lbl{display:block;font-size:11px;color:var(--muted);margin-top:3px;text-transform:capitalize}
+  .gphoto .ga{display:flex;gap:6px;margin-top:4px}
+  .gphoto .ga button{font-size:11px;padding:3px 6px;border-radius:7px;border:1px solid var(--line);background:#0e1512;color:var(--ink);cursor:pointer}
+  .gphoto .ga button.del{color:var(--danger)}
+  dl.fields{margin:8px 0 0}
+  dl.fields > div{display:flex;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+  dl.fields dt{flex:0 0 130px;color:var(--muted);font-size:14px;margin:0}
+  dl.fields dd{margin:0;font-size:15px;flex:1;min-width:0;word-wrap:break-word}
+</style>
+</head>
+<body>
+<div x-data="app" x-cloak>
+
+  <div x-show="view==='loading'" class="center" style="color:var(--muted)">Connecting to your collection…</div>
+
+  <!-- ===== AUTH ===== -->
+  <div x-show="view==='login'" class="center">
+    <div class="card">
+      <div class="brand" style="margin-bottom:18px"><span class="leaf">🌱</span> Plant Collector</div>
+      <h1 x-text="heading()"></h1>
+      <p class="sub" x-text="subhead()"></p>
+      <form @submit.prevent="submit()">
+        <template x-if="mode!=='newpass'">
+          <div><label for="email">Email</label><input id="email" type="email" autocomplete="email" x-model="email"></div>
+        </template>
+        <template x-if="mode!=='reset'">
+          <div><label for="pass" x-text="mode==='newpass'?'New password':'Password'"></label><input id="pass" type="password" autocomplete="current-password" x-model="password"></div>
+        </template>
+        <button class="primary" type="submit" :disabled="busy" x-text="busy?'Working…':submitLabel()"></button>
+      </form>
+      <div class="msg" :class="ok?'ok':'err'" x-text="message"></div>
+      <div class="links">
+        <template x-if="mode==='signin'"><a @click="setMode('signup')">Need an account? Create one</a></template>
+        <template x-if="mode==='signin'"><a @click="setMode('reset')">Forgot password?</a></template>
+        <template x-if="mode==='signup'"><a @click="setMode('signin')">Have an account? Sign in</a></template>
+        <template x-if="mode==='reset'||mode==='newpass'"><a @click="setMode('signin')">Back to sign in</a></template>
+      </div>
+      <p class="note">Your collection is private — secured by per-account locks in the database.</p>
+    </div>
+  </div>
+
+  <!-- ===== APP ===== -->
+  <div x-show="view==='app'" class="app">
+    <div class="topbar">
+      <div class="brand"><span class="leaf">🌱</span> Plant Collector</div>
+      <div class="acts">
+        <button class="ghost" @click="exportCsv()" :disabled="!plants.length" x-show="screen==='list'" title="Download your collection as a spreadsheet">Export CSV</button>
+        <button class="add" @click="openForm()" x-show="screen==='list'">＋ Add plant</button>
+      </div>
+    </div>
+
+    <!-- entry / edit form -->
+    <div class="formwrap" x-show="screen==='form'" x-transition>
+      <h2 x-text="editId?'Edit plant':'Add a plant'"></h2>
+      <p class="hint">Pick the genus first, then its species. Use ＋ to add anything that isn't in the list yet.</p>
+
+      <!-- PHOTOS (only when adding; managed in the detail view when editing) -->
+      <div x-show="!editId">
+        <label>Photos</label>
+        <p class="hint">Snap the tag (to read the label) and a clean shot. On a phone you can take a photo or pick from your library. The first photo becomes the cover.</p>
+        <input type="file" x-ref="addInput" accept="image/*" multiple @change="onPhotoFiles($event)" style="display:none">
+        <button type="button" class="filebtn" @click="$refs.addInput.click()" :disabled="photoBusy">＋ Add Photo</button>
+        <div x-show="photoBusy" class="hint">Processing photos…</div>
+        <div x-show="detectedNote" x-transition class="detected">
+          <span x-text="detectedNote"></span>
+          <a @click="detectedNote=''" style="color:var(--pine-2);cursor:pointer;margin-left:6px">dismiss</a>
+        </div>
+        <div class="thumbs" x-show="pendingPhotos.length">
+          <template x-for="(ph,idx) in pendingPhotos" :key="ph.id">
+            <div class="thumb">
+              <button type="button" class="rm" @click="removePending(ph.id)">✕</button>
+              <span class="cover" x-show="idx===0">cover</span>
+              <img :src="ph.url" alt="">
+              <select x-model="ph.label">
+                <option value="plant">Plant</option><option value="flower">Flower</option>
+                <option value="tag">Tag</option><option value="pests">Pests</option><option value="other">Other</option>
+              </select>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <label>Genus *</label>
+          <div class="pickrow">
+            <div>
+              <select x-model="form.genusId" @change="onGenusChange()" :disabled="adding.genus">
+                <option value="">— choose genus —</option>
+                <template x-for="g in genusOptions()" :key="g.id"><option :value="g.id" x-text="g.name"></option></template>
+              </select>
+            </div>
+            <button type="button" class="mini" @click="startAdd('genus')" x-show="!adding.genus">＋ New</button>
+          </div>
+          <div class="addbox" x-show="adding.genus" x-transition>
+            <input type="text" placeholder="New genus name" x-model="newName.genus" @keydown.enter.prevent="confirmAdd('genus')" x-ref="addgenus">
+            <button type="button" class="ok" @click="confirmAdd('genus')">Add</button>
+            <button type="button" class="no" @click="cancelAdd('genus')">✕</button>
+          </div>
+        </div>
+        <div>
+          <label>Species *</label>
+          <div class="pickrow">
+            <div>
+              <select x-model="form.speciesId" :disabled="!form.genusId || adding.species">
+                <option value="" x-text="form.genusId?'— choose species —':'pick a genus first'"></option>
+                <template x-for="s in speciesOptions()" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
+              </select>
+            </div>
+            <button type="button" class="mini" @click="startAdd('species')" x-show="!adding.species" :disabled="!form.genusId">＋ New</button>
+          </div>
+          <div class="addbox" x-show="adding.species" x-transition>
+            <input type="text" placeholder="New species (e.g. prolifera, 'Razzberry Blonde')" x-model="newName.species" @keydown.enter.prevent="confirmAdd('species')" x-ref="addspecies">
+            <button type="button" class="ok" @click="confirmAdd('species')">Add</button>
+            <button type="button" class="no" @click="cancelAdd('species')">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <label>Form / Descriptor</label>
+      <input type="text" x-model="form.formDescriptor" placeholder="optional — e.g. White form, giant clone">
+
+      <div class="grid2">
+        <div>
+          <label>Source / Vendor</label>
+          <div class="pickrow">
+            <div>
+              <select x-model="form.vendorId" :disabled="adding.vendor">
+                <option value="">— none —</option>
+                <template x-for="v in vendors" :key="v.id"><option :value="v.id" x-text="v.name"></option></template>
+              </select>
+            </div>
+            <button type="button" class="mini" @click="startAdd('vendor')" x-show="!adding.vendor">＋ New</button>
+          </div>
+          <div class="addbox" x-show="adding.vendor" x-transition>
+            <input type="text" placeholder="New vendor name" x-model="newName.vendor" @keydown.enter.prevent="confirmAdd('vendor')" x-ref="addvendor">
+            <button type="button" class="ok" @click="confirmAdd('vendor')">Add</button>
+            <button type="button" class="no" @click="cancelAdd('vendor')">✕</button>
+          </div>
+        </div>
+        <div>
+          <label>Growing location</label>
+          <div class="pickrow">
+            <div>
+              <select x-model="form.growingLocationId" :disabled="adding.location">
+                <option value="">— none —</option>
+                <template x-for="l in locations" :key="l.id"><option :value="l.id" x-text="l.name"></option></template>
+              </select>
+            </div>
+            <button type="button" class="mini" @click="startAdd('location')" x-show="!adding.location">＋ New</button>
+          </div>
+          <div class="addbox" x-show="adding.location" x-transition>
+            <input type="text" placeholder="e.g. Garage rack, Windowsill" x-model="newName.location" @keydown.enter.prevent="confirmAdd('location')" x-ref="addlocation">
+            <button type="button" class="ok" @click="confirmAdd('location')">Add</button>
+            <button type="button" class="no" @click="cancelAdd('location')">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div><label>Acquisition date</label><input type="date" x-model="form.acquisitionDate"></div>
+        <div>
+          <label>How acquired</label>
+          <select x-model="form.acquisitionType">
+            <option value="">— unspecified —</option>
+            <option value="bought">Bought</option>
+            <option value="traded">Traded</option>
+            <option value="gift">Gift</option>
+            <option value="division">Division</option>
+            <option value="seed">Grown from seed</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid2">
+        <div><label>Quantity</label><input type="number" min="0" step="1" x-model="form.quantity"></div>
+        <div><label>Price</label><input type="number" min="0" step="0.01" x-model="form.price" placeholder="optional"></div>
+      </div>
+
+      <label>Accession / clone ID</label>
+      <input type="text" x-model="form.accessionId" placeholder="optional — e.g. BE-3390">
+
+      <label>Purchase link <span class="hint">(listing page — often has grow info)</span></label>
+      <input type="url" x-model="form.sourceUrl" placeholder="optional — https://…">
+
+      <label>Location data <span class="hint">(where it's from in nature)</span></label>
+      <input type="text" x-model="form.locationData" placeholder="optional — e.g. Warby Range, Victoria, Australia">
+
+      <label>Status</label>
+      <select x-model="form.lifecycleStatus">
+        <option value="in_collection">In collection</option>
+        <option value="dead">Dead</option>
+        <option value="sold">Sold</option>
+        <option value="traded">Traded</option>
+        <option value="given_away">Given away</option>
+      </select>
+
+      <label>Notes</label>
+      <textarea rows="2" x-model="form.notes" placeholder="optional"></textarea>
+
+      <label>Categories</label>
+      <div class="cat-chips">
+        <template x-for="c in categories" :key="c.id">
+          <button type="button" class="cat-chip" :class="form.categoryIds.includes(c.id)?'selected':''" @click="toggleCategory(c.id)" x-text="c.name"></button>
+        </template>
+        <button type="button" class="mini" @click="startAdd('category')" x-show="!adding.category">＋ New</button>
+      </div>
+      <div x-show="categories.length===0&&!adding.category" class="hint">No categories yet — use ＋ New to create your first (e.g. Carnivorous, Orchid, Bonsai).</div>
+      <div class="addbox" x-show="adding.category" x-transition>
+        <input type="text" placeholder="e.g. Carnivorous, Orchid, Bonsai" x-model="newName.category" @keydown.enter.prevent="confirmAdd('category')" x-ref="addcategory">
+        <button type="button" class="ok" @click="confirmAdd('category')">Add</button>
+        <button type="button" class="no" @click="cancelAdd('category')">✕</button>
+      </div>
+
+      <div class="msg err" x-text="formError"></div>
+      <div class="formfoot">
+        <button class="primary" @click="savePlant()" :disabled="saving||photoBusy" x-text="saving?'Saving…':(editId?'Save changes':'Save plant')"></button>
+        <button class="ghost" @click="closeForm()" :disabled="saving">Cancel</button>
+      </div>
+    </div>
+
+    <!-- plant detail -->
+    <template x-if="screen==='detail' && detailPlant">
+      <div class="detailwrap">
+        <div class="backbar"><button class="ghost" @click="closeDetail()">← Collection</button></div>
+        <h2 x-text="displayName(detailPlant)"></h2>
+        <p class="hint" x-show="detailPlant.lifecycle_status && detailPlant.lifecycle_status!=='in_collection'">
+          Status: <span x-text="statusLabel(detailPlant.lifecycle_status)"></span>
+        </p>
+        <div x-show="detailPlant.plant_category && detailPlant.plant_category.length" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px">
+          <template x-for="pc in (detailPlant.plant_category||[])" :key="pc.category_id">
+            <span class="cat-chip selected" x-text="pc.category && pc.category.name"></span>
+          </template>
+        </div>
+
+        <!-- photo gallery -->
+        <div class="gallery">
+          <template x-for="ph in detailPhotos" :key="ph.id">
+            <div class="gphoto">
+              <span class="cover" x-show="ph.id===detailPlant.cover_photo_id">cover</span>
+              <img :src="ph.thumbUrl" alt="">
+              <span class="lbl" x-text="ph.label"></span>
+              <div class="ga">
+                <button x-show="ph.id!==detailPlant.cover_photo_id" @click="setCover(ph)">Cover</button>
+                <button class="del" @click="removeDetailPhoto(ph)">Delete</button>
+              </div>
+            </div>
+          </template>
+        </div>
+        <input type="file" x-ref="detailInput" accept="image/*" multiple @change="addDetailPhotos($event)" style="display:none">
+        <button type="button" class="filebtn" @click="$refs.detailInput.click()" :disabled="detailBusy">＋ Add Photo</button>
+        <div x-show="detailBusy" class="hint">Working…</div>
+        <div class="msg err" x-text="detailError"></div>
+
+        <!-- fields -->
+        <dl class="fields">
+          <div><dt>Genus</dt><dd x-text="detailPlant.species && detailPlant.species.genus ? detailPlant.species.genus.name : '—'"></dd></div>
+          <div><dt>Species</dt><dd x-text="detailPlant.species ? detailPlant.species.name : '—'"></dd></div>
+          <div x-show="detailPlant.form_descriptor"><dt>Form/Descriptor</dt><dd x-text="detailPlant.form_descriptor"></dd></div>
+          <div><dt>Vendor</dt><dd x-text="detailPlant.vendor ? detailPlant.vendor.name : '—'"></dd></div>
+          <div><dt>Growing location</dt><dd x-text="detailPlant.growing_location ? detailPlant.growing_location.name : '—'"></dd></div>
+          <div><dt>Quantity</dt><dd x-text="detailPlant.quantity"></dd></div>
+          <div x-show="detailPlant.acquisition_date"><dt>Acquired</dt><dd x-text="detailPlant.acquisition_date"></dd></div>
+          <div x-show="detailPlant.acquisition_type"><dt>How acquired</dt><dd x-text="acqTypeLabel(detailPlant.acquisition_type)"></dd></div>
+          <div x-show="detailPlant.price!=null"><dt>Price</dt><dd x-text="detailPlant.price"></dd></div>
+          <div x-show="detailPlant.accession_id"><dt>Accession ID</dt><dd x-text="detailPlant.accession_id"></dd></div>
+          <div x-show="detailPlant.source_url"><dt>Purchase link</dt><dd><a :href="detailPlant.source_url" target="_blank" rel="noopener noreferrer" x-text="detailPlant.source_url" style="color:var(--pine-2);word-break:break-all"></a></dd></div>
+          <div x-show="detailPlant.location_data"><dt>Location data</dt><dd x-text="detailPlant.location_data"></dd></div>
+          <div><dt>Status</dt><dd x-text="statusLabel(detailPlant.lifecycle_status)"></dd></div>
+          <div x-show="detailPlant.notes"><dt>Notes</dt><dd x-text="detailPlant.notes"></dd></div>
+        </dl>
+
+        <div class="formfoot">
+          <button class="primary" @click="editPlant()" :disabled="detailBusy">Edit</button>
+          <button class="ghost danger" @click="deletePlant()" :disabled="detailBusy" x-text="confirmingDelete?'Tap again to delete':'Delete'"></button>
+        </div>
+      </div>
+    </template>
+
+    <!-- collection list -->
+    <div x-show="screen==='list'">
+      <p class="who">Signed in as <span x-text="userEmail"></span> · <a style="color:var(--pine-2);cursor:pointer" @click="signOut()">sign out</a></p>
+
+      <div x-show="plants.length===0" class="empty">
+        <p style="margin:0 0 6px;font-size:16px;color:var(--ink)">Your collection is empty.</p>
+        <p style="margin:0">Tap <strong>＋ Add plant</strong> to enter your first one.</p>
+      </div>
+
+      <div x-show="plants.length>0">
+        <p class="count" x-text="countLine()"></p>
+        <div x-show="categories.length" style="margin:0 0 14px">
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+            <button type="button" class="cat-chip" :class="filterCategoryIds.length===0?'selected':''" @click="filterCategoryIds=[]">All</button>
+            <template x-for="c in categories" :key="c.id">
+              <button type="button" class="cat-chip" :class="filterCategoryIds.includes(c.id)?'selected':''" @click="toggleFilter(c.id)" x-text="c.name"></button>
+            </template>
+          </div>
+          <p class="hint" x-show="filterCategoryIds.length>1" style="margin-top:6px">Showing plants in <strong>all</strong> selected categories.</p>
+        </div>
+        <template x-for="grp in groupedPlants()" :key="grp.genus">
+          <div>
+            <div class="genusHead" x-text="grp.genus"></div>
+            <template x-for="p in grp.plants" :key="p.id">
+              <div class="plant" @click="openDetail(p)">
+                <img class="pic" x-show="p.thumbUrl" :src="p.thumbUrl" alt="">
+                <div class="body">
+                  <div class="name" x-text="displayName(p)"></div>
+                  <div class="meta">
+                    <span class="badge warn" x-show="p.lifecycle_status && p.lifecycle_status!=='in_collection'" x-text="statusLabel(p.lifecycle_status)"></span>
+                    <template x-for="pc in (p.plant_category||[])" :key="pc.category_id">
+                      <span class="badge" x-text="pc.category && pc.category.name"></span>
+                    </template>
+                    <span x-show="p.vendor" x-text="'from ' + (p.vendor && p.vendor.name)"></span>
+                    <span x-show="p.growing_location" x-text="'📍 ' + (p.growing_location && p.growing_location.name)"></span>
+                    <span x-show="p.quantity>1" x-text="'×' + p.quantity"></span>
+                    <span x-show="p.acquisition_date" x-text="p.acquisition_date"></span>
+                  </div>
+                </div>
+                <span class="chev">›</span>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="lib/supabase.min.js"></script>
+<script src="lib/exifr.min.js"></script>
+<script>
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  /* ---- image helpers (catalog's Safari-proven mechanism) ---- */
+  function uid(){return crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);});}
+  function isHeic(f){const t=(f.type||'').toLowerCase(),n=(f.name||'').toLowerCase();return t.includes('heic')||t.includes('heif')||n.endsWith('.heic')||n.endsWith('.heif');}
+  let _heic=null;
+  function loadHeic2any(){if(_heic)return _heic;_heic=new Promise((res,rej)=>{const s=document.createElement('script');s.src='lib/heic2any.min.js';s.onload=res;s.onerror=()=>rej(new Error('Could not load the HEIC converter.'));document.head.appendChild(s);});return _heic;}
+  async function heicToJpeg(f){await loadHeic2any();const out=await window.heic2any({blob:f,toType:'image/jpeg',quality:.92});return Array.isArray(out)?out[0]:out;}
+  function resizeImage(file,maxEdge=1600,quality=.85){
+    return new Promise((res,rej)=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width,h=img.height;const scale=Math.min(1,maxEdge/Math.max(w,h));
+        w=Math.round(w*scale);h=Math.round(h*scale);
+        const c=document.createElement("canvas");c.width=w;c.height=h;
+        c.getContext("2d").drawImage(img,0,0,w,h);
+        c.toBlob(b=>b?res(b):rej(new Error("encode failed")),"image/jpeg",quality);
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror=()=>{URL.revokeObjectURL(img.src);rej(new Error("Could not read this image file."));};
+      img.src=URL.createObjectURL(file);
+    });
+  }
+  async function fileToResizedBlob(file){
+    try{ return await resizeImage(file); }
+    catch(e){ if(isHeic(file)){ const jpeg=await heicToJpeg(file); return await resizeImage(jpeg); } throw e; }
+  }
+  async function processImage(file){
+    const full=await fileToResizedBlob(file);
+    const thumb=await resizeImage(full,420,.72);
+    return{full,thumb};
+  }
+  // upload one processed photo, returning its storage path
+  async function uploadPhoto(userId,photoId,full,thumb){
+    const fullPath=userId+'/'+photoId+'.jpg', thumbPath=userId+'/'+photoId+'_thumb.jpg';
+    const u1=await sb.storage.from('photos').upload(fullPath,full,{contentType:'image/jpeg',upsert:true});
+    if(u1.error)throw u1.error;
+    const u2=await sb.storage.from('photos').upload(thumbPath,thumb,{contentType:'image/jpeg',upsert:true});
+    if(u2.error)throw u2.error;
+    return fullPath;
+  }
+  const thumbOf=path=>path.replace(/\.jpg$/,'_thumb.jpg');
+
+  /* ---- name auto-detection from filename + photo metadata (ported from the catalog app) ---- */
+  // Built-in dictionary so detection works on day one, before the user's genus table is full.
+  const CARNIVORE_GENERA=["Aldrovanda","Brocchinia","Byblis","Catopsis","Cephalotus","Darlingtonia","Dionaea","Drosera","Drosophyllum","Genlisea","Heliamphora","Nepenthes","Pinguicula","Roridula","Sarracenia","Stylidium","Triphyophyllum","Utricularia"];
+  const STOP=new Set(["photo","img","image","picture","plant","plants","flower","flowers","copy","edit","edited","final","raw","jpg","jpeg","heic","png","the","and","new","sale","show","crop","cropped","scan","version","print","sp","spp","var","with","from","near","wild","seed","seedling","division","clone","form","pot","label","tag","red","green","giant","large","small","for","var.","in"]);
+  const RANK=/^(var|subsp|ssp|f|forma|nothovar|cv)$/i;
+  function escapeRe(s){return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}
+  function collectStrings(o,depth,out){
+    out=out||[];depth=depth||0;
+    if(o==null||depth>4)return out;
+    if(typeof o==="string"){if(o.length<300)out.push(o);return out;}
+    if(Array.isArray(o)){o.forEach(v=>collectStrings(v,depth+1,out));return out;}
+    if(typeof o==="object"){for(const k in o)collectStrings(o[k],depth+1,out);return out;}
+    return out;
+  }
+  // Pull the species epithet + any variety/subspecies/forma/cultivar/hybrid that follows.
+  function extractEpithet(after,genusList){
+    after=after.replace(/^[\s:;,._\-]+/,"");
+    let hybrid="";
+    const hm=after.match(/^(×|x)\s+/i);
+    if(hm){hybrid="× ";after=after.slice(hm[0].length);}
+    let cv=after.match(/^['‘’"“”]([^'‘’"“”]{2,40})['‘’"“”]/);
+    if(cv) return (hybrid+"'"+cv[1].trim()+"'").trim();
+    const genSet=new Set(genusList.map(x=>x.toLowerCase()));
+    const spMatch=after.match(/^(spp?)\.\s+([A-Za-z][A-Za-z\-]*)/i);
+    if(spMatch) return hybrid+"sp. "+spMatch[2];
+    const m=after.match(/^([A-Za-z][A-Za-z\-]{2,})/);
+    if(!m) return hybrid.trim();
+    const word=m[1].toLowerCase();
+    if(genSet.has(word)||STOP.has(word)) return hybrid.trim();
+    const parts=[hybrid+word];
+    after=after.slice(m[0].length);
+    for(let i=0;i<2;i++){ // var. / subsp. / f. + epithet
+      const r=after.match(/^\s+([A-Za-z]+)\.?\s+([A-Za-z][A-Za-z\-]+)/);
+      if(r&&RANK.test(r[1])){parts.push(r[1].toLowerCase().replace(/\.?$/,".")+" "+r[2].toLowerCase());after=after.slice(r[0].length);}
+      else break;
+    }
+    const hx=after.match(/^\s+(×|x)\s+([A-Za-z][A-Za-z\-]{2,})/i); // hybrid cross
+    if(hx){parts.push("× "+hx[2].toLowerCase());after=after.slice(hx[0].length);}
+    cv=after.match(/^\s+['‘’"“”]([^'‘’"“”]{2,40})['‘’"“”]/); // trailing cultivar
+    if(cv) parts.push("'"+cv[1].trim()+"'");
+    return parts.join(" ").trim();
+  }
+  function matchGenusSpeciesFromString(raw,genusList){
+    const t=" "+raw.replace(/\s+/g," ").trim()+" ";
+    for(const g of genusList){
+      const m=new RegExp("\\b"+escapeRe(g)+"\\b","i").exec(t);
+      if(!m) continue;
+      let after=t.slice(m.index+m[0].length).replace(/^\s+/,"");
+      if(!after) return {genus:g,species:""};
+      const cvM=after.match(/^(['‘’"“”])(.*?)\1\s*(.*)/s); // cultivar in quotes; rest → notes
+      if(cvM){return {genus:g,species:"'"+cvM[2].trim()+"'",notes:cvM[3].trim()};}
+      if(/\s[Xx×]\s/.test(" "+after)){ // hybrid — grab verbatim
+        return {genus:g,species:after.replace(/\s+/g," ").replace(/\s([Xx])\s/g," × ").trim()};
+      }
+      const sp=extractEpithet(after,genusList);
+      return {genus:g,species:sp||""};
+    }
+    return null;
+  }
+  function matchGenusSpecies(text,genusList){ // concatenated fallback; catches genus-only hits
+    const t=" "+(text||"").replace(/[_\-]+/g," ").replace(/\s+/g," ")+" ";
+    let fallback=null;
+    for(const g of genusList){
+      const m=new RegExp("\\b"+escapeRe(g)+"\\b","i").exec(t);
+      if(!m) continue;
+      const sp=extractEpithet(t.slice(m.index+m[0].length),genusList);
+      if(sp) return {genus:g,species:sp};
+      if(!fallback) fallback={genus:g,species:""};
+    }
+    return fallback;
+  }
+  function exifDateOf(meta){ // the day the photo was taken → calendar date string
+    const d=meta&&(meta.DateTimeOriginal||meta.CreateDate||meta.ModifyDate);
+    if(!d)return null;
+    const dt=(d instanceof Date)?d:new Date(d);
+    if(isNaN(dt))return null;
+    const p=n=>String(n).padStart(2,"0");
+    return dt.getFullYear()+"-"+p(dt.getMonth()+1)+"-"+p(dt.getDate());
+  }
+  async function detectFromFile(file,genusList){
+    const candidates=[(file.name||"").replace(/\.[a-z0-9]+$/i,"")];
+    let date=null;
+    try{
+      if(window.exifr){
+        const meta=await exifr.parse(file,{tiff:true,ifd0:true,exif:true,xmp:true,iptc:true,jfif:false,icc:false,gps:false,mergeOutput:true});
+        if(meta){candidates.push(...collectStrings(meta));date=exifDateOf(meta);}
+      }
+    }catch(e){}
+    let hit=null;
+    for(const c of candidates){ const r=matchGenusSpeciesFromString(c,genusList); if(r&&r.species){hit=r;break;} }
+    if(!hit)hit=matchGenusSpecies(candidates.join("  "),genusList);
+    return {match:hit,date};
+  }
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('app', () => ({
+      view:'loading', mode:'signin', email:'', password:'', message:'', ok:false, busy:false, userEmail:'', userId:'',
+      genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[],
+      lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'',
+      screen:'list', editId:null, saving:false, formError:'', photoBusy:false, pendingPhotos:[], detectedNote:'',
+      detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
+      filterCategoryIds:[],
+      adding:{genus:false,species:false,vendor:false,location:false,category:false},
+      newName:{genus:'',species:'',vendor:'',location:'',category:''},
+      form:{genusId:'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:'',acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',categoryIds:[]},
+
+      init(){
+        sb.auth.onAuthStateChange((event,session)=>{
+          if(event==='PASSWORD_RECOVERY'){this.mode='newpass';this.view='login';this.clearMsg();return;}
+          if(session&&session.user){this.userEmail=session.user.email;this.userId=session.user.id;this.view='app';this.loadData();}
+          else{this.view='login';}
+        });
+        sb.auth.getSession().then(({data})=>{
+          if(data.session&&data.session.user){this.userEmail=data.session.user.email;this.userId=data.session.user.id;this.view='app';this.loadData();}
+          else{this.view='login';}
+        }).catch(()=>{this.view='login';this.fail('Couldn’t reach the server. Check your connection.');});
+      },
+
+      /* ---- auth ---- */
+      clearMsg(){this.message='';this.ok=false;},
+      fail(m){this.message=m;this.ok=false;}, good(m){this.message=m;this.ok=true;},
+      setMode(m){this.mode=m;this.clearMsg();},
+      heading(){return{signin:'Welcome back',signup:'Create your account',reset:'Reset your password',newpass:'Set a new password'}[this.mode];},
+      subhead(){return{signin:'Sign in to your plant collection.',signup:'Start your private plant collection.',reset:'We’ll email you a reset link.',newpass:'Choose a new password to finish.'}[this.mode];},
+      submitLabel(){return{signin:'Sign in',signup:'Create account',reset:'Send reset link',newpass:'Set new password'}[this.mode];},
+      async submit(){
+        this.clearMsg();this.busy=true;
+        try{
+          if(this.mode==='reset'){if(!this.email)return this.fail('Enter your email.');
+            const{error}=await sb.auth.resetPasswordForEmail(this.email,{redirectTo:location.origin+location.pathname});
+            if(error)return this.fail(error.message);return this.good('Check your email for a reset link.');}
+          if(this.mode==='newpass'){if(!this.password||this.password.length<6)return this.fail('Password must be at least 6 characters.');
+            const{error}=await sb.auth.updateUser({password:this.password});if(error)return this.fail(error.message);this.password='';return;}
+          if(!this.email||!this.password)return this.fail('Enter your email and password.');
+          let res; if(this.mode==='signup')res=await sb.auth.signUp({email:this.email,password:this.password});
+          else res=await sb.auth.signInWithPassword({email:this.email,password:this.password});
+          if(res.error)return this.fail(res.error.message);
+          if(this.mode==='signup'&&!res.data.session){this.setMode('signin');return this.good('Account created — you can sign in now.');}
+        }catch(e){this.fail(e.message||'Something went wrong.');}finally{this.busy=false;}
+      },
+      async signOut(){await sb.auth.signOut();location.reload();},
+
+      /* ---- data ---- */
+      async loadData(){
+        const [g,s,v,l,cat] = await Promise.all([
+          sb.from('genus').select('id,name').order('name'),
+          sb.from('species').select('id,name,genus_id').order('name'),
+          sb.from('vendor').select('id,name').order('name'),
+          sb.from('growing_location').select('id,name').order('name'),
+          sb.from('category').select('id,name').order('name'),
+        ]);
+        this.genera=g.data||[]; this.speciesAll=s.data||[]; this.vendors=v.data||[]; this.locations=l.data||[]; this.categories=cat.data||[];
+        await this.loadPlants();
+      },
+      async loadPlants(){
+        const {data,error}=await sb.from('plant').select(
+          'id,species_id,vendor_id,growing_location_id,cover_photo_id,form_descriptor,quantity,price:acquisition_price,accession_id,source_url,location_data,acquisition_date,acquisition_type,lifecycle_status,notes,'+
+          'species:species_id(id,name,genus:genus_id(id,name)),vendor:vendor_id(name),growing_location:growing_location_id(name),cover:cover_photo_id(storage_path),'+
+          'plant_category(category_id,category:category_id(id,name))'
+        );
+        if(error){console.error(error);return;}
+        this.plants=data||[];
+        const withCover=this.plants.filter(p=>p.cover&&p.cover.storage_path);
+        if(withCover.length){
+          const {data:signed}=await sb.storage.from('photos').createSignedUrls(withCover.map(p=>thumbOf(p.cover.storage_path)),3600);
+          if(signed)withCover.forEach((p,i)=>{ if(signed[i]&&signed[i].signedUrl)p.thumbUrl=signed[i].signedUrl; });
+        }
+      },
+
+      /* ---- dropdown ordering ---- */
+      genusOptions(){
+        const list=[...this.genera]; list.sort((a,b)=>a.name.localeCompare(b.name));
+        const i=list.findIndex(g=>g.id===this.lastGenusId); if(i>0){const[x]=list.splice(i,1);list.unshift(x);}
+        return list;
+      },
+      speciesOptions(){
+        const list=this.speciesAll.filter(s=>s.genus_id===this.form.genusId);
+        list.sort((a,b)=>a.name.replace(/^'/,'').localeCompare(b.name.replace(/^'/,'')));
+        const i=list.findIndex(s=>s.id===this.lastSpeciesId); if(i>0){const[x]=list.splice(i,1);list.unshift(x);}
+        return list;
+      },
+      onGenusChange(){this.form.speciesId='';},
+
+      /* ---- inline add ---- */
+      startAdd(kind){this.adding[kind]=true;this.newName[kind]='';this.$nextTick(()=>{const r=this.$refs['add'+kind];if(r)r.focus();});},
+      cancelAdd(kind){this.adding[kind]=false;this.newName[kind]='';},
+      async confirmAdd(kind){
+        const name=(this.newName[kind]||'').trim(); if(!name)return;
+        try{
+          if(kind==='genus'){const{data,error}=await sb.from('genus').insert({name}).select('id,name').single();if(error)throw error;this.genera.push(data);this.form.genusId=data.id;this.onGenusChange();}
+          else if(kind==='species'){if(!this.form.genusId){this.formError='Pick a genus before adding a species.';return;}const{data,error}=await sb.from('species').insert({name,genus_id:this.form.genusId}).select('id,name,genus_id').single();if(error)throw error;this.speciesAll.push(data);this.form.speciesId=data.id;}
+          else if(kind==='vendor'){const{data,error}=await sb.from('vendor').insert({name}).select('id,name').single();if(error)throw error;this.vendors.push(data);this.form.vendorId=data.id;}
+          else if(kind==='location'){const{data,error}=await sb.from('growing_location').insert({name}).select('id,name').single();if(error)throw error;this.locations.push(data);this.form.growingLocationId=data.id;}
+          else if(kind==='category'){const{data,error}=await sb.from('category').insert({name}).select('id,name').single();if(error)throw error;this.categories.push(data);this.form.categoryIds.push(data.id);}
+          this.cancelAdd(kind);
+        }catch(e){this.formError=(e.message||'Could not add')+' — it may already exist.';}
+      },
+
+      /* ---- photos in the add form ---- */
+      async onPhotoFiles(ev){
+        const files=[...ev.target.files]; ev.target.value=''; if(!files.length)return;
+        this.photoBusy=true; this.formError='';
+        let first=true;
+        for(const file of files){
+          try{
+            // Auto-detect name from the photo's filename/caption until we have a genus,
+            // and grab the photo's date on the first one. Always confirm-don't-clobber.
+            if(!this.form.genusId || (first && !this.form.acquisitionDate)){
+              try{ const det=await detectFromFile(file,this.genusNameList()); await this.applyDetection(det); }catch(e){}
+            }
+            first=false;
+            const {full,thumb}=await processImage(file);
+            this.pendingPhotos.push({id:uid(),full,thumb,label:'plant',url:URL.createObjectURL(thumb)});
+          }
+          catch(e){ this.formError = isHeic(file)
+            ? 'That HEIC photo can’t be read in this browser. Open the app in Safari, or save the photo as JPEG and add it again.'
+            : ('A photo could not be processed: '+((e&&e.message)||e)); }
+        }
+        this.photoBusy=false;
+      },
+      // genus names to match against = the user's table ∪ the built-in carnivore dictionary
+      genusNameList(){
+        const names=this.genera.map(g=>g.name);
+        const seen=new Set(names.map(n=>n.toLowerCase()));
+        for(const g of CARNIVORE_GENERA){ if(!seen.has(g.toLowerCase()))names.push(g); }
+        return names;
+      },
+      // apply a detection result to the form: select/create genus + species, fill date/notes
+      async applyDetection(det){
+        if(!det)return;
+        const {match,date}=det;
+        const bits=[];
+        if(match && match.genus && !this.form.genusId){
+          let g=this.genera.find(x=>x.name.toLowerCase()===match.genus.toLowerCase());
+          if(!g){ try{ const {data,error}=await sb.from('genus').insert({name:match.genus}).select('id,name').single(); if(!error&&data){g=data;this.genera.push(g);} }catch(e){} }
+          if(g){
+            this.form.genusId=g.id; this.onGenusChange();
+            let label=g.name;
+            if(match.species){
+              let s=this.speciesAll.find(x=>x.genus_id===g.id && x.name.toLowerCase()===match.species.toLowerCase());
+              if(!s){ try{ const {data,error}=await sb.from('species').insert({name:match.species,genus_id:g.id}).select('id,name,genus_id').single(); if(!error&&data){s=data;this.speciesAll.push(s);} }catch(e){} }
+              if(s){ this.form.speciesId=s.id; label+=' '+s.name; }
+            }
+            bits.push(label);
+            if(match.notes && !this.form.notes) this.form.notes=match.notes;
+          }
+        }
+        if(date && !this.form.acquisitionDate){ this.form.acquisitionDate=date; bits.push('dated '+date); }
+        if(bits.length) this.detectedNote='Auto-filled '+bits.join(', ')+' from your photo — change anything below.';
+      },
+      removePending(id){const i=this.pendingPhotos.findIndex(p=>p.id===id);if(i>=0){try{URL.revokeObjectURL(this.pendingPhotos[i].url);}catch(e){}this.pendingPhotos.splice(i,1);}},
+      clearPendingPhotos(){this.pendingPhotos.forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}});this.pendingPhotos=[];},
+
+      /* ---- form open/close/save ---- */
+      openForm(){this.editId=null;this.resetForm();this.screen='form';},
+      closeForm(){this.clearPendingPhotos(); if(this.editId){this.editId=null;this.screen='detail';} else this.screen='list';},
+      resetForm(){
+        this.formError=''; this.detectedNote=''; this.clearPendingPhotos();
+        Object.keys(this.adding).forEach(k=>this.adding[k]=false);
+        this.form={genusId:this.lastGenusId||'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:new Date().toISOString().slice(0,10),acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',categoryIds:[]};
+      },
+      formRow(){
+        return {
+          species_id:this.form.speciesId,
+          form_descriptor:this.form.formDescriptor.trim()||null,
+          vendor_id:this.form.vendorId||null,
+          growing_location_id:this.form.growingLocationId||null,
+          acquisition_date:this.form.acquisitionDate||null,
+          acquisition_type:this.form.acquisitionType||null,
+          quantity:Number(this.form.quantity)||1,
+          acquisition_price:this.form.price===''?null:Number(this.form.price),
+          accession_id:this.form.accessionId.trim()||null,
+          source_url:this.form.sourceUrl.trim()||null,
+          location_data:this.form.locationData.trim()||null,
+          lifecycle_status:this.form.lifecycleStatus||'in_collection',
+          notes:this.form.notes.trim()||null,
+        };
+      },
+      rememberPicks(){this.lastGenusId=this.form.genusId;localStorage.setItem('lastGenusId',this.lastGenusId);this.lastSpeciesId=this.form.speciesId;localStorage.setItem('lastSpeciesId',this.lastSpeciesId);},
+      async savePlant(){
+        this.formError='';
+        if(!this.form.genusId)return this.formError='Please choose a genus.';
+        if(!this.form.speciesId)return this.formError='Please choose a species.';
+        this.saving=true;
+        try{
+          if(this.editId){
+            const {error}=await sb.from('plant').update(this.formRow()).eq('id',this.editId);
+            if(error)throw error;
+            await this.syncCategories(this.editId,this.form.categoryIds);
+            this.rememberPicks();
+            const id=this.editId; this.editId=null;
+            await this.loadPlants();
+            const fresh=this.plants.find(x=>x.id===id);
+            if(fresh){this.detailPlant=fresh;await this.loadDetailPhotos(id);this.screen='detail';}
+            else this.screen='list';
+          }else{
+            const {data:planted,error}=await sb.from('plant').insert(this.formRow()).select('id').single();
+            if(error)throw error;
+            const plantId=planted.id;
+            let coverId=null;
+            for(let i=0;i<this.pendingPhotos.length;i++){
+              const ph=this.pendingPhotos[i];
+              const path=await uploadPhoto(this.userId,ph.id,ph.full,ph.thumb);
+              const {error:perr}=await sb.from('photo').insert({id:ph.id,plant_id:plantId,storage_path:path,label:ph.label,sort_order:i});
+              if(perr)throw perr;
+              if(i===0)coverId=ph.id;
+            }
+            if(coverId){const {error:cerr}=await sb.from('plant').update({cover_photo_id:coverId}).eq('id',plantId);if(cerr)throw cerr;}
+            await this.syncCategories(plantId,this.form.categoryIds);
+            this.rememberPicks();
+            this.clearPendingPhotos();
+            await this.loadPlants();
+            this.screen='list';
+          }
+        }catch(e){
+          const m=(e&&e.message)||'';
+          this.formError=/row-level security/i.test(m)
+            ? 'Save was blocked — your sign-in may have expired. Reload the page, sign in again, and retry.'
+            : (m||'Could not save the plant.');
+        }finally{this.saving=false;}
+      },
+
+      /* ---- detail view ---- */
+      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);},
+      closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailError='';this.confirmingDelete=false;},
+      async loadDetailPhotos(plantId){
+        const {data}=await sb.from('photo').select('id,storage_path,label,sort_order').eq('plant_id',plantId).order('sort_order');
+        const photos=data||[];
+        if(photos.length){
+          const {data:signed}=await sb.storage.from('photos').createSignedUrls(photos.map(p=>thumbOf(p.storage_path)),3600);
+          if(signed)photos.forEach((p,i)=>{if(signed[i]&&signed[i].signedUrl)p.thumbUrl=signed[i].signedUrl;});
+        }
+        this.detailPhotos=photos;
+      },
+      async refreshDetail(){
+        await this.loadPlants();
+        const fresh=this.plants.find(x=>x.id===this.detailPlant.id);
+        if(fresh){this.detailPlant=fresh;await this.loadDetailPhotos(fresh.id);}
+      },
+      statusLabel(s){return{in_collection:'In collection',dead:'Dead',sold:'Sold',traded:'Traded',given_away:'Given away'}[s]||'In collection';},
+      acqTypeLabel(t){return{bought:'Bought',traded:'Traded',gift:'Gift',division:'Division',seed:'Grown from seed',other:'Other'}[t]||'';},
+      editPlant(){
+        const p=this.detailPlant; this.editId=p.id; this.formError=''; this.clearPendingPhotos();
+        Object.keys(this.adding).forEach(k=>this.adding[k]=false);
+        this.form={
+          genusId:p.species&&p.species.genus?p.species.genus.id:'',
+          speciesId:p.species?p.species.id:'',
+          formDescriptor:p.form_descriptor||'',
+          vendorId:p.vendor_id||'',
+          growingLocationId:p.growing_location_id||'',
+          acquisitionDate:p.acquisition_date||'',
+          acquisitionType:p.acquisition_type||'',
+          quantity:p.quantity||1,
+          price:p.price==null?'':p.price,
+          accessionId:p.accession_id||'',
+          sourceUrl:p.source_url||'',
+          locationData:p.location_data||'',
+          lifecycleStatus:p.lifecycle_status||'in_collection',
+          notes:p.notes||'',
+          categoryIds:(p.plant_category||[]).map(pc=>pc.category_id),
+        };
+        this.screen='form';
+      },
+      async deletePlant(){
+        if(!this.confirmingDelete){this.confirmingDelete=true;setTimeout(()=>{this.confirmingDelete=false;},3500);return;}
+        this.detailBusy=true;this.detailError='';
+        try{
+          const paths=[]; this.detailPhotos.forEach(ph=>{paths.push(ph.storage_path);paths.push(thumbOf(ph.storage_path));});
+          if(paths.length)await sb.storage.from('photos').remove(paths);
+          await sb.from('plant_category').delete().eq('plant_id',this.detailPlant.id);
+          const {error}=await sb.from('plant').delete().eq('id',this.detailPlant.id);
+          if(error)throw error;
+          this.confirmingDelete=false;
+          await this.loadPlants();
+          this.closeDetail();
+        }catch(e){this.detailError=e.message||'Could not delete this plant.';}
+        finally{this.detailBusy=false;}
+      },
+
+      /* ---- photo management in detail ---- */
+      async addDetailPhotos(ev){
+        const files=[...ev.target.files]; ev.target.value=''; if(!files.length)return;
+        this.detailBusy=true;this.detailError='';
+        try{
+          let order=this.detailPhotos.length;
+          let firstNewId=null;
+          for(const file of files){
+            try{
+              const {full,thumb}=await processImage(file);
+              const id=uid();
+              const path=await uploadPhoto(this.userId,id,full,thumb);
+              const {error}=await sb.from('photo').insert({id,plant_id:this.detailPlant.id,storage_path:path,label:'plant',sort_order:order++});
+              if(error)throw error;
+              if(!firstNewId)firstNewId=id;
+            }catch(e){ this.detailError = isHeic(file)
+              ? 'That HEIC photo can’t be read in this browser. Open the app in Safari, or save it as JPEG.'
+              : ('A photo could not be added: '+((e&&e.message)||e)); }
+          }
+          if(firstNewId && !this.detailPlant.cover_photo_id){
+            await sb.from('plant').update({cover_photo_id:firstNewId}).eq('id',this.detailPlant.id);
+          }
+          await this.refreshDetail();
+        }finally{this.detailBusy=false;}
+      },
+      async removeDetailPhoto(ph){
+        this.detailBusy=true;this.detailError='';
+        try{
+          await sb.storage.from('photos').remove([ph.storage_path,thumbOf(ph.storage_path)]);
+          if(this.detailPlant.cover_photo_id===ph.id){
+            const other=this.detailPhotos.find(x=>x.id!==ph.id);
+            await sb.from('plant').update({cover_photo_id:other?other.id:null}).eq('id',this.detailPlant.id);
+          }
+          const {error}=await sb.from('photo').delete().eq('id',ph.id);
+          if(error)throw error;
+          await this.refreshDetail();
+        }catch(e){this.detailError=e.message||'Could not remove the photo.';}
+        finally{this.detailBusy=false;}
+      },
+      async setCover(ph){
+        this.detailBusy=true;this.detailError='';
+        try{
+          const {error}=await sb.from('plant').update({cover_photo_id:ph.id}).eq('id',this.detailPlant.id);
+          if(error)throw error;
+          await this.refreshDetail();
+        }catch(e){this.detailError=e.message||'Could not set the cover.';}
+        finally{this.detailBusy=false;}
+      },
+
+      /* ---- display ---- */
+      displayName(p){
+        const g=p.species&&p.species.genus?p.species.genus.name:'';
+        const s=p.species?p.species.name:'';
+        return [g,s,p.form_descriptor].filter(Boolean).join(' ').trim()||'Unnamed plant';
+      },
+      groupedPlants(){
+        const f=this.filterCategoryIds;
+        const list=f.length?this.plants.filter(p=>{const ids=(p.plant_category||[]).map(pc=>pc.category_id);return f.every(id=>ids.includes(id));}):this.plants;
+        const by={};
+        for(const p of list){const g=(p.species&&p.species.genus&&p.species.genus.name)||'Unfiled';(by[g]=by[g]||[]).push(p);}
+        return Object.keys(by).sort().map(genus=>({genus,plants:by[genus].sort((a,b)=>this.displayName(a).localeCompare(this.displayName(b)))}));
+      },
+      countLine(){
+        const groups=this.groupedPlants();const shown=groups.reduce((t,g)=>t+g.plants.length,0);
+        const t=this.plants.length,gc=groups.length;
+        if(this.filterCategoryIds.length)return `${shown} of ${t} plants`;
+        return `${t} plant${t!==1?'s':''} · ${gc} gen${gc===1?'us':'era'}`;
+      },
+      toggleFilter(id){const i=this.filterCategoryIds.indexOf(id);if(i>=0)this.filterCategoryIds.splice(i,1);else this.filterCategoryIds.push(id);},
+      toggleCategory(id){const i=this.form.categoryIds.indexOf(id);if(i>=0)this.form.categoryIds.splice(i,1);else this.form.categoryIds.push(id);},
+      async syncCategories(plantId,categoryIds){
+        await sb.from('plant_category').delete().eq('plant_id',plantId);
+        if(categoryIds.length){const rows=categoryIds.map(cid=>({plant_id:plantId,category_id:cid}));const{error}=await sb.from('plant_category').insert(rows);if(error)throw error;}
+      },
+
+      /* ---- CSV export ---- */
+      exportCsv(){
+        const head=['Genus','Species','Form/Descriptor','Vendor','Growing location','Quantity','Price','Accession ID','Purchase link','Location data','Acquisition date','How acquired','Status','Notes','Categories'];
+        const esc=v=>{v=(v==null?'':String(v));return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+        const rows=this.plants.map(p=>[
+          p.species&&p.species.genus?p.species.genus.name:'', p.species?p.species.name:'',
+          p.form_descriptor||'', p.vendor?p.vendor.name:'', p.growing_location?p.growing_location.name:'',
+          p.quantity, p.price==null?'':p.price, p.accession_id||'', p.source_url||'', p.location_data||'', p.acquisition_date||'', this.acqTypeLabel(p.acquisition_type), this.statusLabel(p.lifecycle_status), p.notes||'',
+          (p.plant_category||[]).map(pc=>pc.category&&pc.category.name).filter(Boolean).join('; ')
+        ].map(esc).join(','));
+        const csv=[head.join(','),...rows].join('\n');
+        const blob=new Blob([csv],{type:'text/csv'});
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+        a.download='plant-collection-'+new Date().toISOString().slice(0,10)+'.csv';
+        a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+      },
+    }));
+  });
+</script>
+<script defer src="lib/alpine.min.js"></script>
+</body>
+</html>
