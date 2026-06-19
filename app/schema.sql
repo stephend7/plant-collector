@@ -146,7 +146,7 @@ create table photo (
   plant_id      uuid not null references plant(id) on delete cascade,
   storage_path  text not null,
   label         text not null default 'plant'
-                  check (label in ('plant','flower','pests','tag','other')),
+                  check (label in ('plant','flower','plant_flower','pests','tag','other')),
   comment       text,
   photo_date    date not null default current_date,
   sort_order    integer not null default 0,

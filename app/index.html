@@ -160,6 +160,7 @@
               <img :src="ph.url" alt="">
               <select x-model="ph.label">
                 <option value="plant">Plant</option><option value="flower">Flower</option>
+                <option value="plant_flower">Plant &amp; Flower</option>
                 <option value="tag">Tag</option><option value="pests">Pests</option><option value="other">Other</option>
               </select>
             </div>
@@ -326,7 +327,7 @@
             <div class="gphoto">
               <span class="cover" x-show="ph.id===detailPlant.cover_photo_id">cover</span>
               <img :src="ph.thumbUrl" alt="">
-              <span class="lbl" x-text="ph.label"></span>
+              <span class="lbl" x-text="photoLabel(ph.label)"></span>
               <div class="ga">
                 <button x-show="ph.id!==detailPlant.cover_photo_id" @click="setCover(ph)">Cover</button>
                 <button class="del" @click="removeDetailPhoto(ph)">Delete</button>
@@ -802,6 +803,7 @@
       },
       statusLabel(s){return{in_collection:'In collection',dead:'Dead',sold:'Sold',traded:'Traded',given_away:'Given away'}[s]||'In collection';},
       acqTypeLabel(t){return{bought:'Bought',traded:'Traded',gift:'Gift',division:'Division',seed:'Grown from seed',other:'Other'}[t]||'';},
+      photoLabel(l){return{plant:'Plant',flower:'Flower',plant_flower:'Plant & Flower',tag:'Tag',pests:'Pests',other:'Other'}[l]||l;},
       editPlant(){
         const p=this.detailPlant; this.editId=p.id; this.formError=''; this.clearPendingPhotos();
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
