@@ -404,8 +404,17 @@
             </template>
             <label>Note <span class="hint">(soil mix, fertilizer, which pest — anything)</span></label>
             <textarea rows="2" x-model="newEvent.note" placeholder="optional"></textarea>
+            <label>Photo for this event <span class="hint">(optional)</span></label>
+            <input type="file" x-ref="eventInput" accept="image/*" @change="onEventPhoto($event)" style="display:none">
+            <div x-show="!newEvent.photo">
+              <button type="button" class="filebtn" @click="$refs.eventInput.click()" :disabled="detailBusy">＋ Add Photo</button>
+            </div>
+            <div class="thumb" x-show="newEvent.photo" style="margin-top:8px">
+              <button type="button" class="rm" @click="removeEventPhoto()">✕</button>
+              <img :src="newEvent.photo&&newEvent.photo.url" alt="">
+            </div>
             <div class="formfoot">
-              <button class="primary" @click="saveEvent()" :disabled="detailBusy">Save event</button>
+              <button class="primary" @click="saveEvent()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save event'"></button>
               <button class="ghost" @click="cancelLogEvent()" :disabled="detailBusy">Cancel</button>
             </div>
           </div>
@@ -426,7 +435,8 @@
                     <span x-show="it.ev.measure_value!=null" x-text="' '+(it.ev.measure_label?it.ev.measure_label+': ':'')+it.ev.measure_value+(it.ev.measure_unit?' '+it.ev.measure_unit:'')"></span>
                     <span x-show="it.ev.cause" class="hint" x-text="' · cause: '+it.ev.cause"></span>
                     <div x-show="it.ev.body" x-text="it.ev.body" style="margin-top:3px"></div>
-                    <button class="tl-del" :class="eventDeleteId===it.ev.id?'arm':''" @click="deleteEvent(it.ev)" x-text="eventDeleteId===it.ev.id?'tap to confirm':'delete'"></button>
+                    <img x-show="eventPhotoUrl(it.ev)" :src="eventPhotoUrl(it.ev)" alt="" class="tl-thumb" style="margin-top:6px">
+                    <div><button class="tl-del" :class="eventDeleteId===it.ev.id?'arm':''" @click="deleteEvent(it.ev)" x-text="eventDeleteId===it.ev.id?'tap to confirm':'delete'"></button></div>
                   </div>
                 </template>
               </div>
@@ -558,6 +568,12 @@
   const thumbOf=path=>path.replace(/\.jpg$/,'_thumb.jpg');
   // today's date in the user's OWN timezone (toISOString() uses UTC and rolls a day early in the Americas)
   function todayLocal(){const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
+  // one place for the plant query shape (used by full-list load AND single-plant reload)
+  const PLANT_SELECT='id,species_id,vendor_id,growing_location_id,cover_photo_id,form_descriptor,quantity,price:acquisition_price,accession_id,source_url,location_data,acquisition_date,acquisition_type,lifecycle_status,notes,'+
+    'species:species_id(id,name,genus:genus_id(id,name)),vendor:vendor_id(name),growing_location:growing_location_id(name),cover:cover_photo_id(storage_path),'+
+    'plant_category(category_id,category:category_id(id,name))';
+  async function signThumb(path){ if(!path)return null; const {data}=await sb.storage.from('photos').createSignedUrls([thumbOf(path)],3600); return data&&data[0]&&data[0].signedUrl||null; }
+  function sameSet(a,b){ if(a.length!==b.length)return false; const s=new Set(a.map(String)); return b.every(x=>s.has(String(x))); }
 
   /* ---- name auto-detection from filename + photo metadata (ported from the catalog app) ---- */
   // Built-in dictionary so detection works on day one, before the user's genus table is full.
@@ -661,7 +677,7 @@
       screen:'list', editId:null, saving:false, formError:'', photoBusy:false, pendingPhotos:[], detectedNote:'',
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
       detailEvents:[], timelineFilter:'all', loggingEvent:false, eventDeleteId:null,
-      newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:''},
+      newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null},
       filterCategoryIds:[],
       adding:{genus:false,species:false,vendor:false,location:false,category:false},
       newName:{genus:'',species:'',vendor:'',location:'',category:''},
@@ -716,11 +732,7 @@
         await this.loadPlants();
       },
       async loadPlants(){
-        const {data,error}=await sb.from('plant').select(
-          'id,species_id,vendor_id,growing_location_id,cover_photo_id,form_descriptor,quantity,price:acquisition_price,accession_id,source_url,location_data,acquisition_date,acquisition_type,lifecycle_status,notes,'+
-          'species:species_id(id,name,genus:genus_id(id,name)),vendor:vendor_id(name),growing_location:growing_location_id(name),cover:cover_photo_id(storage_path),'+
-          'plant_category(category_id,category:category_id(id,name))'
-        );
+        const {data,error}=await sb.from('plant').select(PLANT_SELECT);
         if(error){console.error(error);return;}
         this.plants=data||[];
         const withCover=this.plants.filter(p=>p.cover&&p.cover.storage_path);
@@ -728,6 +740,15 @@
           const {data:signed}=await sb.storage.from('photos').createSignedUrls(withCover.map(p=>thumbOf(p.cover.storage_path)),3600);
           if(signed)withCover.forEach((p,i)=>{ if(signed[i]&&signed[i].signedUrl)p.thumbUrl=signed[i].signedUrl; });
         }
+      },
+      // re-fetch ONE plant and splice it into the list — avoids re-downloading the whole collection on every save
+      async reloadPlant(id){
+        const {data}=await sb.from('plant').select(PLANT_SELECT).eq('id',id).single();
+        if(!data)return null;
+        if(data.cover&&data.cover.storage_path)data.thumbUrl=await signThumb(data.cover.storage_path);
+        const i=this.plants.findIndex(p=>p.id===id);
+        if(i>=0)this.plants.splice(i,1,data); else this.plants.push(data);
+        return data;
       },
 
       /* ---- dropdown ordering ---- */
@@ -850,25 +871,25 @@
             const id=this.editId;
             const oldStatus=this.detailPlant?this.detailPlant.lifecycle_status:null;
             const newStatus=this.form.lifecycleStatus;
+            const origCats=(this.detailPlant&&this.detailPlant.plant_category||[]).map(pc=>pc.category_id);
             const {error}=await sb.from('plant').update(this.formRow()).eq('id',id);
             if(error)throw error;
-            await this.syncCategories(id,this.form.categoryIds);
-            // log the status change as a dated event (history we can't backfill)
+            // only touch categories / log a status event when they actually changed (fewer round-trips)
+            const work=[];
+            if(!sameSet(origCats,this.form.categoryIds))work.push(this.syncCategories(id,this.form.categoryIds));
             if(oldStatus && newStatus!==oldStatus){
-              try{
-                const t={dead:'died',sold:'sold',traded:'traded',given_away:'given_away',in_collection:'note'}[newStatus]||'note';
-                await this.logEvent(id,t,{
-                  date:todayLocal(),
-                  body:newStatus==='in_collection'?'Returned to collection':null,
-                  cause:newStatus==='dead'?((this.form.cause||'').trim()||null):null
-                });
-              }catch(e){}
+              const t={dead:'died',sold:'sold',traded:'traded',given_away:'given_away',in_collection:'note'}[newStatus]||'note';
+              work.push(this.logEvent(id,t,{
+                date:todayLocal(),
+                body:newStatus==='in_collection'?'Returned to collection':null,
+                cause:newStatus==='dead'?((this.form.cause||'').trim()||null):null
+              }).catch(()=>{}));
             }
+            if(work.length)await Promise.all(work);
             this.rememberPicks();
             this.editId=null;
-            await this.loadPlants();
-            const fresh=this.plants.find(x=>x.id===id);
-            if(fresh){this.detailPlant=fresh;await this.loadDetailPhotos(id);await this.loadDetailEvents(id);this.screen='detail';}
+            const fresh=await this.reloadPlant(id);
+            if(fresh){this.detailPlant=fresh;await Promise.all([this.loadDetailPhotos(id),this.loadDetailEvents(id)]);this.screen='detail';}
             else this.screen='list';
           }else{
             const {data:planted,error}=await sb.from('plant').insert(this.formRow()).select('id').single();
@@ -883,11 +904,12 @@
               if(i===0)coverId=ph.id;
             }
             if(coverId){const {error:cerr}=await sb.from('plant').update({cover_photo_id:coverId}).eq('id',plantId);if(cerr)throw cerr;}
-            await this.syncCategories(plantId,this.form.categoryIds);
-            try{ await this.logEvent(plantId,'acquired',{date:this.form.acquisitionDate||todayLocal()}); }catch(e){}
+            const after=[ this.logEvent(plantId,'acquired',{date:this.form.acquisitionDate||todayLocal()}).catch(()=>{}) ];
+            if(this.form.categoryIds.length)after.push(this.syncCategories(plantId,this.form.categoryIds));
+            await Promise.all(after);
             this.rememberPicks();
             this.clearPendingPhotos();
-            await this.loadPlants();
+            await this.reloadPlant(plantId);
             this.screen='list';
           }
         }catch(e){
@@ -912,10 +934,11 @@
       },
       async loadDetailEvents(plantId){
         const {data}=await sb.from('journal_entry')
-          .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause')
+          .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause,photo_id')
           .eq('plant_id',plantId).order('entry_date',{ascending:false}).order('created_at',{ascending:false});
         this.detailEvents=data||[];
       },
+      eventPhotoUrl(ev){ if(!ev.photo_id)return null; const p=this.detailPhotos.find(x=>x.id===ev.photo_id); return p?p.thumbUrl:null; },
       async refreshDetail(){
         await this.loadPlants();
         const fresh=this.plants.find(x=>x.id===this.detailPlant.id);
@@ -925,8 +948,12 @@
       eventTypeLabel(t){return{note:'Note',acquired:'Acquired',flowered:'Flowered',fruited:'Fruited / set seed',divided:'Divided',repotted:'Repotted',fed:'Fed',pest_treated:'Pest / disease treated',dormant:'Went dormant',woke:'Woke from dormancy',measured:'Measured',died:'Died',sold:'Sold',traded:'Traded',given_away:'Given away',crossed:'Crossed'}[t]||t;},
       timeline(){
         const items=[];
-        if(this.timelineFilter==='all') for(const e of this.detailEvents) items.push({kind:'event',date:e.entry_date,sort:(e.entry_date||''),ev:e});
-        for(const p of this.detailPhotos) items.push({kind:'photo',date:p.photo_date,sort:(p.photo_date||''),ph:p});
+        const all=this.timelineFilter==='all';
+        const onEvents=new Set(this.detailEvents.map(e=>e.photo_id).filter(Boolean));
+        if(all) for(const e of this.detailEvents) items.push({kind:'event',date:e.entry_date,sort:(e.entry_date||''),ev:e});
+        // In "All", a photo attached to an event is shown ON that event (skip the dupe).
+        // In "Photos", show every photo so you can flip the full progression.
+        for(const p of this.detailPhotos){ if(all && onEvents.has(p.id))continue; items.push({kind:'photo',date:p.photo_date,sort:(p.photo_date||''),ph:p}); }
         items.sort((a,b)=>(a.sort<b.sort?1:a.sort>b.sort?-1:0));
         return items;
       },
@@ -941,14 +968,40 @@
         const {error}=await sb.from('journal_entry').insert(row);
         if(error)throw error;
       },
-      startLogEvent(){this.eventDeleteId=null;this.newEvent={type:'note',date:todayLocal(),note:'',measureLabel:'',measureValue:'',measureUnit:''};this.loggingEvent=true;},
-      cancelLogEvent(){this.loggingEvent=false;},
+      startLogEvent(){this.eventDeleteId=null;this.newEvent={type:'note',date:todayLocal(),note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null};this.loggingEvent=true;},
+      cancelLogEvent(){ if(this.newEvent.photo){try{URL.revokeObjectURL(this.newEvent.photo.url);}catch(e){}} this.loggingEvent=false; },
+      async onEventPhoto(ev){
+        const file=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!file)return;
+        this.detailBusy=true; this.detailError='';
+        try{ const {full,thumb}=await processImage(file); this.newEvent.photo={id:uid(),full,thumb,url:URL.createObjectURL(thumb)}; }
+        catch(e){ this.detailError = isHeic(file) ? 'That HEIC can’t be read here — open in Safari or save as JPEG.' : ('Couldn’t process that photo: '+((e&&e.message)||e)); }
+        finally{ this.detailBusy=false; }
+      },
+      removeEventPhoto(){ if(this.newEvent.photo){try{URL.revokeObjectURL(this.newEvent.photo.url);}catch(e){}} this.newEvent.photo=null; },
       async saveEvent(){
         const e=this.newEvent; this.detailBusy=true; this.detailError='';
         try{
-          await this.logEvent(this.detailPlant.id,e.type,{date:e.date,body:(e.note||'').trim()||null,label:(e.measureLabel||'').trim()||null,value:e.measureValue,unit:(e.measureUnit||'').trim()||null});
+          const date=e.date||todayLocal();
+          let photoId=null;
+          if(e.photo){
+            photoId=e.photo.id;
+            const label={flowered:'flower',fruited:'flower',pest_treated:'pests'}[e.type]||'plant';
+            await uploadPhoto(this.userId,photoId,e.photo.full,e.photo.thumb);
+            const {error:perr}=await sb.from('photo').insert({id:photoId,plant_id:this.detailPlant.id,storage_path:this.userId+'/'+photoId+'.jpg',label,photo_date:date});
+            if(perr)throw perr;
+          }
+          const row={plant_id:this.detailPlant.id,event_type:e.type,entry_date:date};
+          if((e.note||'').trim())row.body=e.note.trim();
+          if(e.type==='measured'){ if((e.measureLabel||'').trim())row.measure_label=e.measureLabel.trim(); if(e.measureValue!==''&&e.measureValue!=null)row.measure_value=Number(e.measureValue); if((e.measureUnit||'').trim())row.measure_unit=e.measureUnit.trim(); }
+          if(photoId)row.photo_id=photoId;
+          const {data,error}=await sb.from('journal_entry').insert(row)
+            .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause,photo_id').single();
+          if(error)throw error;
+          // optimistic — update the screen in place, no reload
+          this.detailEvents.unshift(data);
+          if(e.photo){ this.detailPhotos.push({id:photoId,storage_path:this.userId+'/'+photoId+'.jpg',label:{flowered:'flower',fruited:'flower',pest_treated:'pests'}[e.type]||'plant',photo_date:date,thumbUrl:e.photo.url}); }
           this.loggingEvent=false;
-          await this.loadDetailEvents(this.detailPlant.id);
+          this.newEvent={type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null};
         }catch(err){this.detailError=err.message||'Could not log the event.';}
         finally{this.detailBusy=false;}
       },
