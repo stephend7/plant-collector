@@ -4,6 +4,25 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-18 — Deployed to GitHub Pages (off file://, now usable on iPhone)
+
+- **Repo:** `github.com/stephend7/plant-collector` (PUBLIC — safe: only app code + the
+  publishable Supabase key, which is useless without the owner-only RLS rules).
+- **Live URL:** `https://stephend7.github.io/plant-collector/app/` (app lives in `/app/`;
+  Pages serves the repo root, with a `.nojekyll` file so files serve as-is).
+- **Excluded from the repo via `.gitignore`:** the three legacy spreadsheets (`*.xlsx`), the
+  "Photos – Just purchased plants" folder, `.DS_Store`, and `.claude/`. Private data never left
+  the laptop; plant data lives in Supabase behind locks regardless.
+- **Why now:** `file://` couldn't run on the iPhone (the real-use device) and caused
+  session-expiry pain. HTTPS hosting fixes both and is the proper home for the app.
+- **Still TODO for production auth:** email confirmation is still OFF; when we turn it back on,
+  set Supabase Site URL + redirect URLs to the live address (password-reset `redirectTo` already
+  uses `location.origin+pathname`, so it'll point at the live URL once allowlisted).
+- **Deploy workflow going forward:** edit locally → `git commit` + `git push` → Pages
+  rebuilds in ~1–2 min. (First build verified: all assets return HTTP 200 over HTTPS.)
+
+---
+
 ## 2026-06-18 — Photo name auto-detect (ported from the catalog app, improved)
 
 Ported the catalog app's genus/species auto-fill and improved it for the new relational model.
