@@ -93,6 +93,20 @@
   dl.fields > div{display:flex;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
   dl.fields dt{flex:0 0 130px;color:var(--muted);font-size:14px;margin:0}
   dl.fields dd{margin:0;font-size:15px;flex:1;min-width:0;word-wrap:break-word}
+  /* activity / event log */
+  .activity{margin-top:20px;border-top:1px solid var(--line);padding-top:14px}
+  .activity h3{font-size:15px;margin:0 0 10px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:10px}
+  .seg button{background:transparent;border:0;color:var(--muted);padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit}
+  .seg button.on{background:var(--pine);color:#fff}
+  .evform{background:#0e1512;border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0 12px}
+  .tl{display:flex;flex-direction:column}
+  .tl-item{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+  .tl-item .when{flex:0 0 84px;color:var(--muted);font-size:12px;padding-top:2px}
+  .tl-item .what{flex:1;min-width:0}
+  .tl-thumb{width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid var(--line)}
+  .tl-del{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:11px;margin-top:4px;padding:0}
+  .tl-del.arm{color:var(--danger)}
 </style>
 </head>
 <body>
@@ -282,6 +296,17 @@
         <option value="traded">Traded</option>
         <option value="given_away">Given away</option>
       </select>
+      <template x-if="form.lifecycleStatus==='dead' && editId">
+        <div>
+          <label>Cause of death <span class="hint">(optional — pick or type your own)</span></label>
+          <input type="text" list="deathcauses" x-model="form.cause" placeholder="optional">
+          <datalist id="deathcauses">
+            <option value="Overwatered"></option><option value="Underwatered"></option>
+            <option value="Dried out"></option><option value="Pest (thrips)"></option>
+            <option value="Crown rot"></option>
+          </datalist>
+        </div>
+      </template>
 
       <label>Notes</label>
       <textarea rows="2" x-model="form.notes" placeholder="optional"></textarea>
@@ -339,6 +364,76 @@
         <button type="button" class="filebtn" @click="$refs.detailInput.click()" :disabled="detailBusy">＋ Add Photo</button>
         <div x-show="detailBusy" class="hint">Working…</div>
         <div class="msg err" x-text="detailError"></div>
+
+        <!-- activity / event log -->
+        <div class="activity">
+          <h3>Activity</h3>
+          <div class="seg">
+            <button :class="timelineFilter==='all'?'on':''" @click="timelineFilter='all'">All</button>
+            <button :class="timelineFilter==='photos'?'on':''" @click="timelineFilter='photos'">Photos</button>
+          </div>
+          <div><button type="button" class="filebtn" @click="startLogEvent()" x-show="!loggingEvent">＋ Log event</button></div>
+
+          <div class="evform" x-show="loggingEvent" x-transition>
+            <div class="grid2">
+              <div>
+                <label>What happened</label>
+                <select x-model="newEvent.type">
+                  <option value="note">Note</option>
+                  <option value="flowered">Flowered</option>
+                  <option value="fruited">Fruited / set seed</option>
+                  <option value="repotted">Repotted</option>
+                  <option value="fed">Fed</option>
+                  <option value="pest_treated">Pest / disease treated</option>
+                  <option value="divided">Divided</option>
+                  <option value="dormant">Went dormant</option>
+                  <option value="woke">Woke from dormancy</option>
+                  <option value="measured">Measured</option>
+                </select>
+              </div>
+              <div><label>Date</label><input type="date" x-model="newEvent.date"></div>
+            </div>
+            <template x-if="newEvent.type==='measured'">
+              <div class="grid2">
+                <div><label>Measure</label><input type="text" x-model="newEvent.measureLabel" placeholder="e.g. pitcher height"></div>
+                <div style="display:flex;gap:8px">
+                  <div style="flex:1"><label>Value</label><input type="number" step="any" x-model="newEvent.measureValue"></div>
+                  <div style="flex:1"><label>Unit</label><input type="text" x-model="newEvent.measureUnit" placeholder="cm"></div>
+                </div>
+              </div>
+            </template>
+            <label>Note <span class="hint">(soil mix, fertilizer, which pest — anything)</span></label>
+            <textarea rows="2" x-model="newEvent.note" placeholder="optional"></textarea>
+            <div class="formfoot">
+              <button class="primary" @click="saveEvent()" :disabled="detailBusy">Save event</button>
+              <button class="ghost" @click="cancelLogEvent()" :disabled="detailBusy">Cancel</button>
+            </div>
+          </div>
+
+          <div class="tl">
+            <template x-for="it in timeline()" :key="it.kind+'-'+(it.kind==='event'?it.ev.id:it.ph.id)">
+              <div class="tl-item">
+                <div class="when" x-text="it.date||'—'"></div>
+                <template x-if="it.kind==='photo'">
+                  <div class="what" style="display:flex;gap:10px;align-items:center">
+                    <img class="tl-thumb" :src="it.ph.thumbUrl" alt="">
+                    <span class="badge" x-text="photoLabel(it.ph.label)"></span>
+                  </div>
+                </template>
+                <template x-if="it.kind==='event'">
+                  <div class="what">
+                    <span class="badge" x-text="eventTypeLabel(it.ev.event_type)"></span>
+                    <span x-show="it.ev.measure_value!=null" x-text="' '+(it.ev.measure_label?it.ev.measure_label+': ':'')+it.ev.measure_value+(it.ev.measure_unit?' '+it.ev.measure_unit:'')"></span>
+                    <span x-show="it.ev.cause" class="hint" x-text="' · cause: '+it.ev.cause"></span>
+                    <div x-show="it.ev.body" x-text="it.ev.body" style="margin-top:3px"></div>
+                    <button class="tl-del" :class="eventDeleteId===it.ev.id?'arm':''" @click="deleteEvent(it.ev)" x-text="eventDeleteId===it.ev.id?'tap to confirm':'delete'"></button>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <div x-show="timeline().length===0" class="hint">No activity yet. Add a photo or log an event.</div>
+          </div>
+        </div>
 
         <!-- fields -->
         <dl class="fields">
@@ -565,10 +660,12 @@
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'',
       screen:'list', editId:null, saving:false, formError:'', photoBusy:false, pendingPhotos:[], detectedNote:'',
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
+      detailEvents:[], timelineFilter:'all', loggingEvent:false, eventDeleteId:null,
+      newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:''},
       filterCategoryIds:[],
       adding:{genus:false,species:false,vendor:false,location:false,category:false},
       newName:{genus:'',species:'',vendor:'',location:'',category:''},
-      form:{genusId:'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:'',acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',categoryIds:[]},
+      form:{genusId:'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:'',acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]},
 
       init(){
         sb.auth.onAuthStateChange((event,session)=>{
@@ -723,7 +820,7 @@
       resetForm(){
         this.formError=''; this.detectedNote=''; this.clearPendingPhotos();
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
-        this.form={genusId:this.lastGenusId||'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:todayLocal(),acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',categoryIds:[]};
+        this.form={genusId:this.lastGenusId||'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:todayLocal(),acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]};
       },
       formRow(){
         return {
@@ -750,14 +847,28 @@
         this.saving=true;
         try{
           if(this.editId){
-            const {error}=await sb.from('plant').update(this.formRow()).eq('id',this.editId);
+            const id=this.editId;
+            const oldStatus=this.detailPlant?this.detailPlant.lifecycle_status:null;
+            const newStatus=this.form.lifecycleStatus;
+            const {error}=await sb.from('plant').update(this.formRow()).eq('id',id);
             if(error)throw error;
-            await this.syncCategories(this.editId,this.form.categoryIds);
+            await this.syncCategories(id,this.form.categoryIds);
+            // log the status change as a dated event (history we can't backfill)
+            if(oldStatus && newStatus!==oldStatus){
+              try{
+                const t={dead:'died',sold:'sold',traded:'traded',given_away:'given_away',in_collection:'note'}[newStatus]||'note';
+                await this.logEvent(id,t,{
+                  date:todayLocal(),
+                  body:newStatus==='in_collection'?'Returned to collection':null,
+                  cause:newStatus==='dead'?((this.form.cause||'').trim()||null):null
+                });
+              }catch(e){}
+            }
             this.rememberPicks();
-            const id=this.editId; this.editId=null;
+            this.editId=null;
             await this.loadPlants();
             const fresh=this.plants.find(x=>x.id===id);
-            if(fresh){this.detailPlant=fresh;await this.loadDetailPhotos(id);this.screen='detail';}
+            if(fresh){this.detailPlant=fresh;await this.loadDetailPhotos(id);await this.loadDetailEvents(id);this.screen='detail';}
             else this.screen='list';
           }else{
             const {data:planted,error}=await sb.from('plant').insert(this.formRow()).select('id').single();
@@ -773,6 +884,7 @@
             }
             if(coverId){const {error:cerr}=await sb.from('plant').update({cover_photo_id:coverId}).eq('id',plantId);if(cerr)throw cerr;}
             await this.syncCategories(plantId,this.form.categoryIds);
+            try{ await this.logEvent(plantId,'acquired',{date:this.form.acquisitionDate||todayLocal()}); }catch(e){}
             this.rememberPicks();
             this.clearPendingPhotos();
             await this.loadPlants();
@@ -787,10 +899,10 @@
       },
 
       /* ---- detail view ---- */
-      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);},
-      closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailError='';this.confirmingDelete=false;},
+      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.eventDeleteId=null;this.timelineFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
+      closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.detailError='';this.confirmingDelete=false;},
       async loadDetailPhotos(plantId){
-        const {data}=await sb.from('photo').select('id,storage_path,label,sort_order').eq('plant_id',plantId).order('sort_order');
+        const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date').eq('plant_id',plantId).order('sort_order');
         const photos=data||[];
         if(photos.length){
           const {data:signed}=await sb.storage.from('photos').createSignedUrls(photos.map(p=>thumbOf(p.storage_path)),3600);
@@ -798,10 +910,54 @@
         }
         this.detailPhotos=photos;
       },
+      async loadDetailEvents(plantId){
+        const {data}=await sb.from('journal_entry')
+          .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause')
+          .eq('plant_id',plantId).order('entry_date',{ascending:false}).order('created_at',{ascending:false});
+        this.detailEvents=data||[];
+      },
       async refreshDetail(){
         await this.loadPlants();
         const fresh=this.plants.find(x=>x.id===this.detailPlant.id);
-        if(fresh){this.detailPlant=fresh;await this.loadDetailPhotos(fresh.id);}
+        if(fresh){this.detailPlant=fresh;await this.loadDetailPhotos(fresh.id);await this.loadDetailEvents(fresh.id);}
+      },
+      /* ---- event log ---- */
+      eventTypeLabel(t){return{note:'Note',acquired:'Acquired',flowered:'Flowered',fruited:'Fruited / set seed',divided:'Divided',repotted:'Repotted',fed:'Fed',pest_treated:'Pest / disease treated',dormant:'Went dormant',woke:'Woke from dormancy',measured:'Measured',died:'Died',sold:'Sold',traded:'Traded',given_away:'Given away',crossed:'Crossed'}[t]||t;},
+      timeline(){
+        const items=[];
+        if(this.timelineFilter==='all') for(const e of this.detailEvents) items.push({kind:'event',date:e.entry_date,sort:(e.entry_date||''),ev:e});
+        for(const p of this.detailPhotos) items.push({kind:'photo',date:p.photo_date,sort:(p.photo_date||''),ph:p});
+        items.sort((a,b)=>(a.sort<b.sort?1:a.sort>b.sort?-1:0));
+        return items;
+      },
+      async logEvent(plantId,type,opt){
+        opt=opt||{};
+        const row={plant_id:plantId,event_type:type,entry_date:opt.date||todayLocal()};
+        if(opt.body)row.body=opt.body;
+        if(opt.label)row.measure_label=opt.label;
+        if(opt.value!==undefined&&opt.value!==''&&opt.value!==null)row.measure_value=Number(opt.value);
+        if(opt.unit)row.measure_unit=opt.unit;
+        if(opt.cause)row.cause=opt.cause;
+        const {error}=await sb.from('journal_entry').insert(row);
+        if(error)throw error;
+      },
+      startLogEvent(){this.eventDeleteId=null;this.newEvent={type:'note',date:todayLocal(),note:'',measureLabel:'',measureValue:'',measureUnit:''};this.loggingEvent=true;},
+      cancelLogEvent(){this.loggingEvent=false;},
+      async saveEvent(){
+        const e=this.newEvent; this.detailBusy=true; this.detailError='';
+        try{
+          await this.logEvent(this.detailPlant.id,e.type,{date:e.date,body:(e.note||'').trim()||null,label:(e.measureLabel||'').trim()||null,value:e.measureValue,unit:(e.measureUnit||'').trim()||null});
+          this.loggingEvent=false;
+          await this.loadDetailEvents(this.detailPlant.id);
+        }catch(err){this.detailError=err.message||'Could not log the event.';}
+        finally{this.detailBusy=false;}
+      },
+      async deleteEvent(ev){
+        if(this.eventDeleteId!==ev.id){this.eventDeleteId=ev.id;setTimeout(()=>{if(this.eventDeleteId===ev.id)this.eventDeleteId=null;},3000);return;}
+        this.detailBusy=true;this.detailError='';
+        try{const {error}=await sb.from('journal_entry').delete().eq('id',ev.id);if(error)throw error;this.eventDeleteId=null;await this.loadDetailEvents(this.detailPlant.id);}
+        catch(e){this.detailError=e.message||'Could not delete the event.';}
+        finally{this.detailBusy=false;}
       },
       statusLabel(s){return{in_collection:'In collection',dead:'Dead',sold:'Sold',traded:'Traded',given_away:'Given away'}[s]||'In collection';},
       acqTypeLabel(t){return{bought:'Bought',traded:'Traded',gift:'Gift',division:'Division',seed:'Grown from seed',other:'Other'}[t]||'';},
@@ -824,6 +980,7 @@
           locationData:p.location_data||'',
           lifecycleStatus:p.lifecycle_status||'in_collection',
           notes:p.notes||'',
+          cause:'',
           categoryIds:(p.plant_category||[]).map(pc=>pc.category_id),
         };
         this.screen='form';
