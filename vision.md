@@ -119,10 +119,12 @@ One dated timeline of "things that happened" to a plant. Each event:
 - **Status changes are events:** keep `lifecycle_status` on the plant (fast filter) AND write a
   dated event when it changes → gives death dates & survival history without complicating reads.
 
-### Death → cause (optional, skippable)
-Marking **Died** offers a quick pick-list — Overwatered · Underwatered · Dried out · Pest
-(thrips/etc.) · Crown rot · **+ add your own** — and can be skipped. Extensible like categories.
-Powers "what actually kills my plants." Pest specifics go in the note.
+### Death → cause (optional, NO popup)
+Marking **Died** is one tap, done — no popup, nothing to dismiss. The cause is an **optional
+slot on that event** ("Cause? ▾"): a quick pick-list — Overwatered · Underwatered · Dried out ·
+Pest (thrips/etc.) · Crown rot · **+ add your own** — that you fill if you feel like it and
+ignore forever otherwise. Extensible like categories. Powers "what actually kills my plants"
+off whatever causes get jotted. Pest specifics go in the note.
 
 ### Measurements & the Experiments module
 - Measurements = an optional number+unit on a "Measured" event. No setup if unused.
@@ -136,12 +138,23 @@ Dormancy (needs winter cold? which months) · Water (rain/distilled vs tap-ok) �
 e.g. Nepenthes) · **Humidity** (low/moderate/high). *Enhancement (later):* AI pre-fills these from
 imported/crowdsourced prose care text; user confirms.
 
-### Anti-bloat mechanism — Simple / Detailed mode
-One toggle in Settings (easiest to grok, reversible):
-- **Simple (default):** add plants, photos, quick events (flowered/repotted/pest/died+cause),
-  care guide. Everyday journaling stays here — it's core, not advanced.
-- **Detailed (opt-in):** also shows Measurements, Breeding/lineage tree, Experiments.
-Finer per-feature toggles can come later; one switch is the least-bloat start.
+### Anti-bloat mechanism — progressive disclosure, NO toggle (LOCKED 2026-06-18)
+Decided against any on/off mode. Reason: every independent toggle doubles the app's possible
+states (6 toggles = 64 combinations to test) — the real source of bugs and layout surprises.
+Instead:
+- Everyday stuff (add plants, photos, quick journal events, care guide) sits right there, clean.
+- Power-features (Measurements, Breeding/lineage tree, Experiments) live behind a collapsed
+  **"▸ Advanced"** section — always available, never in the way, nothing to switch, no
+  combinations to test. (Our top-to-bottom card layout collapses cleanly: hidden = page just
+  shorter, no holes.)
+- A single Simple/Detailed switch can be added LATER if collapsed headers ever annoy — cheap,
+  because by then it's just one switch.
+
+### UX principle — small frictions matter; optional never interrupts (LOCKED 2026-06-18)
+- **Optional is optional — it never blocks.** No popups for data you can skip; offer it as an
+  ignorable inline field instead (see Death → cause).
+- The app only stops you for a genuinely **destructive, hard-to-undo** action (e.g. *deleting*
+  a plant → keep the two-tap confirm). Reversible actions (marking dead) never get a gate.
 
 ### Upload species per genus (reference-data import)
 The "upload-to-create reference lists" feature: bulk-load species into a genus's dropdown.
