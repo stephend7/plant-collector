@@ -26,4 +26,4 @@ Always run them in number order, and only once each. They're safe and non-destru
 | 000 | `../schema.sql` (baseline)                | Built all tables, security, storage bucket     | ✅ APPLIED 2026-06-17 |
 | 001 | `001_acquisition_type_and_source_url.sql` | Adds `acquisition_type` + `source_url` to plant | ✅ APPLIED 2026-06-18 |
 | 002 | `002_photo_label_plant_flower.sql`        | Adds `plant_flower` to allowed photo labels     | ✅ APPLIED 2026-06-18 |
-| 003 | `003_event_log_and_care_fields.sql`       | Event-log columns on journal + species care fields | ⬜ NOT APPLIED — pending sign-off + security check |
+| 003 | `003_event_log_and_care_fields.sql`       | Event-log columns on journal + species care fields | ✅ APPLIED 2026-06-18 |
