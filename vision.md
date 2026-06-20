@@ -221,19 +221,25 @@ Why people open the app (Stephen's ranking + analysis). Frequency drives the des
   (greenhouse location); mark status change; look up care; show/share a *sale/trade list*
   (seller); admire; analytics; identify a tagless plant; export/backup.
 
-### Resulting nav decisions (supersede earlier mockup details)
-- **"+" = Add a plant** — instant, one tap, NO menu (walk back the earlier "capture-first" idea;
-  camera still leads *inside* the add flow). Adding is universal; keep it the fastest path.
-- **Search pinned at the top of the Plants home** — finding is the real daily bottleneck
-  (every journal entry starts by locating the plant). Coded-pot-tag (QR) scanning is a LATER
-  accelerator, not a dependency.
-- **Slim tab bar: Plants · Browse · ( + ) · Care.** Journal is NOT a prime tab (most won't use
-  it enough to earn a slot), but stays discoverable — it lives on each plant + a gentle nudge;
-  a whole-collection journal view is reachable, just not greeting everyone.
-- **Home body:** "All" sorts **recent-first** (so the plants you're currently tending surface at
-  top — serves daily re-access with no extra UI), with the All / By genus / By category control
-  to reorganise. Default look TBD (magazine vs clean grid vs shelves) — clean + recognisable
-  favoured for findability; beauty modes a tap away.
+### Converged nav + home (LOCKED 2026-06-19 — supersedes earlier mockup details)
+- **Tab bar: Plants · Journal · List · Care**, plus a floating **"+"** (green FAB, bottom-right,
+  like the old AppSheet) = **Add a plant**, instant, one tap, NO menu (camera leads *inside* the
+  add flow). Walk back the earlier "capture-first +" and the "drop Journal" idea — Journal IS a
+  tab (visible = encourages use, per Stephen).
+- **Plants tab = the home = a GENUS gallery**, NOT individual plants. Each genus = a card with a
+  **representative photo borrowed from that genus** (auto-pick most-recent; option to pin a
+  favourite as the genus "face") + its plant count. Tap genus → its plants (same photo grid) →
+  plant page. **Search pinned at the top** searches plants by name directly (skips the
+  hierarchy). A grouping control: **All genera / By category** (category groups the genus cards).
+- **List tab = a TRUE text list — NO graphics/thumbnails.** Just plant names, **grouped/sorted by
+  genus** (genus headers), dense and scannable like a spreadsheet. **Filter by category, by genus,
+  or both.** For the spreadsheet-minded (Stephen: "spreadsheet users will miss scanning a list…
+  literally a list, no graphics"). Natural home for **Export CSV**. Two roads to the same plant
+  page: gallery (eyes) + list (scanners).
+- **Journal tab = whole-collection journal** (discoverable, inviting); journaling is ALSO one tap
+  on each plant + the gentle "add a note?" nudge.
+- **Care tab** = care guides / what-needs-doing (later phase).
+- Coded-pot-tag (QR) scanning stays a LATER find-accelerator, not a dependency.
 
 ## Favorites to chase (subjective, for sequencing)
 1. Living photo timeline / time-lapse (data's already there; emotional payoff).
