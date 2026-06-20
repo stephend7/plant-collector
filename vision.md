@@ -163,6 +163,45 @@ across 8 genera, ready to seed. On the roadmap.
 
 ---
 
+## DESIGN DIRECTION — locked 2026-06-19 (the redesign)
+
+Stephen's brief: "blow people away with intuitiveness and pure beauty… how beautiful, I want to
+use this all the time." The plants are the product, not the data. Mockups reviewed + approved.
+
+- **Theme: LIGHT & BOTANICAL (locked).** "This is joy, it's fun." Off-white/airy, one deep
+  botanical green accent (~#2E5E43), full light+dark support. NOT the current dark theme.
+- **Type:** serif *italic* for every plant & genus name (botanical convention); clean sans for UI.
+- **Photography-first:** the plant's cover photo is the hero on every surface. Flat fills in the
+  mockups stand in for real photos; payoff scales as the collection is photographed.
+- **Home = a photo gallery** ("Collection"), 2-col card grid, with one control to regroup the
+  SAME gallery: All / By genus / By category. Search. Grid is the default; a list option exists.
+- **Browse = the drill-down** Stephen described, kept verbatim from his AppSheet idea but
+  re-skinned: Category → Genus (rows w/ thumbnail + count) → Plant. (Keep its brain, drop its
+  flat body.)
+- **Tab bar:** Plants · Journal · ( + ) · Browse · Care.
+- **Journal is its OWN place:** a Journal tab (whole-collection feed) AND a section at the bottom
+  of each plant page (artful heading + latest 1–2 entries + "View all N ›"). Tapping opens the
+  full journal with the species name PINNED at top as you scroll. Entries are SINGLE LINE:
+  [type icon] Event · date · a right-side indicator dot (note / photo / none).
+- **Plant page info hierarchy (3 tiers):** (1) instant, no scroll — photo, name, what it is,
+  Location data + Growing spot (both moved UP top, per Stephen), care-at-a-glance; (2) one
+  glance down — status, quantity, acquisition; (3) tap to expand — accession, listing link,
+  full dated care guide, journal.
+- **Care-at-a-glance = ICON SCALES, not words** (universal across plant types — solves the
+  cactus/Hoya/houseplant vocab problem): **Water = amount (1–3 drops) PLUS an "RO" purity tag**
+  (CP-critical; tag only when needed) · **Light = sun→shade phases** · **Dormancy = yes badge,
+  tap for months/precision** · **Photoperiod = hour range (e.g. 12–14 h)** · Humidity · Feeding.
+  **Tap any care tile → the precise, dated care detail.** ("Liked how you did the water.")
+- **Naming fix:** the locality field is **"Location data"** (not "Wild origin") everywhere.
+
+### Staged build order (get Stephen's eye at each step; don't disappear)
+1. **Theme + type pass** on the current app — light botanical palette + serif names. Fastest
+   "whole app suddenly feels like this" win; low-risk, reversible.
+2. Gallery home + the All/Genus/Category grouping control.
+3. Plant page redesign — Location/Growing up top, care-icon strip, journal section at bottom.
+4. Journal tab + full journal screen (pinned species header, single-line entries).
+5. Browse drill-down polish + the shared-element photo→hero transition.
+
 ## Favorites to chase (subjective, for sequencing)
 1. Living photo timeline / time-lapse (data's already there; emotional payoff).
 2. Season-aware care reminders (the daily-use hook; very CP-specific).
