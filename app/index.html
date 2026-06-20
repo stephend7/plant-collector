@@ -152,12 +152,41 @@
   .care-head{display:flex;align-items:center;justify-content:space-between;margin:14px 0 0}
   .care-head h3{font-size:15px;margin:0;font-weight:500}
   .care-edit{background:none;border:0;color:var(--pine-2);font-size:13px;cursor:pointer;font-family:inherit;padding:2px 0}
-  .care-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+  .care-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;align-items:start;grid-auto-rows:min-content}
   .care-tile{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
   .care-tile .cl{font-size:10.5px;color:var(--muted)}
   .care-tile .cv{font-size:13px;color:var(--ink);margin-top:3px;display:flex;align-items:center;gap:3px;min-height:16px}
   .care-tile .cv.empty{color:var(--muted)}
   .care-drop{width:15px;height:15px;flex:0 0 auto}
+  .photos-head{display:flex;align-items:center;justify-content:space-between;margin:16px 0 0}
+  .photos-head h3{font-size:15px;margin:0;font-weight:500}
+  .pstrip{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;-webkit-overflow-scrolling:touch}
+  .pthumb{position:relative;flex:0 0 auto;width:88px;height:88px;border-radius:10px;overflow:hidden;border:1px solid var(--line);cursor:pointer}
+  .pthumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .pthumb .cover{position:absolute;bottom:4px;left:4px;background:var(--pine);color:#fff;font-size:9px;padding:1px 5px;border-radius:5px}
+  .padd{flex:0 0 auto;width:88px;height:88px;border-radius:10px;border:1px dashed var(--line);background:var(--field);color:var(--pine);font-size:26px;cursor:pointer}
+  .progress-list{display:flex;flex-direction:column;gap:16px;margin-top:12px}
+  .pbig{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card)}
+  .pbig img{width:100%;display:block;max-height:60vh;object-fit:cover}
+  .pbig-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px;color:var(--muted)}
+  .pbig-bar button{background:none;border:0;color:var(--pine-2);cursor:pointer;font-size:13px;font-family:inherit;padding:0}
+  .pbig-bar button.del{color:var(--danger)}
+  .pbig-bar .cover{background:var(--pine);color:#fff;font-size:10px;padding:1px 7px;border-radius:6px}
+  .photopage-head{position:sticky;top:0;background:var(--bg);z-index:5;display:flex;align-items:center;gap:12px;padding:8px 0 10px;border-bottom:1px solid var(--line);margin-bottom:4px}
+  .photo-page-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  .ppcard{position:relative;aspect-ratio:1/1;border-radius:10px;overflow:hidden;border:1px solid var(--line);cursor:pointer}
+  .ppcard img{width:100%;height:100%;object-fit:cover;display:block}
+  .ppcard .cover{position:absolute;top:5px;left:5px;background:var(--pine);color:#fff;font-size:9px;padding:1px 6px;border-radius:5px}
+  .ppcard .pplbl{position:absolute;bottom:5px;left:5px;background:rgba(0,0,0,.45);color:#fff;font-size:10px;padding:1px 6px;border-radius:5px}
+  .viewer{position:fixed;inset:0;background:rgba(15,20,16,.93);z-index:50;display:flex;align-items:center;justify-content:center}
+  .viewer img{max-width:94vw;max-height:76vh;object-fit:contain;border-radius:6px}
+  .vclose{position:absolute;top:14px;right:16px;background:rgba(255,255,255,.16);color:#fff;border:0;width:38px;height:38px;border-radius:50%;font-size:17px;cursor:pointer;z-index:2}
+  .vnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);color:#fff;border:0;width:40px;height:56px;font-size:26px;cursor:pointer;border-radius:8px}
+  .vprev{left:8px}
+  .vnext{right:8px}
+  .vbar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:rgba(0,0,0,.5);color:#fff;font-size:13px}
+  .vbar button{background:none;border:0;color:#bfe3cf;cursor:pointer;font-size:13px;font-family:inherit;padding:0}
+  .vbar button.del{color:#ff9d9d}
 </style>
 </head>
 <body>
@@ -402,6 +431,20 @@
           </div>
         </div>
 
+        <!-- info fields (up top) -->
+        <dl class="fields">
+          <div x-show="detailPlant.form_descriptor"><dt>Form/Descriptor</dt><dd x-text="detailPlant.form_descriptor"></dd></div>
+          <div><dt>Vendor</dt><dd x-text="detailPlant.vendor ? detailPlant.vendor.name : '—'"></dd></div>
+          <div><dt>Quantity</dt><dd x-text="detailPlant.quantity"></dd></div>
+          <div x-show="detailPlant.acquisition_date"><dt>Acquired</dt><dd x-text="detailPlant.acquisition_date"></dd></div>
+          <div x-show="detailPlant.acquisition_type"><dt>How acquired</dt><dd x-text="acqTypeLabel(detailPlant.acquisition_type)"></dd></div>
+          <div x-show="detailPlant.price!=null"><dt>Price</dt><dd x-text="detailPlant.price"></dd></div>
+          <div x-show="detailPlant.accession_id"><dt>Accession ID</dt><dd x-text="detailPlant.accession_id"></dd></div>
+          <div x-show="detailPlant.source_url"><dt>Purchase link</dt><dd><a :href="detailPlant.source_url" target="_blank" rel="noopener noreferrer" x-text="detailPlant.source_url" style="color:var(--pine-2);word-break:break-all"></a></dd></div>
+          <div><dt>Status</dt><dd x-text="statusLabel(detailPlant.lifecycle_status)"></dd></div>
+          <div x-show="detailPlant.notes"><dt>Notes</dt><dd x-text="detailPlant.notes"></dd></div>
+        </dl>
+
         <!-- care at a glance (species-level) -->
         <div class="care-head">
           <h3>Care</h3>
@@ -445,22 +488,18 @@
           <div class="care-tile"><div class="cl">Feeding</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_feeding?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_feeding)||'—'"></div></div>
         </div>
 
-        <!-- photo gallery -->
-        <div class="gallery">
-          <template x-for="ph in detailPhotos" :key="ph.id">
-            <div class="gphoto">
-              <span class="cover" x-show="ph.id===detailPlant.cover_photo_id">cover</span>
-              <img :src="ph.thumbUrl" alt="">
-              <span class="lbl" x-text="photoLabel(ph.label)"></span>
-              <div class="ga">
-                <button x-show="ph.id!==detailPlant.cover_photo_id" @click="setCover(ph)">Cover</button>
-                <button class="del" @click="removeDetailPhoto(ph)">Delete</button>
-              </div>
-            </div>
-          </template>
+        <!-- photos: one-line strip; tap a photo to view it, "See all" opens the photo page -->
+        <div class="photos-head">
+          <h3>Photos</h3>
+          <button class="care-edit" x-show="detailPhotos.length" @click="openPhotos()">See all <span x-text="detailPhotos.length"></span> ›</button>
         </div>
-        <input type="file" x-ref="detailInput" accept="image/*" multiple @change="addDetailPhotos($event)" style="display:none">
-        <button type="button" class="filebtn" @click="$refs.detailInput.click()" :disabled="detailBusy">＋ Add Photo</button>
+        <div class="pstrip">
+          <template x-for="(ph,idx) in recentPhotos()" :key="ph.id">
+            <div class="pthumb" @click="openViewer(recentPhotos(), idx)"><img :src="ph.thumbUrl" alt=""><span class="cover" x-show="ph.id===detailPlant.cover_photo_id">cover</span></div>
+          </template>
+          <input type="file" x-ref="detailInput" accept="image/*" multiple @change="addDetailPhotos($event)" style="display:none">
+          <button type="button" class="padd" @click="$refs.detailInput.click()" :disabled="detailBusy" aria-label="Add photo">＋</button>
+        </div>
         <div x-show="detailBusy" class="hint">Working…</div>
         <div class="msg err" x-text="detailError"></div>
 
@@ -544,28 +583,60 @@
           </div>
         </div>
 
-        <!-- fields -->
-        <dl class="fields">
-          <div><dt>Genus</dt><dd x-text="detailPlant.species && detailPlant.species.genus ? detailPlant.species.genus.name : '—'"></dd></div>
-          <div><dt>Species</dt><dd x-text="detailPlant.species ? detailPlant.species.name : '—'"></dd></div>
-          <div x-show="detailPlant.form_descriptor"><dt>Form/Descriptor</dt><dd x-text="detailPlant.form_descriptor"></dd></div>
-          <div><dt>Vendor</dt><dd x-text="detailPlant.vendor ? detailPlant.vendor.name : '—'"></dd></div>
-          <div><dt>Quantity</dt><dd x-text="detailPlant.quantity"></dd></div>
-          <div x-show="detailPlant.acquisition_date"><dt>Acquired</dt><dd x-text="detailPlant.acquisition_date"></dd></div>
-          <div x-show="detailPlant.acquisition_type"><dt>How acquired</dt><dd x-text="acqTypeLabel(detailPlant.acquisition_type)"></dd></div>
-          <div x-show="detailPlant.price!=null"><dt>Price</dt><dd x-text="detailPlant.price"></dd></div>
-          <div x-show="detailPlant.accession_id"><dt>Accession ID</dt><dd x-text="detailPlant.accession_id"></dd></div>
-          <div x-show="detailPlant.source_url"><dt>Purchase link</dt><dd><a :href="detailPlant.source_url" target="_blank" rel="noopener noreferrer" x-text="detailPlant.source_url" style="color:var(--pine-2);word-break:break-all"></a></dd></div>
-          <div><dt>Status</dt><dd x-text="statusLabel(detailPlant.lifecycle_status)"></dd></div>
-          <div x-show="detailPlant.notes"><dt>Notes</dt><dd x-text="detailPlant.notes"></dd></div>
-        </dl>
-
         <div class="formfoot">
           <button class="primary" @click="editPlant()" :disabled="detailBusy">Edit</button>
           <button class="ghost danger" @click="deletePlant()" :disabled="detailBusy" x-text="confirmingDelete?'Tap again to delete':'Delete'"></button>
         </div>
       </div>
     </template>
+
+    <!-- photo-only page (progression) -->
+    <template x-if="screen==='photos' && detailPlant">
+      <div class="detailwrap">
+        <div class="photopage-head">
+          <button class="ghost" @click="closePhotos()">← Back</button>
+          <div style="min-width:0">
+            <div style="font-family:var(--serif);font-style:italic;font-size:18px;color:var(--ink)" x-text="displayName(detailPlant)"></div>
+            <div class="hint" style="margin:0" x-text="detailPhotos.length+' photo'+(detailPhotos.length===1?'':'s')"></div>
+          </div>
+        </div>
+        <div class="filterbar">
+          <span class="fsel"><select x-model="photoSort"><option value="new">Newest first</option><option value="old">Oldest first</option></select></span>
+          <button type="button" class="cat-chip" :class="photoLabelFilter==='all'?'selected':''" @click="photoLabelFilter='all'">All</button>
+          <template x-for="lb in photoLabelsPresent()" :key="lb"><button type="button" class="cat-chip" :class="photoLabelFilter===lb?'selected':''" @click="photoLabelFilter=lb" x-text="photoLabel(lb)"></button></template>
+        </div>
+        <input type="file" x-ref="photosInput" accept="image/*" multiple @change="addDetailPhotos($event)" style="display:none">
+        <button type="button" class="filebtn" @click="$refs.photosInput.click()" :disabled="detailBusy">＋ Add Photo</button>
+        <div x-show="detailBusy" class="hint">Working…</div>
+        <div class="msg err" x-text="detailError"></div>
+        <div class="photo-page-grid">
+          <template x-for="(ph,idx) in pagePhotos()" :key="ph.id">
+            <div class="ppcard" @click="openViewer(pagePhotos(), idx)">
+              <img :src="ph.thumbUrl" alt="">
+              <span class="cover" x-show="ph.id===detailPlant.cover_photo_id">cover</span>
+              <span class="pplbl" x-text="ph.photo_date"></span>
+            </div>
+          </template>
+        </div>
+        <div x-show="detailPhotos.length===0" class="hint" style="margin-top:14px">No photos yet. Tap ＋ Add Photo.</div>
+      </div>
+    </template>
+
+    <!-- full-photo viewer -->
+    <div class="viewer" x-show="viewerOpen" x-cloak @click.self="closeViewer()">
+      <button class="vclose" @click="closeViewer()" aria-label="Close">✕</button>
+      <button class="vnav vprev" @click="viewerPrev()" x-show="viewerList.length>1" aria-label="Previous photo">‹</button>
+      <img :src="viewerUrl" alt="">
+      <button class="vnav vnext" @click="viewerNext()" x-show="viewerList.length>1" aria-label="Next photo">›</button>
+      <div class="vbar" x-show="viewerPhoto()">
+        <span x-text="viewerPhoto()&&viewerPhoto().photo_date"></span>
+        <span x-text="viewerPhoto()?('· '+photoLabel(viewerPhoto().label)):''"></span>
+        <span style="margin-left:auto;display:flex;gap:14px">
+          <button x-show="detailPlant&&viewerPhoto()&&viewerPhoto().id!==detailPlant.cover_photo_id" @click="setCoverFromViewer()">Set cover</button>
+          <button class="del" @click="deleteFromViewer()">Delete</button>
+        </span>
+      </div>
+    </div>
 
     <!-- ===== HOME (tabbed) ===== -->
     <div class="home" x-show="screen==='list'">
@@ -768,6 +839,7 @@
     'species:species_id(id,name,care_dormancy,care_water,care_feeding,care_light,care_photoperiod,care_humidity,genus:genus_id(id,name)),vendor:vendor_id(name),growing_location:growing_location_id(name),cover:cover_photo_id(storage_path),'+
     'plant_category(category_id,category:category_id(id,name))';
   async function signThumb(path){ if(!path)return null; const {data}=await sb.storage.from('photos').createSignedUrls([thumbOf(path)],3600); return data&&data[0]&&data[0].signedUrl||null; }
+  async function signFull(path){ if(!path)return null; const {data}=await sb.storage.from('photos').createSignedUrls([path],3600); return data&&data[0]&&data[0].signedUrl||null; }
   function sameSet(a,b){ if(a.length!==b.length)return false; const s=new Set(a.map(String)); return b.every(x=>s.has(String(x))); }
 
   /* ---- name auto-detection from filename + photo metadata (ported from the catalog app) ---- */
@@ -873,6 +945,7 @@
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
       detailEvents:[], timelineFilter:'all', loggingEvent:false, eventDeleteId:null,
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
+      photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'',
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null},
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
@@ -1118,7 +1191,7 @@
       },
 
       /* ---- detail view ---- */
-      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.eventDeleteId=null;this.careEditing=false;this.timelineFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
+      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.eventDeleteId=null;this.careEditing=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
       closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.detailError='';this.confirmingDelete=false;},
       async loadDetailPhotos(plantId){
         const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date').eq('plant_id',plantId).order('sort_order');
@@ -1377,6 +1450,26 @@
         await sb.from('plant_category').delete().eq('plant_id',plantId);
         if(categoryIds.length){const rows=categoryIds.map(cid=>({plant_id:plantId,category_id:cid}));const{error}=await sb.from('plant_category').insert(rows);if(error)throw error;}
       },
+
+      /* ---- photos: strip, page, viewer ---- */
+      recentPhotos(){ return [...this.detailPhotos].sort((a,b)=>((b.photo_date||'')+'').localeCompare((a.photo_date||'')+'')).slice(0,3); },
+      photoLabelsPresent(){ return [...new Set(this.detailPhotos.map(p=>p.label))]; },
+      pagePhotos(){
+        let list=[...this.detailPhotos];
+        if(this.photoLabelFilter!=='all')list=list.filter(p=>p.label===this.photoLabelFilter);
+        list.sort((a,b)=>{const c=((a.photo_date||'')+'').localeCompare((b.photo_date||'')+'');return this.photoSort==='old'?c:-c;});
+        return list;
+      },
+      openPhotos(){this.screen='photos';},
+      closePhotos(){this.screen='detail';},
+      viewerPhoto(){return this.viewerList[this.viewerI]||null;},
+      async _viewerLoad(){const ph=this.viewerList[this.viewerI];this.viewerUrl=ph?((await signFull(ph.storage_path))||ph.thumbUrl):'';},
+      async openViewer(list,i){this.viewerList=list;this.viewerI=i;this.viewerOpen=true;this.viewerUrl=(list[i]&&list[i].thumbUrl)||'';await this._viewerLoad();},
+      closeViewer(){this.viewerOpen=false;},
+      async viewerNext(){if(this.viewerList.length<2)return;this.viewerI=(this.viewerI+1)%this.viewerList.length;await this._viewerLoad();},
+      async viewerPrev(){if(this.viewerList.length<2)return;this.viewerI=(this.viewerI-1+this.viewerList.length)%this.viewerList.length;await this._viewerLoad();},
+      async setCoverFromViewer(){const ph=this.viewerPhoto();if(ph)await this.setCover(ph);},
+      async deleteFromViewer(){const ph=this.viewerPhoto();if(!ph)return;this.viewerOpen=false;await this.removeDetailPhoto(ph);},
 
       /* ---- CSV export ---- */
       exportCsv(){
