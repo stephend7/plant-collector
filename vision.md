@@ -202,6 +202,39 @@ use this all the time." The plants are the product, not the data. Mockups review
 4. Journal tab + full journal screen (pinned species header, single-line entries).
 5. Browse drill-down polish + the shared-element photo→hero transition.
 
+## Jobs-to-be-done & the home, locked 2026-06-19 (task-driven design)
+
+Why people open the app (Stephen's ranking + analysis). Frequency drives the design, not looks.
+- **Three co-equal SPEED goals (the design contract):** (1) quick to ADD a plant, (2) quick to
+  FIND a plant, (3) quick to add a JOURNAL entry. None dominates; none crowds the others.
+- **Journaling reality:** the obsessive grower (Stephen's friend) is the exception — *most won't
+  journal often*. BUT the journal is important to the software's value, so it must be **easy,
+  fast, inviting, and discoverable** to ENCOURAGE casual use — never buried, never dominant,
+  never nagging. "Easy enough to be tempting." Encouragement mechanisms:
+  - a friendly, prominent **"Log"** on every plant (not a tiny buried link);
+  - a soft, ignorable **"Add a note?"** inline nudge right after adding a photo (no popup);
+  - **inviting empty states** ("Start this plant's story →") instead of blanks;
+  - keep it **discoverable** (hiding it would kill the behavior we want);
+  - **no streaks / guilt / badgering** — invitation, not pressure.
+- **Other jobs surfaced:** find a specific plant fast (underlies "check a sick plant" + "show a
+  friend"); "do I already own this / did I kill it before?" (at a sale); "where did I put it?"
+  (greenhouse location); mark status change; look up care; show/share a *sale/trade list*
+  (seller); admire; analytics; identify a tagless plant; export/backup.
+
+### Resulting nav decisions (supersede earlier mockup details)
+- **"+" = Add a plant** — instant, one tap, NO menu (walk back the earlier "capture-first" idea;
+  camera still leads *inside* the add flow). Adding is universal; keep it the fastest path.
+- **Search pinned at the top of the Plants home** — finding is the real daily bottleneck
+  (every journal entry starts by locating the plant). Coded-pot-tag (QR) scanning is a LATER
+  accelerator, not a dependency.
+- **Slim tab bar: Plants · Browse · ( + ) · Care.** Journal is NOT a prime tab (most won't use
+  it enough to earn a slot), but stays discoverable — it lives on each plant + a gentle nudge;
+  a whole-collection journal view is reachable, just not greeting everyone.
+- **Home body:** "All" sorts **recent-first** (so the plants you're currently tending surface at
+  top — serves daily re-access with no extra UI), with the All / By genus / By category control
+  to reorganise. Default look TBD (magazine vs clean grid vs shelves) — clean + recognisable
+  favoured for findability; beauty modes a tap away.
+
 ## Favorites to chase (subjective, for sequencing)
 1. Living photo timeline / time-lapse (data's already there; emotional payoff).
 2. Season-aware care reminders (the daily-use hook; very CP-specific).
