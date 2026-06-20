@@ -111,6 +111,44 @@
   .tl-thumb{width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid var(--line)}
   .tl-del{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:11px;margin-top:4px;padding:0}
   .tl-del.arm{color:var(--danger)}
+  /* ===== redesigned shell: tabbed home ===== */
+  .home{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
+  .homehead{display:flex;align-items:flex-end;justify-content:space-between;margin:2px 0 0}
+  .homehead h1{font-family:var(--serif);font-style:italic;font-weight:500;font-size:26px;margin:0}
+  .homesub{color:var(--muted);font-size:13px;margin:2px 0 0}
+  .iconbtn{background:none;border:0;color:var(--pine);cursor:pointer;padding:4px;display:flex}
+  .iconbtn svg{width:23px;height:23px}
+  .searchbar{display:flex;align-items:center;gap:9px;background:var(--field);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin:13px 0 0}
+  .searchbar svg{width:18px;height:18px;color:var(--muted);flex:0 0 auto}
+  .searchbar input{border:0;background:transparent;padding:0;font-size:15px;color:var(--ink);flex:1;min-width:0}
+  .searchbar input:focus{outline:none}
+  .gallery-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+  .gcard{cursor:pointer}
+  .gcard .ph{aspect-ratio:1/1;border-radius:12px;background:var(--chip);overflow:hidden;display:flex;align-items:center;justify-content:center}
+  .gcard .ph img{width:100%;height:100%;object-fit:cover;display:block}
+  .gcard .ph svg{width:34px;height:34px;color:var(--pine);opacity:.45}
+  .gcard .gname{font-family:var(--serif);font-style:italic;font-size:16px;margin:7px 2px 0;color:var(--ink)}
+  .gcard .gsub{color:var(--muted);font-size:12px;margin:1px 2px 0}
+  .gcard .badge.warn{margin-top:4px;display:inline-block}
+  .backrow{display:inline-flex;align-items:center;gap:6px;margin:2px 0 4px;color:var(--pine);cursor:pointer;font-size:14px;background:none;border:0;font-family:inherit;padding:0}
+  .lgrouphead{font-family:var(--serif);font-style:italic;font-size:16px;color:var(--pine);background:var(--chip);padding:7px 14px;margin:0;border-radius:8px}
+  .lrow{padding:11px 14px;border-bottom:1px solid var(--line);font-size:15px;cursor:pointer;display:flex;align-items:center;gap:8px}
+  .lrow .lmeta{color:var(--muted);font-size:12px;margin-left:auto;flex:0 0 auto}
+  .filterbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 2px}
+  .fsel{display:inline-flex;align-items:center;gap:5px;background:var(--field);border:1px solid var(--line);border-radius:20px;padding:0}
+  .fsel select{border:0;background:transparent;padding:7px 10px;font-size:13px;color:var(--ink);border-radius:20px}
+  .jrow{display:flex;gap:11px;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer;align-items:flex-start}
+  .jrow .jname{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--ink)}
+  .jrow .jevent{font-size:13px;color:var(--muted);margin-top:1px}
+  .jrow .jdate{color:var(--muted);font-size:12px;flex:0 0 auto;white-space:nowrap}
+  .jdot{width:8px;height:8px;border-radius:50%;background:var(--pine);flex:0 0 auto;margin-top:6px}
+  .tabbar{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;align-items:center;background:var(--card);border-top:1px solid var(--line);padding:7px 4px;padding-bottom:calc(7px + env(safe-area-inset-bottom));z-index:20}
+  .tabbar .tab{display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--muted);font-size:11px;background:none;border:0;cursor:pointer;flex:1;padding:2px;font-family:inherit}
+  .tabbar .tab.on{color:var(--pine)}
+  .tabbar .tab svg{width:24px;height:24px}
+  .fab{position:fixed;right:18px;bottom:calc(72px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;background:var(--pine);color:#fff;border:0;cursor:pointer;z-index:21;box-shadow:0 3px 12px rgba(31,42,34,.22);display:flex;align-items:center;justify-content:center}
+  .fab svg{width:28px;height:28px}
+  .emptybox{margin:34px 0;padding:30px;border:1px dashed var(--line);border-radius:14px;text-align:center;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -146,13 +184,6 @@
 
   <!-- ===== APP ===== -->
   <div x-show="view==='app'" class="app">
-    <div class="topbar">
-      <div class="brand"><span class="leaf">🌱</span> Plant Collector</div>
-      <div class="acts">
-        <button class="ghost" @click="exportCsv()" :disabled="!plants.length" x-show="screen==='list'" title="Download your collection as a spreadsheet">Export CSV</button>
-        <button class="add" @click="openForm()" x-show="screen==='list'">＋ Add plant</button>
-      </div>
-    </div>
 
     <!-- entry / edit form -->
     <div class="formwrap" x-show="screen==='form'" x-transition>
@@ -474,51 +505,149 @@
       </div>
     </template>
 
-    <!-- collection list -->
-    <div x-show="screen==='list'">
-      <p class="who">Signed in as <span x-text="userEmail"></span> · <a style="color:var(--pine-2);cursor:pointer" @click="signOut()">sign out</a></p>
+    <!-- ===== HOME (tabbed) ===== -->
+    <div class="home" x-show="screen==='list'">
 
-      <div x-show="plants.length===0" class="empty">
-        <p style="margin:0 0 6px;font-size:16px;color:var(--ink)">Your collection is empty.</p>
-        <p style="margin:0">Tap <strong>＋ Add plant</strong> to enter your first one.</p>
+      <!-- PLANTS tab: genus gallery → a genus's plants -->
+      <div x-show="tab==='plants'">
+        <div class="homehead">
+          <div>
+            <h1 x-text="galleryGenus ? galleryGenus : 'Collection'"></h1>
+            <p class="homesub" x-show="!galleryGenus" x-text="plants.length+' plant'+(plants.length===1?'':'s')+' · '+generaGallery().length+' gen'+(generaGallery().length===1?'us':'era')"></p>
+            <p class="homesub" x-show="galleryGenus" x-text="genusPlants(galleryGenus).length+' plant'+(genusPlants(galleryGenus).length===1?'':'s')"></p>
+          </div>
+        </div>
+
+        <div class="searchbar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4" stroke-linecap="round"/></svg>
+          <input type="search" placeholder="Search plants" x-model="searchQ">
+        </div>
+
+        <div x-show="plants.length===0" class="emptybox">
+          <p style="margin:0 0 6px;font-size:16px;color:var(--ink)">Your collection is empty.</p>
+          <p style="margin:0">Tap <strong>＋</strong> to add your first plant.</p>
+        </div>
+
+        <!-- search results (flat) -->
+        <div x-show="searchQ.trim().length>0">
+          <template x-for="p in searchResults()" :key="p.id">
+            <div class="lrow" @click="openDetail(p)"><span style="font-family:var(--serif);font-style:italic" x-text="displayName(p)"></span></div>
+          </template>
+          <div x-show="searchResults().length===0" class="hint" style="margin-top:14px">No matches.</div>
+        </div>
+
+        <!-- genus gallery -->
+        <template x-if="searchQ.trim().length===0 && !galleryGenus">
+          <div>
+            <div class="pills2" x-show="categories.length">
+              <button type="button" class="cat-chip" :class="galleryCatId===''?'selected':''" @click="galleryCatId=''">All genera</button>
+              <template x-for="c in categories" :key="c.id">
+                <button type="button" class="cat-chip" :class="galleryCatId===c.id?'selected':''" @click="galleryCatId=c.id" x-text="c.name"></button>
+              </template>
+            </div>
+            <div class="gallery-grid">
+              <template x-for="g in generaGallery()" :key="g.genus">
+                <div class="gcard" @click="openGenus(g.genus)">
+                  <div class="ph">
+                    <img x-show="g.thumbUrl" :src="g.thumbUrl" alt="">
+                    <svg x-show="!g.thumbUrl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 21c0-7 4-12 14-13 0 8-5 13-12 13z"/><path d="M5 21c2-5 5-8 9-10" stroke-linecap="round"/></svg>
+                  </div>
+                  <div class="gname" x-text="g.genus"></div>
+                  <div class="gsub" x-text="g.count+' plant'+(g.count===1?'':'s')"></div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- one genus's plants -->
+        <template x-if="searchQ.trim().length===0 && galleryGenus">
+          <div>
+            <button class="backrow" @click="galleryGenus=null">‹ All genera</button>
+            <div class="gallery-grid">
+              <template x-for="p in genusPlants(galleryGenus)" :key="p.id">
+                <div class="gcard" @click="openDetail(p)">
+                  <div class="ph">
+                    <img x-show="p.thumbUrl" :src="p.thumbUrl" alt="">
+                    <svg x-show="!p.thumbUrl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 21c0-7 4-12 14-13 0 8-5 13-12 13z"/><path d="M5 21c2-5 5-8 9-10" stroke-linecap="round"/></svg>
+                  </div>
+                  <div class="gname" x-text="speciesLine(p)"></div>
+                  <div class="gsub"><span class="badge warn" x-show="p.lifecycle_status&&p.lifecycle_status!=='in_collection'" x-text="statusLabel(p.lifecycle_status)"></span><span x-show="p.quantity>1" x-text="'×'+p.quantity"></span></div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
       </div>
 
-      <div x-show="plants.length>0">
-        <p class="count" x-text="countLine()"></p>
-        <div x-show="categories.length" style="margin:0 0 14px">
-          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
-            <button type="button" class="cat-chip" :class="filterCategoryIds.length===0?'selected':''" @click="filterCategoryIds=[]">All</button>
-            <template x-for="c in categories" :key="c.id">
-              <button type="button" class="cat-chip" :class="filterCategoryIds.includes(c.id)?'selected':''" @click="toggleFilter(c.id)" x-text="c.name"></button>
-            </template>
-          </div>
-          <p class="hint" x-show="filterCategoryIds.length>1" style="margin-top:6px">Showing plants in <strong>all</strong> selected categories.</p>
+      <!-- LIST tab (text only, grouped by genus, filterable) -->
+      <div x-show="tab==='list'">
+        <div class="homehead">
+          <div><h1>All plants</h1><p class="homesub" x-text="listCount()+' shown'"></p></div>
+          <button class="iconbtn" @click="exportCsv()" :disabled="!plants.length" title="Export to CSV" aria-label="Export to CSV">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12M8 11l4 4 4-4M5 20h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
         </div>
-        <template x-for="grp in groupedPlants()" :key="grp.genus">
-          <div>
-            <div class="genusHead" x-text="grp.genus"></div>
+        <div class="filterbar" x-show="plants.length>0">
+          <span class="fsel"><select x-model="listCatId"><option value="">Category: All</option><template x-for="c in categories" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select></span>
+          <span class="fsel"><select x-model="listGenusName"><option value="">Genus: All</option><template x-for="gn in genusNames()" :key="gn"><option :value="gn" x-text="gn"></option></template></select></span>
+        </div>
+        <div x-show="plants.length===0" class="hint" style="margin-top:16px">No plants yet.</div>
+        <template x-for="grp in listGroups()" :key="grp.genus">
+          <div style="margin-top:14px">
+            <p class="lgrouphead"><span x-text="grp.genus"></span><span style="color:var(--muted);font-size:12px;font-style:normal;font-family:-apple-system,sans-serif" x-text="' · '+grp.plants.length"></span></p>
             <template x-for="p in grp.plants" :key="p.id">
-              <div class="plant" @click="openDetail(p)">
-                <img class="pic" x-show="p.thumbUrl" :src="p.thumbUrl" alt="">
-                <div class="body">
-                  <div class="name" x-text="displayName(p)"></div>
-                  <div class="meta">
-                    <span class="badge warn" x-show="p.lifecycle_status && p.lifecycle_status!=='in_collection'" x-text="statusLabel(p.lifecycle_status)"></span>
-                    <template x-for="pc in (p.plant_category||[])" :key="pc.category_id">
-                      <span class="badge" x-text="pc.category && pc.category.name"></span>
-                    </template>
-                    <span x-show="p.vendor" x-text="'from ' + (p.vendor && p.vendor.name)"></span>
-                    <span x-show="p.growing_location" x-text="'📍 ' + (p.growing_location && p.growing_location.name)"></span>
-                    <span x-show="p.quantity>1" x-text="'×' + p.quantity"></span>
-                    <span x-show="p.acquisition_date" x-text="p.acquisition_date"></span>
-                  </div>
-                </div>
-                <span class="chev">›</span>
+              <div class="lrow" @click="openDetail(p)">
+                <span x-text="speciesLine(p)"></span>
+                <span class="lmeta"><span x-show="p.lifecycle_status&&p.lifecycle_status!=='in_collection'" x-text="statusLabel(p.lifecycle_status)"></span><span x-show="p.quantity>1" x-text="' ×'+p.quantity"></span></span>
               </div>
             </template>
           </div>
         </template>
       </div>
+
+      <!-- JOURNAL tab (whole collection, newest first) -->
+      <div x-show="tab==='journal'">
+        <div class="homehead"><div><h1>Journal</h1><p class="homesub">Everything that's happened, newest first</p></div></div>
+        <div x-show="allEvents.length===0" class="emptybox" style="margin-top:18px">
+          <p style="margin:0 0 6px;font-size:15px;color:var(--ink)">No entries yet.</p>
+          <p style="margin:0">Open a plant and tap <strong>Log</strong> to start its story.</p>
+        </div>
+        <div style="margin-top:6px">
+          <template x-for="e in allEvents" :key="e.id">
+            <div class="jrow" @click="openPlantById(e.plant_id)">
+              <div class="jdot"></div>
+              <div style="flex:1;min-width:0">
+                <div class="jname" x-text="e.plantName"></div>
+                <div class="jevent"><span x-text="eventTypeLabel(e.event_type)"></span><span x-show="e.body" x-text="' — '+e.body"></span></div>
+              </div>
+              <span class="jdate" x-text="e.entry_date"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- CARE tab (placeholder) -->
+      <div x-show="tab==='care'">
+        <div class="homehead"><div><h1>Care</h1><p class="homesub">Growing guides &amp; what needs doing</p></div></div>
+        <div class="emptybox" style="margin-top:20px">
+          <p style="margin:0 0 6px;font-size:15px;color:var(--ink)">Coming soon.</p>
+          <p style="margin:0">Care guides and reminders will live here. For now, each plant carries its own care info.</p>
+        </div>
+      </div>
+
+      <p class="who" style="margin-top:26px;text-align:center">Signed in as <span x-text="userEmail"></span> · <a style="color:var(--pine-2);cursor:pointer" @click="signOut()">sign out</a></p>
+    </div>
+
+    <!-- floating add + bottom tabs (home only) -->
+    <button class="fab" x-show="screen==='list' && (tab==='plants'||tab==='list')" @click="openForm()" aria-label="Add a plant">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+    </button>
+    <div class="tabbar" x-show="screen==='list'">
+      <button class="tab" :class="tab==='plants'?'on':''" @click="setTab('plants')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 21c0-7 4-12 14-13 0 8-5 13-12 13z"/><path d="M5 21c2-5 5-8 9-10" stroke-linecap="round"/></svg>Plants</button>
+      <button class="tab" :class="tab==='journal'?'on':''" @click="setTab('journal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 5a2 2 0 0 1 2-2h11v18H7a2 2 0 0 1-2-2z"/><path d="M7 16h11"/></svg>Journal</button>
+      <button class="tab" :class="tab==='list'?'on':''" @click="setTab('list')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h12M8 12h12M8 18h12M4 6h0M4 12h0M4 18h0" stroke-linecap="round"/></svg>List</button>
+      <button class="tab" :class="tab==='care'?'on':''" @click="setTab('care')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"/></svg>Care</button>
     </div>
   </div>
 
@@ -683,6 +812,7 @@
       detailEvents:[], timelineFilter:'all', loggingEvent:false, eventDeleteId:null,
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null},
       filterCategoryIds:[],
+      tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
       adding:{genus:false,species:false,vendor:false,location:false,category:false},
       newName:{genus:'',species:'',vendor:'',location:'',category:''},
       form:{genusId:'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:'',acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]},
@@ -1128,6 +1258,41 @@
       },
       toggleFilter(id){const i=this.filterCategoryIds.indexOf(id);if(i>=0)this.filterCategoryIds.splice(i,1);else this.filterCategoryIds.push(id);},
       toggleCategory(id){const i=this.form.categoryIds.indexOf(id);if(i>=0)this.form.categoryIds.splice(i,1);else this.form.categoryIds.push(id);},
+
+      /* ---- redesigned home: tabs, genus gallery, text list, journal ---- */
+      genusOf(p){return (p.species&&p.species.genus&&p.species.genus.name)||'Unfiled';},
+      speciesLine(p){const s=p.species?p.species.name:'';const line=[s,p.form_descriptor].filter(Boolean).join(' ').trim();return line||this.displayName(p);},
+      setTab(t){this.tab=t;this.eventDeleteId=null;if(t==='journal')this.loadAllEvents();},
+      generaGallery(){
+        const list=this.galleryCatId?this.plants.filter(p=>(p.plant_category||[]).some(pc=>pc.category_id===this.galleryCatId)):this.plants;
+        const by={};
+        for(const p of list){const g=this.genusOf(p);if(!by[g])by[g]={genus:g,count:0,thumbUrl:null};by[g].count++;if(!by[g].thumbUrl&&p.thumbUrl)by[g].thumbUrl=p.thumbUrl;}
+        return Object.values(by).sort((a,b)=>a.genus.localeCompare(b.genus));
+      },
+      genusPlants(genusName){return this.plants.filter(p=>this.genusOf(p)===genusName).sort((a,b)=>this.speciesLine(a).localeCompare(this.speciesLine(b)));},
+      openGenus(name){this.galleryGenus=name;},
+      searchResults(){const q=this.searchQ.trim().toLowerCase();if(!q)return[];return this.plants.filter(p=>this.displayName(p).toLowerCase().includes(q)).slice(0,60);},
+      genusNames(){const s=new Set();for(const p of this.plants){const g=p.species&&p.species.genus&&p.species.genus.name;if(g)s.add(g);}return[...s].sort((a,b)=>a.localeCompare(b));},
+      listGroups(){
+        let list=this.plants;
+        if(this.listCatId)list=list.filter(p=>(p.plant_category||[]).some(pc=>pc.category_id===this.listCatId));
+        if(this.listGenusName)list=list.filter(p=>this.genusOf(p)===this.listGenusName);
+        const by={};
+        for(const p of list){const g=this.genusOf(p);(by[g]=by[g]||[]).push(p);}
+        return Object.keys(by).sort().map(genus=>({genus,plants:by[genus].sort((a,b)=>this.speciesLine(a).localeCompare(this.speciesLine(b)))}));
+      },
+      listCount(){return this.listGroups().reduce((t,g)=>t+g.plants.length,0);},
+      async loadAllEvents(){
+        const {data}=await sb.from('journal_entry')
+          .select('id,plant_id,entry_date,event_type,body,plant:plant_id(form_descriptor,species:species_id(name,genus:genus_id(name)))')
+          .order('entry_date',{ascending:false}).order('created_at',{ascending:false}).limit(150);
+        this.allEvents=(data||[]).map(e=>{
+          const sp=e.plant&&e.plant.species,g=sp&&sp.genus?sp.genus.name:'',s=sp?sp.name:'';
+          const name=[g,s,e.plant&&e.plant.form_descriptor].filter(Boolean).join(' ').trim()||'Plant';
+          return {id:e.id,plant_id:e.plant_id,entry_date:e.entry_date,event_type:e.event_type,body:e.body,plantName:name};
+        });
+      },
+      async openPlantById(id){const p=this.plants.find(x=>x.id===id);if(p)await this.openDetail(p);},
       async syncCategories(plantId,categoryIds){
         await sb.from('plant_category').delete().eq('plant_id',plantId);
         if(categoryIds.length){const rows=categoryIds.map(cid=>({plant_id:plantId,category_id:cid}));const{error}=await sb.from('plant_category').insert(rows);if(error)throw error;}
