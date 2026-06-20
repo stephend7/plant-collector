@@ -149,6 +149,15 @@
   .fab{position:fixed;right:18px;bottom:calc(72px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;background:var(--pine);color:#fff;border:0;cursor:pointer;z-index:21;box-shadow:0 3px 12px rgba(31,42,34,.22);display:flex;align-items:center;justify-content:center}
   .fab svg{width:28px;height:28px}
   .emptybox{margin:34px 0;padding:30px;border:1px dashed var(--line);border-radius:14px;text-align:center;color:var(--muted)}
+  .care-head{display:flex;align-items:center;justify-content:space-between;margin:14px 0 0}
+  .care-head h3{font-size:15px;margin:0;font-weight:500}
+  .care-edit{background:none;border:0;color:var(--pine-2);font-size:13px;cursor:pointer;font-family:inherit;padding:2px 0}
+  .care-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+  .care-tile{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .care-tile .cl{font-size:10.5px;color:var(--muted)}
+  .care-tile .cv{font-size:13px;color:var(--ink);margin-top:3px;display:flex;align-items:center;gap:3px;min-height:16px}
+  .care-tile .cv.empty{color:var(--muted)}
+  .care-drop{width:15px;height:15px;flex:0 0 auto}
 </style>
 </head>
 <body>
@@ -391,6 +400,49 @@
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--pine)" stroke-width="1.6" style="flex:0 0 auto"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>
             <div style="min-width:0"><div style="font-size:10.5px;color:var(--muted)">Growing spot</div><div style="font-size:13px" :style="detailPlant.growing_location?'':'color:var(--muted)'" x-text="detailPlant.growing_location ? detailPlant.growing_location.name : 'Not set'"></div></div>
           </div>
+        </div>
+
+        <!-- care at a glance (species-level) -->
+        <div class="care-head">
+          <h3>Care</h3>
+          <button class="care-edit" @click="openCareEditor()" x-show="!careEditing" x-text="hasCare()?'Edit':'＋ Add care'"></button>
+        </div>
+        <p class="hint" x-show="!careEditing && detailPlant.species" style="margin-top:2px">Shared by all your <span x-text="detailPlant.species&&detailPlant.species.name"></span></p>
+
+        <!-- care editor -->
+        <div class="evform" x-show="careEditing" x-transition>
+          <div class="grid2">
+            <div><label>Water (amount)</label><select x-model="careForm.water"><option value="">—</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+            <div><label>Light</label><select x-model="careForm.light"><option value="">—</option><option value="Full sun">Full sun</option><option value="Bright">Bright</option><option value="Partial">Partial shade</option><option value="Shade">Shade</option></select></div>
+            <div><label>Dormancy</label><select x-model="careForm.dormancy"><option value="">—</option><option value="None">None</option><option value="Winter">Winter</option><option value="Summer">Summer</option></select></div>
+            <div><label>Humidity</label><select x-model="careForm.humidity"><option value="">—</option><option value="Low">Low</option><option value="Moderate">Moderate</option><option value="High">High</option></select></div>
+            <div><label>Feeding</label><select x-model="careForm.feeding"><option value="">—</option><option value="None">None</option><option value="Occasional">Occasional</option><option value="Regular">Regular</option></select></div>
+            <div><label>Photoperiod</label><input type="text" x-model="careForm.photoperiod" placeholder="e.g. 12–14 h"></div>
+          </div>
+          <div class="formfoot">
+            <button class="primary" @click="saveCare()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save care'"></button>
+            <button class="ghost" @click="careEditing=false" :disabled="detailBusy">Cancel</button>
+          </div>
+        </div>
+
+        <!-- care tiles -->
+        <div class="care-grid" x-show="!careEditing && hasCare()">
+          <div class="care-tile">
+            <div class="cl">Water</div>
+            <div class="cv" :class="waterLevel()?'':'empty'">
+              <template x-if="waterLevel()">
+                <span style="display:flex;gap:1px">
+                  <template x-for="i in 3" :key="i"><svg class="care-drop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" :style="i<=waterLevel()?'color:#185FA5':'color:var(--muted);opacity:.35'"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"/></svg></template>
+                </span>
+              </template>
+              <span x-show="!waterLevel()">—</span>
+            </div>
+          </div>
+          <div class="care-tile"><div class="cl">Light</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_light?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_light)||'—'"></div></div>
+          <div class="care-tile"><div class="cl">Dormancy</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_dormancy?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_dormancy)||'—'"></div></div>
+          <div class="care-tile"><div class="cl">Photoperiod</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_photoperiod?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_photoperiod)||'—'"></div></div>
+          <div class="care-tile"><div class="cl">Humidity</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_humidity?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_humidity)||'—'"></div></div>
+          <div class="care-tile"><div class="cl">Feeding</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_feeding?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_feeding)||'—'"></div></div>
         </div>
 
         <!-- photo gallery -->
@@ -713,7 +765,7 @@
   function todayLocal(){const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
   // one place for the plant query shape (used by full-list load AND single-plant reload)
   const PLANT_SELECT='id,species_id,vendor_id,growing_location_id,cover_photo_id,form_descriptor,quantity,price:acquisition_price,accession_id,source_url,location_data,acquisition_date,acquisition_type,lifecycle_status,notes,'+
-    'species:species_id(id,name,genus:genus_id(id,name)),vendor:vendor_id(name),growing_location:growing_location_id(name),cover:cover_photo_id(storage_path),'+
+    'species:species_id(id,name,care_dormancy,care_water,care_feeding,care_light,care_photoperiod,care_humidity,genus:genus_id(id,name)),vendor:vendor_id(name),growing_location:growing_location_id(name),cover:cover_photo_id(storage_path),'+
     'plant_category(category_id,category:category_id(id,name))';
   async function signThumb(path){ if(!path)return null; const {data}=await sb.storage.from('photos').createSignedUrls([thumbOf(path)],3600); return data&&data[0]&&data[0].signedUrl||null; }
   function sameSet(a,b){ if(a.length!==b.length)return false; const s=new Set(a.map(String)); return b.every(x=>s.has(String(x))); }
@@ -820,6 +872,7 @@
       screen:'list', editId:null, saving:false, formError:'', photoBusy:false, pendingPhotos:[], detectedNote:'',
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
       detailEvents:[], timelineFilter:'all', loggingEvent:false, eventDeleteId:null,
+      careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null},
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
@@ -1065,7 +1118,7 @@
       },
 
       /* ---- detail view ---- */
-      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.eventDeleteId=null;this.timelineFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
+      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.eventDeleteId=null;this.careEditing=false;this.timelineFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
       closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.detailError='';this.confirmingDelete=false;},
       async loadDetailPhotos(plantId){
         const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date').eq('plant_id',plantId).order('sort_order');
@@ -1303,6 +1356,23 @@
         });
       },
       async openPlantById(id){const p=this.plants.find(x=>x.id===id);if(p)await this.openDetail(p);},
+      /* ---- care guide (species-level) ---- */
+      hasCare(){const s=this.detailPlant&&this.detailPlant.species;return !!(s&&(s.care_dormancy||s.care_water||s.care_feeding||s.care_light||s.care_photoperiod||s.care_humidity));},
+      waterLevel(){const w=this.detailPlant&&this.detailPlant.species&&this.detailPlant.species.care_water;return {low:1,medium:2,high:3}[w]||0;},
+      openCareEditor(){const s=(this.detailPlant&&this.detailPlant.species)||{};this.careForm={dormancy:s.care_dormancy||'',water:s.care_water||'',feeding:s.care_feeding||'',light:s.care_light||'',photoperiod:s.care_photoperiod||'',humidity:s.care_humidity||''};this.careEditing=true;},
+      async saveCare(){
+        const s=this.detailPlant&&this.detailPlant.species; if(!s)return;
+        this.detailBusy=true;this.detailError='';
+        try{
+          const row={care_dormancy:this.careForm.dormancy||null,care_water:this.careForm.water||null,care_feeding:this.careForm.feeding||null,care_light:this.careForm.light||null,care_photoperiod:(this.careForm.photoperiod||'').trim()||null,care_humidity:this.careForm.humidity||null};
+          const {error}=await sb.from('species').update(row).eq('id',s.id);
+          if(error)throw error;
+          Object.assign(s,row);
+          const sa=this.speciesAll.find(x=>x.id===s.id); if(sa)Object.assign(sa,row);
+          this.careEditing=false;
+        }catch(e){this.detailError=e.message||'Could not save care info.';}
+        finally{this.detailBusy=false;}
+      },
       async syncCategories(plantId,categoryIds){
         await sb.from('plant_category').delete().eq('plant_id',plantId);
         if(categoryIds.length){const rows=categoryIds.map(cid=>({plant_id:plantId,category_id:cid}));const{error}=await sb.from('plant_category').insert(rows);if(error)throw error;}
