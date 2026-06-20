@@ -3,11 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5F4EE">
 <title>Plant Collector</title>
 <style>
   :root{
-    --bg:#0f1411; --card:#18211c; --ink:#e8f0ea; --muted:#9fb3a6;
-    --line:#2a382f; --pine:#3f7d54; --pine-2:#6fce8f; --danger:#ff9d9d; --chip:#22302a;
+    color-scheme:light;
+    --bg:#F5F4EE; --card:#FFFFFF; --field:#F4F4EE; --ink:#1F2A22; --muted:#6E7C71;
+    --line:#E4E6DD; --pine:#2E5E43; --pine-2:#336B45; --danger:#B3261E; --chip:#EAEFE5;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,'Times New Roman',serif;
   }
   *{box-sizing:border-box}
   [x-cloak]{display:none!important}
@@ -16,13 +19,13 @@
     font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     -webkit-text-size-adjust:100%}
   .center{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
-  .brand{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700}
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--serif);font-style:italic;font-size:20px;font-weight:500}
   .brand .leaf{font-size:24px}
   .card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
   h1{font-size:19px;margin:0 0 4px} .sub{color:var(--muted);font-size:14px;margin:0 0 18px}
   label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px}
   input,select,textarea{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);
-    background:#0e1512;color:var(--ink);font-size:16px;font-family:inherit}
+    background:var(--field);color:var(--ink);font-size:16px;font-family:inherit}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pine)}
   button{font-family:inherit}
   button.primary{width:100%;margin-top:18px;padding:13px;border:0;border-radius:10px;background:var(--pine);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
@@ -36,21 +39,21 @@
   .topbar .acts{display:flex;gap:8px;align-items:center}
   button.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);padding:9px 13px;border-radius:10px;font-size:14px;cursor:pointer}
   button.ghost:disabled{opacity:.5;cursor:default}
-  button.ghost.danger{color:var(--danger);border-color:#5a2f2f}
+  button.ghost.danger{color:var(--danger);border-color:#E2B8B4}
   button.add{background:var(--pine);color:#fff;border:0;padding:10px 15px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
-  button.filebtn{display:inline-block;margin-top:6px;padding:10px 15px;border-radius:10px;border:1px solid var(--line);background:#0e1512;color:var(--pine-2);font-size:14px;font-weight:600;cursor:pointer}
+  button.filebtn{display:inline-block;margin-top:6px;padding:10px 15px;border-radius:10px;border:1px solid var(--line);background:var(--field);color:var(--pine-2);font-size:14px;font-weight:600;cursor:pointer}
   button.filebtn:disabled{opacity:.5;cursor:default}
   .who{color:var(--muted);font-size:12px;margin:10px 0 0}
   .empty{margin:34px 0;padding:30px;border:1px dashed var(--line);border-radius:14px;text-align:center;color:var(--muted)}
-  .genusHead{margin:22px 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--pine-2)}
+  .genusHead{margin:22px 0 8px;font-family:var(--serif);font-style:italic;font-size:16px;color:var(--pine)}
   .plant{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:center;cursor:pointer}
   .plant:hover{border-color:var(--pine)}
-  .plant .pic{width:52px;height:52px;border-radius:9px;object-fit:cover;border:1px solid var(--line);flex:0 0 auto;background:#0e1512}
+  .plant .pic{width:52px;height:52px;border-radius:9px;object-fit:cover;border:1px solid var(--line);flex:0 0 auto;background:var(--field)}
   .plant .body{flex:1;min-width:0}
-  .plant .name{font-size:16px;font-weight:600}
+  .plant .name{font-family:var(--serif);font-style:italic;font-weight:500;font-size:17px}
   .plant .meta{color:var(--muted);font-size:13px;margin-top:2px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   .badge{font-size:11px;padding:1px 7px;border-radius:6px;background:var(--chip);color:var(--muted);text-transform:capitalize}
-  .badge.warn{background:#3a2a1a;color:#e7b07a}
+  .badge.warn{background:#F6ECD4;color:#8A5A12}
   .count{color:var(--muted);font-size:13px}
   .cat-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
   .cat-chip{background:var(--chip);border:1px solid var(--line);color:var(--muted);padding:5px 11px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit}
@@ -59,11 +62,12 @@
   .chev{color:var(--muted);flex:0 0 auto}
   .formwrap,.detailwrap{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:14px 0}
   .formwrap h2,.detailwrap h2{font-size:17px;margin:0 0 4px}
+  .detailwrap h2{font-family:var(--serif);font-style:italic;font-weight:500;font-size:21px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media(max-width:520px){.grid2{grid-template-columns:1fr}}
   .pickrow{display:flex;gap:8px;align-items:flex-end}
   .pickrow > div:first-child{flex:1}
-  .mini{flex:0 0 auto;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:#0e1512;color:var(--pine-2);font-size:14px;cursor:pointer}
+  .mini{flex:0 0 auto;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--field);color:var(--pine-2);font-size:14px;cursor:pointer}
   .mini:disabled{opacity:.5;cursor:default}
   .addbox{display:flex;gap:8px;margin-top:6px}
   .addbox input{flex:1}
@@ -87,7 +91,7 @@
   .gphoto .cover{position:absolute;top:5px;left:5px;background:var(--pine);color:#fff;font-size:10px;padding:1px 6px;border-radius:6px}
   .gphoto .lbl{display:block;font-size:11px;color:var(--muted);margin-top:3px;text-transform:capitalize}
   .gphoto .ga{display:flex;gap:6px;margin-top:4px}
-  .gphoto .ga button{font-size:11px;padding:3px 6px;border-radius:7px;border:1px solid var(--line);background:#0e1512;color:var(--ink);cursor:pointer}
+  .gphoto .ga button{font-size:11px;padding:3px 6px;border-radius:7px;border:1px solid var(--line);background:var(--field);color:var(--ink);cursor:pointer}
   .gphoto .ga button.del{color:var(--danger)}
   dl.fields{margin:8px 0 0}
   dl.fields > div{display:flex;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
@@ -99,7 +103,7 @@
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:10px}
   .seg button{background:transparent;border:0;color:var(--muted);padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit}
   .seg button.on{background:var(--pine);color:#fff}
-  .evform{background:#0e1512;border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0 12px}
+  .evform{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0 12px}
   .tl{display:flex;flex-direction:column}
   .tl-item{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
   .tl-item .when{flex:0 0 84px;color:var(--muted);font-size:12px;padding-top:2px}
