@@ -203,6 +203,25 @@
   .vbar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:rgba(0,0,0,.5);color:#fff;font-size:13px}
   .vbar button{background:none;border:0;color:#bfe3cf;cursor:pointer;font-size:13px;font-family:inherit;padding:0}
   .vbar button.del{color:#ff9d9d}
+  /* ===== focused journal-entry sheet ===== */
+  .sheet-back{position:fixed;inset:0;background:rgba(15,20,16,.45);z-index:45;display:flex;align-items:flex-end;justify-content:center}
+  .sheet{background:var(--card);width:100%;max-width:680px;border-radius:18px 18px 0 0;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 -6px 26px rgba(0,0,0,.2);animation:sheetUp .22s ease}
+  @keyframes sheetUp{from{transform:translateY(20px);opacity:.4}to{transform:translateY(0);opacity:1}}
+  .sheet-grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:9px auto 2px;flex:0 0 auto}
+  .sheet-hd{display:flex;align-items:center;gap:10px;padding:6px 16px 12px;flex:0 0 auto}
+  .sheet-hd .nm{font-family:var(--serif);font-style:italic;font-size:18px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sheet-x{background:none;border:0;font-size:19px;color:var(--muted);cursor:pointer;padding:2px 6px;flex:0 0 auto}
+  .sheet-body{padding:0 16px 4px;overflow-y:auto;flex:1;min-height:0}
+  .sheet-photo{width:100%;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin-bottom:12px;cursor:pointer;background:var(--field);position:relative}
+  .sheet-photo img{width:100%;display:block;max-height:48vh;object-fit:cover}
+  .sheet-photo .zoom{position:absolute;right:8px;bottom:8px;background:rgba(15,20,16,.6);color:#fff;font-size:11px;padding:3px 9px;border-radius:20px}
+  .sheet-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+  .sheet-meta .d{color:var(--muted);font-size:13px}
+  .sheet-note{font-size:15px;line-height:1.5;white-space:pre-wrap;margin:8px 0 14px}
+  .sheet-acts{display:flex;gap:9px;padding:12px 16px calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--line);flex:0 0 auto}
+  .sheet-acts button{flex:1;padding:11px 8px;border-radius:10px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--field);color:var(--ink)}
+  .sheet-acts button.danger{color:var(--danger);border-color:#E2B8B4;background:transparent}
+  .sheet-acts button.go{background:var(--pine);color:#fff;border-color:var(--pine)}
   /* ===== plant detail v2: hero + section boxes ===== */
   .plant-hero{background:var(--pine);border-radius:14px;padding:14px 16px 16px;margin-bottom:12px}
   .ph-toprow{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
@@ -574,7 +593,7 @@
               <button type="button" class="filebtn" @click="startLogEvent()" x-show="!loggingEvent" style="margin-top:0;padding:7px 13px;font-size:13px">＋ Log event</button>
             </div>
 
-            <div class="evform" x-show="loggingEvent" x-transition>
+            <div class="evform" id="eventEditor" x-show="loggingEvent" x-transition>
               <p class="hint" x-show="editEventId" style="margin:0 0 8px;color:var(--ink);font-weight:600">Edit entry</p>
               <div class="grid2">
                 <div>
@@ -625,25 +644,24 @@
 
             <div class="tl">
               <template x-for="it in timeline()" :key="it.kind+'-'+(it.kind==='event'?it.ev.id:it.ph.id)">
-                <div class="tl-item">
+                <div class="tl-item" style="cursor:pointer" @click="it.kind==='event'?openEntrySheet('event',it.ev):openEntrySheet('photo',it.ph)">
                   <div class="when" x-text="it.date||'—'"></div>
                   <template x-if="it.kind==='photo'">
                     <div class="what" style="display:flex;gap:10px;align-items:center">
                       <img class="tl-thumb" :src="it.ph.thumbUrl" alt="">
                       <span class="badge" x-text="photoLabel(it.ph.label)"></span>
+                      <svg style="margin-left:auto;color:var(--muted);flex:0 0 auto" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 6 15 12 9 18" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </div>
                   </template>
                   <template x-if="it.kind==='event'">
-                    <div class="what">
-                      <span class="badge" x-text="eventTypeLabel(it.ev.event_type)"></span>
-                      <span x-show="it.ev.measure_value!=null" x-text="' '+(it.ev.measure_label?it.ev.measure_label+': ':'')+it.ev.measure_value+(it.ev.measure_unit?' '+it.ev.measure_unit:'')"></span>
-                      <span x-show="it.ev.cause" class="hint" x-text="' · cause: '+it.ev.cause"></span>
-                      <div x-show="it.ev.body" x-text="it.ev.body" style="margin-top:3px"></div>
-                      <img x-show="eventPhotoUrl(it.ev)" :src="eventPhotoUrl(it.ev)" alt="" class="tl-thumb" style="margin-top:6px">
-                      <div class="tl-acts">
-                        <button class="tl-edit" @click="startEditEvent(it.ev)">edit</button>
-                        <button class="tl-del" :class="eventDeleteId===it.ev.id?'arm':''" @click="deleteEvent(it.ev)" x-text="eventDeleteId===it.ev.id?'tap to confirm':'delete'"></button>
+                    <div class="what" style="display:flex;align-items:flex-start;gap:8px">
+                      <div style="flex:1;min-width:0">
+                        <span class="badge" x-text="eventTypeLabel(it.ev.event_type)"></span>
+                        <span x-show="it.ev.measure_value!=null" x-text="' '+(it.ev.measure_label?it.ev.measure_label+': ':'')+it.ev.measure_value+(it.ev.measure_unit?' '+it.ev.measure_unit:'')"></span>
+                        <div x-show="it.ev.body" x-text="it.ev.body" style="margin-top:3px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical"></div>
                       </div>
+                      <img x-show="eventPhotoUrl(it.ev)" :src="eventPhotoUrl(it.ev)" alt="" class="tl-thumb" style="flex:0 0 auto">
+                      <svg style="color:var(--muted);flex:0 0 auto;margin-top:2px" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 6 15 12 9 18" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </div>
                   </template>
                 </div>
@@ -707,6 +725,55 @@
         </span>
         <button x-show="viewerReadonly&&viewerPhoto()" style="margin-left:auto;color:#bfe3cf" @click="viewPlantFromViewer()">View plant ›</button>
       </div>
+    </div>
+
+    <!-- focused journal-entry sheet -->
+    <div class="sheet-back" x-show="sheetOpen" x-cloak @click.self="closeSheet()">
+      <template x-if="sheet">
+        <div class="sheet">
+          <div class="sheet-grab"></div>
+          <div class="sheet-hd">
+            <span class="nm" x-text="sheet.plantName"></span>
+            <button class="sheet-x" @click="closeSheet()" aria-label="Close">✕</button>
+          </div>
+          <div class="sheet-body">
+            <!-- photo (if any) -->
+            <div class="sheet-photo" x-show="sheetPhoto()" @click="sheetOpenPhoto()">
+              <img :src="sheetPhoto() && sheetPhoto().thumbUrl" alt="">
+              <span class="zoom">Tap to enlarge</span>
+            </div>
+            <!-- event entry -->
+            <template x-if="sheet.kind==='event'">
+              <div>
+                <div class="sheet-meta">
+                  <span class="badge" x-text="eventTypeLabel(sheet.ev.event_type)"></span>
+                  <span class="d" x-text="fmtDate(sheet.ev.entry_date)"></span>
+                </div>
+                <div class="sheet-meta" x-show="sheet.ev.measure_value!=null">
+                  <span x-text="(sheet.ev.measure_label?sheet.ev.measure_label+': ':'')+sheet.ev.measure_value+(sheet.ev.measure_unit?' '+sheet.ev.measure_unit:'')"></span>
+                </div>
+                <div class="sheet-meta" x-show="sheet.ev.cause"><span class="d" x-text="'Cause: '+sheet.ev.cause"></span></div>
+                <div class="sheet-note" x-show="sheet.ev.body" x-text="sheet.ev.body"></div>
+                <div class="hint" x-show="!sheet.ev.body && !sheetPhoto() && sheet.ev.measure_value==null" style="margin-bottom:12px">No note on this entry.</div>
+              </div>
+            </template>
+            <!-- photo-only entry -->
+            <template x-if="sheet.kind==='photo'">
+              <div class="sheet-meta">
+                <span class="badge" x-text="photoLabel(sheet.ph.label)"></span>
+                <span class="d" x-text="fmtDate(sheet.ph.photo_date)"></span>
+              </div>
+            </template>
+          </div>
+          <div class="sheet-acts">
+            <button class="go" @click="sheetViewPlant()">View plant →</button>
+            <template x-if="sheet.kind==='event'">
+              <button @click="sheetEdit()">Edit</button>
+            </template>
+            <button class="danger" @click="sheetDelete()" x-text="sheetConfirmDelete?'Tap to confirm':'Delete'"></button>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- ===== HOME (tabbed) ===== -->
@@ -828,7 +895,7 @@
             </div>
             <div style="margin-top:6px">
               <template x-for="e in allEvents" :key="e.id">
-                <div class="jrow" @click="openPlantById(e.plant_id)">
+                <div class="jrow" @click="openJournalEntry('event', e.id, e.plant_id)">
                   <div class="jicon" x-html="eventIconSvg(e.event_type)"></div>
                   <div class="jmid">
                     <div class="jname" x-text="e.plantName"></div>
@@ -856,7 +923,7 @@
             </div>
             <div class="journal-photo-grid">
               <template x-for="(ph,idx) in allPhotos" :key="ph.id">
-                <div class="jpcard" @click="openViewer(allPhotos, idx, true)">
+                <div class="jpcard" @click="openJournalEntry('photo', ph.id, ph.plant_id)">
                   <img :src="ph.thumbUrl" alt="">
                   <span class="jplbl" x-text="ph.plantName"></span>
                 </div>
@@ -1054,6 +1121,7 @@
       detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
       photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
+      sheetOpen:false, sheet:null, sheetConfirmDelete:false,
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null,existingPhotoId:null,existingPhotoUrl:null,photoRemoved:false},
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
@@ -1300,8 +1368,8 @@
       },
 
       /* ---- detail view ---- */
-      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
-      closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;},
+      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.sheetOpen=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
+      closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;this.sheetOpen=false;},
       async loadDetailPhotos(plantId){
         const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date').eq('plant_id',plantId).order('sort_order');
         const photos=data||[];
@@ -1625,6 +1693,63 @@
       },
       async openPlantById(id){const p=this.plants.find(x=>x.id===id);if(p)await this.openDetail(p);},
       async viewPlantFromViewer(){const ph=this.viewerPhoto();if(!ph)return;const id=ph.plant_id;this.closeViewer();await this.openPlantById(id);},
+
+      /* ---- focused journal-entry sheet ---- */
+      // open from the per-plant timeline (detailPlant/detailEvents/detailPhotos already loaded)
+      openEntrySheet(kind,item){
+        this.sheetConfirmDelete=false;
+        if(kind==='event'){
+          const ph=item.photo_id?this.detailPhotos.find(x=>x.id===item.photo_id):null;
+          this.sheet={kind:'event',ev:item,ph:ph||null,plantName:this.displayName(this.detailPlant)};
+        }else{
+          this.sheet={kind:'photo',ev:null,ph:item,plantName:this.displayName(this.detailPlant)};
+        }
+        this.sheetOpen=true;
+      },
+      // open from the whole-collection Journal tab (load that plant's detail data first)
+      async openJournalEntry(kind,id,plantId){
+        const p=this.plants.find(x=>x.id===plantId); if(!p)return;
+        if(!this.detailPlant || this.detailPlant.id!==plantId){
+          this.detailPlant=p; this.timelineFilter='all'; this.loggingEvent=false; this.editEventId=null;
+          this.eventDeleteId=null; this.careEditing=false;
+          await this.loadDetailPhotos(plantId); await this.loadDetailEvents(plantId);
+        }
+        if(kind==='event'){ const ev=this.detailEvents.find(e=>e.id===id); if(ev)this.openEntrySheet('event',ev); }
+        else{ const ph=this.detailPhotos.find(x=>x.id===id); if(ph)this.openEntrySheet('photo',ph); }
+      },
+      sheetPhoto(){ return this.sheet ? this.sheet.ph : null; },
+      closeSheet(){ this.sheetOpen=false; this.sheetConfirmDelete=false; },
+      sheetOpenPhoto(){ const ph=this.sheetPhoto(); if(!ph)return; const aug=Object.assign({},ph,{plant_id:this.detailPlant&&this.detailPlant.id,plantName:this.sheet.plantName}); this.openViewer([aug],0,true); },
+      async sheetViewPlant(){ const p=this.detailPlant; this.closeSheet(); if(p) await this.openDetail(p); },
+      async sheetEdit(){
+        if(!this.sheet||this.sheet.kind!=='event')return;
+        const evId=this.sheet.ev.id, p=this.detailPlant;
+        this.closeSheet(); await this.openDetail(p);
+        const ev=this.detailEvents.find(e=>e.id===evId);
+        if(ev){ this.startEditEvent(ev); this.$nextTick(()=>{ const el=document.getElementById('eventEditor'); if(el)el.scrollIntoView({behavior:'smooth',block:'center'}); }); }
+      },
+      async sheetDelete(){
+        if(!this.sheet)return;
+        if(!this.sheetConfirmDelete){ this.sheetConfirmDelete=true; setTimeout(()=>{this.sheetConfirmDelete=false;},3000); return; }
+        this.detailBusy=true; this.detailError='';
+        try{
+          if(this.sheet.kind==='event'){
+            const {error}=await sb.from('journal_entry').delete().eq('id',this.sheet.ev.id); if(error)throw error;
+          }else{
+            const ph=this.sheet.ph;
+            if(this.detailPlant && this.detailPlant.cover_photo_id===ph.id){
+              const other=this.detailPhotos.find(x=>x.id!==ph.id);
+              await sb.from('plant').update({cover_photo_id:other?other.id:null}).eq('id',this.detailPlant.id);
+            }
+            try{ await sb.storage.from('photos').remove([ph.storage_path,thumbOf(ph.storage_path)]); }catch(_){}
+            const {error}=await sb.from('photo').delete().eq('id',ph.id); if(error)throw error;
+          }
+          this.closeSheet();
+          if(this.detailPlant){ await this.loadDetailEvents(this.detailPlant.id); await this.loadDetailPhotos(this.detailPlant.id); }
+          if(this.tab==='journal'){ await this.loadAllEvents(); this.allPhotosLoaded=false; if(this.journalFilter==='photos')await this.loadAllPhotos(); }
+        }catch(e){ this.detailError=e.message||'Could not delete the entry.'; }
+        finally{ this.detailBusy=false; }
+      },
       /* ---- care guide (species-level) ---- */
       hasCare(){const s=this.detailPlant&&this.detailPlant.species;return !!(s&&(s.care_dormancy||s.care_water||s.care_feeding||s.care_light||s.care_photoperiod||s.care_humidity));},
       waterLevel(){const w=this.detailPlant&&this.detailPlant.species&&this.detailPlant.species.care_water;return {low:1,medium:2,high:3}[w]||0;},
