@@ -153,7 +153,7 @@
   .care-head h3{font-size:15px;margin:0;font-weight:500}
   .care-edit{background:none;border:0;color:var(--pine-2);font-size:13px;cursor:pointer;font-family:inherit;padding:2px 0}
   .care-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;align-items:start;grid-auto-rows:min-content}
-  .care-tile{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .care-tile{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px;align-self:start}
   .care-tile .cl{font-size:10.5px;color:var(--muted)}
   .care-tile .cv{font-size:13px;color:var(--ink);margin-top:3px;display:flex;align-items:center;gap:3px;min-height:16px}
   .care-tile .cv.empty{color:var(--muted)}
@@ -187,6 +187,22 @@
   .vbar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:rgba(0,0,0,.5);color:#fff;font-size:13px}
   .vbar button{background:none;border:0;color:#bfe3cf;cursor:pointer;font-size:13px;font-family:inherit;padding:0}
   .vbar button.del{color:#ff9d9d}
+  /* ===== plant detail v2: hero + section boxes ===== */
+  .plant-hero{background:var(--pine);border-radius:14px;padding:14px 16px 16px;margin-bottom:12px}
+  .ph-back{display:inline-flex;align-items:center;gap:4px;color:rgba(255,255,255,.72);font-size:14px;background:none;border:0;cursor:pointer;font-family:inherit;padding:0;margin-bottom:9px}
+  .ph-back svg{width:15px;height:15px}
+  .plant-hero h2{font-family:var(--serif);font-style:italic;font-weight:500;font-size:22px;color:#fff;margin:0;line-height:1.25}
+  .ph-cats{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+  .ph-cat{font-size:11px;padding:2px 9px;border-radius:20px;background:rgba(255,255,255,.2);color:#fff}
+  .info-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+  .info-card .fields{margin:0}
+  .info-card .fields>div:first-child{border-top:0;padding-top:0}
+  .sec-wrap{margin-bottom:12px}
+  .sec-hd{display:flex;align-items:center;gap:9px;background:var(--pine);color:#fff;border-radius:14px 14px 0 0;padding:11px 14px}
+  .sico{width:17px;height:17px;flex:0 0 auto;opacity:.88}
+  .sec-hd h3{margin:0;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;flex:1;color:#fff}
+  .sec-act{color:rgba(255,255,255,.8);font-size:13px;background:none;border:0;cursor:pointer;font-family:inherit;padding:0}
+  .sec-body{background:var(--card);border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:14px}
 </style>
 </head>
 <body>
@@ -407,184 +423,209 @@
 
     <!-- plant detail -->
     <template x-if="screen==='detail' && detailPlant">
-      <div class="detailwrap">
-        <div class="backbar"><button class="ghost" @click="closeDetail()">← Collection</button></div>
-        <h2 x-text="displayName(detailPlant)"></h2>
-        <p class="hint" x-show="detailPlant.lifecycle_status && detailPlant.lifecycle_status!=='in_collection'">
-          Status: <span x-text="statusLabel(detailPlant.lifecycle_status)"></span>
-        </p>
-        <div x-show="detailPlant.plant_category && detailPlant.plant_category.length" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px">
-          <template x-for="pc in (detailPlant.plant_category||[])" :key="pc.category_id">
-            <span class="cat-chip selected" x-text="pc.category && pc.category.name"></span>
-          </template>
-        </div>
+      <div style="padding-bottom:20px">
 
-        <!-- where (up top — wild origin + growing spot) -->
-        <div style="display:flex;gap:8px;margin:10px 0 4px">
-          <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 11px">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--pine)" stroke-width="1.6" style="flex:0 0 auto"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
-            <div style="min-width:0"><div style="font-size:10.5px;color:var(--muted)">Location data</div><div style="font-size:13px" :style="detailPlant.location_data?'':'color:var(--muted)'" x-text="detailPlant.location_data || 'No information'"></div></div>
-          </div>
-          <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 11px">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--pine)" stroke-width="1.6" style="flex:0 0 auto"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>
-            <div style="min-width:0"><div style="font-size:10.5px;color:var(--muted)">Growing spot</div><div style="font-size:13px" :style="detailPlant.growing_location?'':'color:var(--muted)'" x-text="detailPlant.growing_location ? detailPlant.growing_location.name : 'Not set'"></div></div>
+        <!-- ── HERO: plant name + back ── -->
+        <div class="plant-hero">
+          <button class="ph-back" @click="closeDetail()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Collection
+          </button>
+          <h2 x-text="displayName(detailPlant)"></h2>
+          <div class="ph-cats" x-show="detailPlant.plant_category && detailPlant.plant_category.length">
+            <template x-for="pc in (detailPlant.plant_category||[])" :key="pc.category_id">
+              <span class="ph-cat" x-text="pc.category && pc.category.name"></span>
+            </template>
           </div>
         </div>
 
-        <!-- info fields (up top) -->
-        <dl class="fields">
-          <div x-show="detailPlant.form_descriptor"><dt>Form/Descriptor</dt><dd x-text="detailPlant.form_descriptor"></dd></div>
-          <div><dt>Vendor</dt><dd x-text="detailPlant.vendor ? detailPlant.vendor.name : '—'"></dd></div>
-          <div><dt>Quantity</dt><dd x-text="detailPlant.quantity"></dd></div>
-          <div x-show="detailPlant.acquisition_date"><dt>Acquired</dt><dd x-text="detailPlant.acquisition_date"></dd></div>
-          <div x-show="detailPlant.acquisition_type"><dt>How acquired</dt><dd x-text="acqTypeLabel(detailPlant.acquisition_type)"></dd></div>
-          <div x-show="detailPlant.price!=null"><dt>Price</dt><dd x-text="detailPlant.price"></dd></div>
-          <div x-show="detailPlant.accession_id"><dt>Accession ID</dt><dd x-text="detailPlant.accession_id"></dd></div>
-          <div x-show="detailPlant.source_url"><dt>Purchase link</dt><dd><a :href="detailPlant.source_url" target="_blank" rel="noopener noreferrer" x-text="detailPlant.source_url" style="color:var(--pine-2);word-break:break-all"></a></dd></div>
-          <div><dt>Status</dt><dd x-text="statusLabel(detailPlant.lifecycle_status)"></dd></div>
-          <div x-show="detailPlant.notes"><dt>Notes</dt><dd x-text="detailPlant.notes"></dd></div>
-        </dl>
-
-        <!-- care at a glance (species-level) -->
-        <div class="care-head">
-          <h3>Care</h3>
-          <button class="care-edit" @click="openCareEditor()" x-show="!careEditing" x-text="hasCare()?'Edit':'＋ Add care'"></button>
-        </div>
-        <p class="hint" x-show="!careEditing && detailPlant.species" style="margin-top:2px">Shared by all your <span x-text="detailPlant.species&&detailPlant.species.name"></span></p>
-
-        <!-- care editor -->
-        <div class="evform" x-show="careEditing" x-transition>
-          <div class="grid2">
-            <div><label>Water (amount)</label><select x-model="careForm.water"><option value="">—</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
-            <div><label>Light</label><select x-model="careForm.light"><option value="">—</option><option value="Full sun">Full sun</option><option value="Bright">Bright</option><option value="Partial">Partial shade</option><option value="Shade">Shade</option></select></div>
-            <div><label>Dormancy</label><select x-model="careForm.dormancy"><option value="">—</option><option value="None">None</option><option value="Winter">Winter</option><option value="Summer">Summer</option></select></div>
-            <div><label>Humidity</label><select x-model="careForm.humidity"><option value="">—</option><option value="Low">Low</option><option value="Moderate">Moderate</option><option value="High">High</option></select></div>
-            <div><label>Feeding</label><select x-model="careForm.feeding"><option value="">—</option><option value="None">None</option><option value="Occasional">Occasional</option><option value="Regular">Regular</option></select></div>
-            <div><label>Photoperiod</label><input type="text" x-model="careForm.photoperiod" placeholder="e.g. 12–14 h"></div>
-          </div>
-          <div class="formfoot">
-            <button class="primary" @click="saveCare()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save care'"></button>
-            <button class="ghost" @click="careEditing=false" :disabled="detailBusy">Cancel</button>
-          </div>
-        </div>
-
-        <!-- care tiles -->
-        <div class="care-grid" x-show="!careEditing && hasCare()">
-          <div class="care-tile">
-            <div class="cl">Water</div>
-            <div class="cv" :class="waterLevel()?'':'empty'">
-              <template x-if="waterLevel()">
-                <span style="display:flex;gap:1px">
-                  <template x-for="i in 3" :key="i"><svg class="care-drop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" :style="i<=waterLevel()?'color:#185FA5':'color:var(--muted);opacity:.35'"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"/></svg></template>
-                </span>
-              </template>
-              <span x-show="!waterLevel()">—</span>
+        <!-- ── INFO CARD: location tiles + detail fields ── -->
+        <div class="info-card">
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 11px">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--pine)" stroke-width="1.6" style="flex:0 0 auto"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
+              <div style="min-width:0"><div style="font-size:10.5px;color:var(--muted)">Location data</div><div style="font-size:13px" :style="detailPlant.location_data?'':'color:var(--muted)'" x-text="detailPlant.location_data || 'No information'"></div></div>
+            </div>
+            <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 11px">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--pine)" stroke-width="1.6" style="flex:0 0 auto"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>
+              <div style="min-width:0"><div style="font-size:10.5px;color:var(--muted)">Growing spot</div><div style="font-size:13px" :style="detailPlant.growing_location?'':'color:var(--muted)'" x-text="detailPlant.growing_location ? detailPlant.growing_location.name : 'Not set'"></div></div>
             </div>
           </div>
-          <div class="care-tile"><div class="cl">Light</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_light?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_light)||'—'"></div></div>
-          <div class="care-tile"><div class="cl">Dormancy</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_dormancy?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_dormancy)||'—'"></div></div>
-          <div class="care-tile"><div class="cl">Photoperiod</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_photoperiod?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_photoperiod)||'—'"></div></div>
-          <div class="care-tile"><div class="cl">Humidity</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_humidity?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_humidity)||'—'"></div></div>
-          <div class="care-tile"><div class="cl">Feeding</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_feeding?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_feeding)||'—'"></div></div>
+          <dl class="fields" style="margin:0">
+            <div x-show="detailPlant.form_descriptor"><dt>Form/Descriptor</dt><dd x-text="detailPlant.form_descriptor"></dd></div>
+            <div><dt>Vendor</dt><dd x-text="detailPlant.vendor ? detailPlant.vendor.name : '—'"></dd></div>
+            <div><dt>Quantity</dt><dd x-text="detailPlant.quantity"></dd></div>
+            <div x-show="detailPlant.acquisition_date"><dt>Acquired</dt><dd x-text="detailPlant.acquisition_date"></dd></div>
+            <div x-show="detailPlant.acquisition_type"><dt>How acquired</dt><dd x-text="acqTypeLabel(detailPlant.acquisition_type)"></dd></div>
+            <div x-show="detailPlant.price!=null"><dt>Price</dt><dd x-text="detailPlant.price"></dd></div>
+            <div x-show="detailPlant.accession_id"><dt>Accession ID</dt><dd x-text="detailPlant.accession_id"></dd></div>
+            <div x-show="detailPlant.source_url"><dt>Purchase link</dt><dd><a :href="detailPlant.source_url" target="_blank" rel="noopener noreferrer" x-text="detailPlant.source_url" style="color:var(--pine-2);word-break:break-all"></a></dd></div>
+            <div><dt>Status</dt><dd x-text="statusLabel(detailPlant.lifecycle_status)"></dd></div>
+            <div x-show="detailPlant.notes"><dt>Notes</dt><dd x-text="detailPlant.notes"></dd></div>
+          </dl>
         </div>
 
-        <!-- photos: one-line strip; tap a photo to view it, "See all" opens the photo page -->
-        <div class="photos-head">
-          <h3>Photos</h3>
-          <button class="care-edit" x-show="detailPhotos.length" @click="openPhotos()">See all <span x-text="detailPhotos.length"></span> ›</button>
-        </div>
-        <div class="pstrip">
-          <template x-for="(ph,idx) in recentPhotos()" :key="ph.id">
-            <div class="pthumb" @click="openViewer(recentPhotos(), idx)"><img :src="ph.thumbUrl" alt=""><span class="cover" x-show="ph.id===detailPlant.cover_photo_id">cover</span></div>
-          </template>
-          <input type="file" x-ref="detailInput" accept="image/*" multiple @change="addDetailPhotos($event)" style="display:none">
-          <button type="button" class="padd" @click="$refs.detailInput.click()" :disabled="detailBusy" aria-label="Add photo">＋</button>
-        </div>
-        <div x-show="detailBusy" class="hint">Working…</div>
-        <div class="msg err" x-text="detailError"></div>
-
-        <!-- activity / event log -->
-        <div class="activity">
-          <h3>Journal</h3>
-          <div class="seg">
-            <button :class="timelineFilter==='all'?'on':''" @click="timelineFilter='all'">All</button>
-            <button :class="timelineFilter==='photos'?'on':''" @click="timelineFilter='photos'">Photos</button>
+        <!-- ── CARE section ── -->
+        <div class="sec-wrap">
+          <div class="sec-hd">
+            <!-- leaf / care icon -->
+            <svg class="sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 21c0-6 3.5-11 12-12 0 7-4.5 12-10.5 12z"/><path d="M6 21c1.5-4.5 4-7.5 8-9.5" stroke-linecap="round"/></svg>
+            <h3>Care</h3>
+            <button class="sec-act" @click="openCareEditor()" x-show="!careEditing" x-text="hasCare()?'Edit':'＋ Add'"></button>
           </div>
-          <div><button type="button" class="filebtn" @click="startLogEvent()" x-show="!loggingEvent">＋ Log event</button></div>
+          <div class="sec-body">
+            <p class="hint" x-show="!careEditing && detailPlant.species" style="margin:0 0 10px">Shared by all your <em x-text="detailPlant.species&&detailPlant.species.name" style="font-family:var(--serif)"></em></p>
 
-          <div class="evform" x-show="loggingEvent" x-transition>
-            <div class="grid2">
-              <div>
-                <label>What happened</label>
-                <select x-model="newEvent.type">
-                  <option value="note">Note</option>
-                  <option value="flowered">Flowered</option>
-                  <option value="fruited">Fruited / set seed</option>
-                  <option value="repotted">Repotted</option>
-                  <option value="fed">Fed</option>
-                  <option value="pest_treated">Pest / disease treated</option>
-                  <option value="divided">Divided</option>
-                  <option value="dormant">Went dormant</option>
-                  <option value="woke">Woke from dormancy</option>
-                  <option value="measured">Measured</option>
-                </select>
-              </div>
-              <div><label>Date</label><input type="date" x-model="newEvent.date"></div>
-            </div>
-            <template x-if="newEvent.type==='measured'">
+            <!-- care editor -->
+            <div class="evform" x-show="careEditing" x-transition>
               <div class="grid2">
-                <div><label>Measure</label><input type="text" x-model="newEvent.measureLabel" placeholder="e.g. pitcher height"></div>
-                <div style="display:flex;gap:8px">
-                  <div style="flex:1"><label>Value</label><input type="number" step="any" x-model="newEvent.measureValue"></div>
-                  <div style="flex:1"><label>Unit</label><input type="text" x-model="newEvent.measureUnit" placeholder="cm"></div>
+                <div><label>Water (amount)</label><select x-model="careForm.water"><option value="">—</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+                <div><label>Light</label><select x-model="careForm.light"><option value="">—</option><option value="Full sun">Full sun</option><option value="Bright">Bright</option><option value="Partial">Partial shade</option><option value="Shade">Shade</option></select></div>
+                <div><label>Dormancy</label><select x-model="careForm.dormancy"><option value="">—</option><option value="None">None</option><option value="Winter">Winter</option><option value="Summer">Summer</option></select></div>
+                <div><label>Humidity</label><select x-model="careForm.humidity"><option value="">—</option><option value="Low">Low</option><option value="Moderate">Moderate</option><option value="High">High</option></select></div>
+                <div><label>Feeding</label><select x-model="careForm.feeding"><option value="">—</option><option value="None">None</option><option value="Occasional">Occasional</option><option value="Regular">Regular</option></select></div>
+                <div><label>Photoperiod</label><input type="text" x-model="careForm.photoperiod" placeholder="e.g. 12–14 h"></div>
+              </div>
+              <div class="formfoot">
+                <button class="primary" @click="saveCare()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save care'"></button>
+                <button class="ghost" @click="careEditing=false" :disabled="detailBusy">Cancel</button>
+              </div>
+            </div>
+
+            <!-- care tiles -->
+            <div class="care-grid" x-show="!careEditing && hasCare()">
+              <div class="care-tile">
+                <div class="cl">Water</div>
+                <div class="cv" :class="waterLevel()?'':'empty'">
+                  <template x-if="waterLevel()">
+                    <span style="display:flex;gap:1px">
+                      <template x-for="i in 3" :key="i"><svg class="care-drop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" :style="i<=waterLevel()?'color:#185FA5':'color:var(--muted);opacity:.35'"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"/></svg></template>
+                    </span>
+                  </template>
+                  <span x-show="!waterLevel()">—</span>
                 </div>
               </div>
-            </template>
-            <label>Note <span class="hint">(soil mix, fertilizer, which pest — anything)</span></label>
-            <textarea rows="2" x-model="newEvent.note" placeholder="optional"></textarea>
-            <label>Photo for this event <span class="hint">(optional)</span></label>
-            <input type="file" x-ref="eventInput" accept="image/*" @change="onEventPhoto($event)" style="display:none">
-            <div x-show="!newEvent.photo">
-              <button type="button" class="filebtn" @click="$refs.eventInput.click()" :disabled="detailBusy">＋ Add Photo</button>
+              <div class="care-tile"><div class="cl">Light</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_light?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_light)||'—'"></div></div>
+              <div class="care-tile"><div class="cl">Dormancy</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_dormancy?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_dormancy)||'—'"></div></div>
+              <div class="care-tile"><div class="cl">Photoperiod</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_photoperiod?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_photoperiod)||'—'"></div></div>
+              <div class="care-tile"><div class="cl">Humidity</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_humidity?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_humidity)||'—'"></div></div>
+              <div class="care-tile"><div class="cl">Feeding</div><div class="cv" :class="detailPlant.species&&detailPlant.species.care_feeding?'':'empty'" x-text="(detailPlant.species&&detailPlant.species.care_feeding)||'—'"></div></div>
             </div>
-            <div class="thumb" x-show="newEvent.photo" style="margin-top:8px">
-              <button type="button" class="rm" @click="removeEventPhoto()">✕</button>
-              <img :src="newEvent.photo&&newEvent.photo.url" alt="">
-            </div>
-            <div class="formfoot">
-              <button class="primary" @click="saveEvent()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save event'"></button>
-              <button class="ghost" @click="cancelLogEvent()" :disabled="detailBusy">Cancel</button>
-            </div>
-          </div>
-
-          <div class="tl">
-            <template x-for="it in timeline()" :key="it.kind+'-'+(it.kind==='event'?it.ev.id:it.ph.id)">
-              <div class="tl-item">
-                <div class="when" x-text="it.date||'—'"></div>
-                <template x-if="it.kind==='photo'">
-                  <div class="what" style="display:flex;gap:10px;align-items:center">
-                    <img class="tl-thumb" :src="it.ph.thumbUrl" alt="">
-                    <span class="badge" x-text="photoLabel(it.ph.label)"></span>
-                  </div>
-                </template>
-                <template x-if="it.kind==='event'">
-                  <div class="what">
-                    <span class="badge" x-text="eventTypeLabel(it.ev.event_type)"></span>
-                    <span x-show="it.ev.measure_value!=null" x-text="' '+(it.ev.measure_label?it.ev.measure_label+': ':'')+it.ev.measure_value+(it.ev.measure_unit?' '+it.ev.measure_unit:'')"></span>
-                    <span x-show="it.ev.cause" class="hint" x-text="' · cause: '+it.ev.cause"></span>
-                    <div x-show="it.ev.body" x-text="it.ev.body" style="margin-top:3px"></div>
-                    <img x-show="eventPhotoUrl(it.ev)" :src="eventPhotoUrl(it.ev)" alt="" class="tl-thumb" style="margin-top:6px">
-                    <div><button class="tl-del" :class="eventDeleteId===it.ev.id?'arm':''" @click="deleteEvent(it.ev)" x-text="eventDeleteId===it.ev.id?'tap to confirm':'delete'"></button></div>
-                  </div>
-                </template>
-              </div>
-            </template>
-            <div x-show="timeline().length===0" class="hint" style="padding:10px 0">Start this plant's story — tap <strong>＋ Log event</strong> to add the first note or photo.</div>
+            <div x-show="!careEditing && !hasCare()" class="hint" style="padding:4px 0">No care guide yet — tap ＋ Add to create one.</div>
           </div>
         </div>
 
-        <div class="formfoot">
-          <button class="primary" @click="editPlant()" :disabled="detailBusy">Edit</button>
+        <!-- ── PHOTOS section ── -->
+        <div class="sec-wrap">
+          <div class="sec-hd">
+            <!-- camera icon -->
+            <svg class="sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3.2"/><path d="M8 7l1.5-3h5L16 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <h3>Photos</h3>
+            <button class="sec-act" x-show="detailPhotos.length" @click="openPhotos()">See all <span x-text="detailPhotos.length"></span> ›</button>
+          </div>
+          <div class="sec-body">
+            <div class="pstrip">
+              <template x-for="(ph,idx) in recentPhotos()" :key="ph.id">
+                <div class="pthumb" @click="openViewer(recentPhotos(), idx)"><img :src="ph.thumbUrl" alt=""><span class="cover" x-show="ph.id===detailPlant.cover_photo_id">cover</span></div>
+              </template>
+              <input type="file" x-ref="detailInput" accept="image/*" multiple @change="addDetailPhotos($event)" style="display:none">
+              <button type="button" class="padd" @click="$refs.detailInput.click()" :disabled="detailBusy" aria-label="Add photo">＋</button>
+            </div>
+            <div x-show="detailBusy" class="hint" style="margin-top:6px">Working…</div>
+            <div class="msg err" x-text="detailError"></div>
+          </div>
+        </div>
+
+        <!-- ── JOURNAL section ── -->
+        <div class="sec-wrap">
+          <div class="sec-hd">
+            <!-- open book / journal icon -->
+            <svg class="sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h7a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M20 4h-7a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1z"/><line x1="7" y1="9" x2="10" y2="9" stroke-linecap="round"/><line x1="7" y1="12" x2="10" y2="12" stroke-linecap="round"/><line x1="14" y1="9" x2="17" y2="9" stroke-linecap="round"/><line x1="14" y1="12" x2="17" y2="12" stroke-linecap="round"/></svg>
+            <h3>Journal</h3>
+          </div>
+          <div class="sec-body">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+              <div class="seg" style="margin-bottom:0">
+                <button :class="timelineFilter==='all'?'on':''" @click="timelineFilter='all'">All</button>
+                <button :class="timelineFilter==='photos'?'on':''" @click="timelineFilter='photos'">Photos</button>
+              </div>
+              <button type="button" class="filebtn" @click="startLogEvent()" x-show="!loggingEvent" style="margin-top:0;padding:7px 13px;font-size:13px">＋ Log event</button>
+            </div>
+
+            <div class="evform" x-show="loggingEvent" x-transition>
+              <div class="grid2">
+                <div>
+                  <label>What happened</label>
+                  <select x-model="newEvent.type">
+                    <option value="note">Note</option>
+                    <option value="flowered">Flowered</option>
+                    <option value="fruited">Fruited / set seed</option>
+                    <option value="repotted">Repotted</option>
+                    <option value="fed">Fed</option>
+                    <option value="pest_treated">Pest / disease treated</option>
+                    <option value="divided">Divided</option>
+                    <option value="dormant">Went dormant</option>
+                    <option value="woke">Woke from dormancy</option>
+                    <option value="measured">Measured</option>
+                  </select>
+                </div>
+                <div><label>Date</label><input type="date" x-model="newEvent.date"></div>
+              </div>
+              <template x-if="newEvent.type==='measured'">
+                <div class="grid2">
+                  <div><label>Measure</label><input type="text" x-model="newEvent.measureLabel" placeholder="e.g. pitcher height"></div>
+                  <div style="display:flex;gap:8px">
+                    <div style="flex:1"><label>Value</label><input type="number" step="any" x-model="newEvent.measureValue"></div>
+                    <div style="flex:1"><label>Unit</label><input type="text" x-model="newEvent.measureUnit" placeholder="cm"></div>
+                  </div>
+                </div>
+              </template>
+              <label>Note <span class="hint">(soil mix, fertilizer, which pest — anything)</span></label>
+              <textarea rows="2" x-model="newEvent.note" placeholder="optional"></textarea>
+              <label>Photo for this event <span class="hint">(optional)</span></label>
+              <input type="file" x-ref="eventInput" accept="image/*" @change="onEventPhoto($event)" style="display:none">
+              <div x-show="!newEvent.photo">
+                <button type="button" class="filebtn" @click="$refs.eventInput.click()" :disabled="detailBusy">＋ Add Photo</button>
+              </div>
+              <div class="thumb" x-show="newEvent.photo" style="margin-top:8px">
+                <button type="button" class="rm" @click="removeEventPhoto()">✕</button>
+                <img :src="newEvent.photo&&newEvent.photo.url" alt="">
+              </div>
+              <div class="formfoot">
+                <button class="primary" @click="saveEvent()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save event'"></button>
+                <button class="ghost" @click="cancelLogEvent()" :disabled="detailBusy">Cancel</button>
+              </div>
+            </div>
+
+            <div class="tl">
+              <template x-for="it in timeline()" :key="it.kind+'-'+(it.kind==='event'?it.ev.id:it.ph.id)">
+                <div class="tl-item">
+                  <div class="when" x-text="it.date||'—'"></div>
+                  <template x-if="it.kind==='photo'">
+                    <div class="what" style="display:flex;gap:10px;align-items:center">
+                      <img class="tl-thumb" :src="it.ph.thumbUrl" alt="">
+                      <span class="badge" x-text="photoLabel(it.ph.label)"></span>
+                    </div>
+                  </template>
+                  <template x-if="it.kind==='event'">
+                    <div class="what">
+                      <span class="badge" x-text="eventTypeLabel(it.ev.event_type)"></span>
+                      <span x-show="it.ev.measure_value!=null" x-text="' '+(it.ev.measure_label?it.ev.measure_label+': ':'')+it.ev.measure_value+(it.ev.measure_unit?' '+it.ev.measure_unit:'')"></span>
+                      <span x-show="it.ev.cause" class="hint" x-text="' · cause: '+it.ev.cause"></span>
+                      <div x-show="it.ev.body" x-text="it.ev.body" style="margin-top:3px"></div>
+                      <img x-show="eventPhotoUrl(it.ev)" :src="eventPhotoUrl(it.ev)" alt="" class="tl-thumb" style="margin-top:6px">
+                      <div><button class="tl-del" :class="eventDeleteId===it.ev.id?'arm':''" @click="deleteEvent(it.ev)" x-text="eventDeleteId===it.ev.id?'tap to confirm':'delete'"></button></div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <div x-show="timeline().length===0" class="hint" style="padding:10px 0">Start this plant's story — tap <strong>＋ Log event</strong> to add the first note or photo.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="formfoot" style="margin-top:4px">
+          <button class="primary" @click="editPlant()" :disabled="detailBusy">Edit plant</button>
           <button class="ghost danger" @click="deletePlant()" :disabled="detailBusy" x-text="confirmingDelete?'Tap again to delete':'Delete'"></button>
         </div>
       </div>
