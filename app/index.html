@@ -165,8 +165,8 @@
   .care-head{display:flex;align-items:center;justify-content:space-between;margin:14px 0 0}
   .care-head h3{font-size:15px;margin:0;font-weight:500}
   .care-edit{background:none;border:0;color:var(--pine-2);font-size:13px;cursor:pointer;font-family:inherit;padding:2px 0}
-  .care-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;align-items:start;grid-auto-rows:min-content}
-  .care-tile{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px;align-self:start}
+  .care-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;align-items:start;align-content:start;grid-auto-rows:54px}
+  .care-tile{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px;height:54px;overflow:hidden;align-self:start}
   .care-tile .cl{font-size:10.5px;color:var(--muted)}
   .care-tile .cv{font-size:13px;color:var(--ink);margin-top:3px;display:flex;align-items:center;gap:3px;min-height:16px}
   .care-tile .cv.empty{color:var(--muted)}
@@ -202,8 +202,10 @@
   .vbar button.del{color:#ff9d9d}
   /* ===== plant detail v2: hero + section boxes ===== */
   .plant-hero{background:var(--pine);border-radius:14px;padding:14px 16px 16px;margin-bottom:12px}
-  .ph-back{display:inline-flex;align-items:center;gap:4px;color:rgba(255,255,255,.72);font-size:14px;background:none;border:0;cursor:pointer;font-family:inherit;padding:0;margin-bottom:9px}
+  .ph-toprow{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+  .ph-back{display:inline-flex;align-items:center;gap:4px;color:rgba(255,255,255,.72);font-size:14px;background:none;border:0;cursor:pointer;font-family:inherit;padding:0}
   .ph-back svg{width:15px;height:15px}
+  .ph-edit{color:#fff;font-size:14px;font-weight:600;background:rgba(255,255,255,.16);border:0;cursor:pointer;font-family:inherit;padding:6px 14px;border-radius:8px}
   .plant-hero h2{font-family:var(--serif);font-style:italic;font-weight:500;font-size:22px;color:#fff;margin:0;line-height:1.25}
   .ph-cats{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
   .ph-cat{font-size:11px;padding:2px 9px;border-radius:20px;background:rgba(255,255,255,.2);color:#fff}
@@ -253,7 +255,7 @@
   <div x-show="view==='app'" class="app">
 
     <!-- entry / edit form -->
-    <div class="formwrap" x-show="screen==='form'" x-transition>
+    <div class="formwrap" x-show="screen==='form'" x-transition style="padding-bottom:calc(88px + env(safe-area-inset-bottom))">
       <h2 x-text="editId?'Edit plant':'Add a plant'"></h2>
       <p class="hint">Pick the genus first, then its species. Use ＋ to add anything that isn't in the list yet.</p>
 
@@ -436,14 +438,17 @@
 
     <!-- plant detail -->
     <template x-if="screen==='detail' && detailPlant">
-      <div style="padding-bottom:20px">
+      <div style="padding-bottom:calc(88px + env(safe-area-inset-bottom))">
 
         <!-- ── HERO: plant name + back ── -->
         <div class="plant-hero">
-          <button class="ph-back" @click="closeDetail()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
-            Collection
-          </button>
+          <div class="ph-toprow">
+            <button class="ph-back" @click="closeDetail()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+              Collection
+            </button>
+            <button class="ph-edit" @click="editPlant()" :disabled="detailBusy">Edit</button>
+          </div>
           <h2 x-text="displayName(detailPlant)"></h2>
           <div class="ph-cats" x-show="detailPlant.plant_category && detailPlant.plant_category.length">
             <template x-for="pc in (detailPlant.plant_category||[])" :key="pc.category_id">
@@ -638,15 +643,14 @@
         </div>
 
         <div class="formfoot" style="margin-top:4px">
-          <button class="primary" @click="editPlant()" :disabled="detailBusy">Edit plant</button>
-          <button class="ghost danger" @click="deletePlant()" :disabled="detailBusy" x-text="confirmingDelete?'Tap again to delete':'Delete'"></button>
+          <button class="ghost danger" @click="deletePlant()" :disabled="detailBusy" x-text="confirmingDelete?'Tap again to delete':'Delete plant'"></button>
         </div>
       </div>
     </template>
 
     <!-- photo-only page (progression) -->
     <template x-if="screen==='photos' && detailPlant">
-      <div class="detailwrap">
+      <div class="detailwrap" style="padding-bottom:calc(88px + env(safe-area-inset-bottom))">
         <div class="photopage-head">
           <button class="ghost" @click="closePhotos()">← Back</button>
           <div style="min-width:0">
@@ -863,11 +867,11 @@
       <p class="who" style="margin-top:26px;text-align:center">Signed in as <span x-text="userEmail"></span> · <a style="color:var(--pine-2);cursor:pointer" @click="signOut()">sign out</a></p>
     </div>
 
-    <!-- floating add + bottom tabs (home only) -->
+    <!-- floating add (home only) + bottom tabs (every page) -->
     <button class="fab" x-show="screen==='list' && (tab==='plants'||tab==='list')" @click="openForm()" aria-label="Add a plant">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
     </button>
-    <div class="tabbar" x-show="screen==='list'">
+    <div class="tabbar">
       <button class="tab" :class="tab==='plants'?'on':''" @click="setTab('plants')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 21c0-7 4-12 14-13 0 8-5 13-12 13z"/><path d="M5 21c2-5 5-8 9-10" stroke-linecap="round"/></svg>Plants</button>
       <button class="tab" :class="tab==='journal'?'on':''" @click="setTab('journal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 5a2 2 0 0 1 2-2h11v18H7a2 2 0 0 1-2-2z"/><path d="M7 16h11"/></svg>Journal</button>
       <button class="tab" :class="tab==='list'?'on':''" @click="setTab('list')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h12M8 12h12M8 18h12M4 6h0M4 12h0M4 18h0" stroke-linecap="round"/></svg>List</button>
@@ -1490,7 +1494,7 @@
       /* ---- redesigned home: tabs, genus gallery, text list, journal ---- */
       genusOf(p){return (p.species&&p.species.genus&&p.species.genus.name)||'Unfiled';},
       speciesLine(p){const s=p.species?p.species.name:'';const line=[s,p.form_descriptor].filter(Boolean).join(' ').trim();return line||this.displayName(p);},
-      setTab(t){this.tab=t;this.eventDeleteId=null;if(t==='journal'){this.loadAllEvents();this.allPhotosLoaded=false;if(this.journalFilter==='photos')this.loadAllPhotos();}},
+      setTab(t){this.tab=t;this.screen='list';this.eventDeleteId=null;if(t==='journal'){this.loadAllEvents();this.allPhotosLoaded=false;if(this.journalFilter==='photos')this.loadAllPhotos();}},
       generaGallery(){
         const list=this.galleryCatId?this.plants.filter(p=>(p.plant_category||[]).some(pc=>pc.category_id===this.galleryCatId)):this.plants;
         const by={};
