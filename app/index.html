@@ -194,6 +194,11 @@
   .ppcard img{width:100%;height:100%;object-fit:cover;display:block}
   .ppcard .cover{position:absolute;top:5px;left:5px;background:var(--pine);color:#fff;font-size:9px;padding:1px 6px;border-radius:5px}
   .ppcard .pplbl{position:absolute;bottom:5px;left:5px;background:rgba(0,0,0,.45);color:#fff;font-size:10px;padding:1px 6px;border-radius:5px}
+  .pp-star{position:absolute;top:6px;right:6px;width:30px;height:30px;border-radius:50%;border:0;background:rgba(15,20,16,.42);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2;transition:background .15s}
+  .pp-star svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:1.6}
+  .pp-star.on{background:var(--pine)}
+  .pp-star.on svg{fill:#fff;stroke:#fff}
+  .pp-star:disabled{opacity:.6}
   .viewer{position:fixed;inset:0;background:rgba(15,20,16,.93);z-index:50;display:flex;align-items:center;justify-content:center}
   .viewer img{max-width:94vw;max-height:76vh;object-fit:contain;border-radius:6px}
   .vclose{position:absolute;top:14px;right:16px;background:rgba(255,255,255,.16);color:#fff;border:0;width:38px;height:38px;border-radius:50%;font-size:17px;cursor:pointer;z-index:2}
@@ -733,11 +738,14 @@
         <button type="button" class="filebtn" @click="$refs.photosInput.click()" :disabled="detailBusy">＋ Add Photo</button>
         <div x-show="detailBusy" class="hint">Working…</div>
         <div class="msg err" x-text="detailError"></div>
+        <p class="hint" x-show="detailPhotos.length" style="margin:10px 0 0">Tap ★ to choose the cover photo shown on the plant.</p>
         <div class="photo-page-grid">
           <template x-for="(ph,idx) in pagePhotos()" :key="ph.id">
             <div class="ppcard" @click="openViewer(pagePhotos(), idx)">
               <img :src="ph.thumbUrl" alt="">
-              <span class="cover" x-show="ph.id===detailPlant.cover_photo_id">cover</span>
+              <button class="pp-star" :class="ph.id===detailPlant.cover_photo_id?'on':''" @click.stop="toggleCover(ph)" :disabled="detailBusy" :aria-label="ph.id===detailPlant.cover_photo_id?'Cover photo — tap to unset':'Set as cover'">
+                <svg viewBox="0 0 24 24" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L4.5 9.7l5.9-.9z"/></svg>
+              </button>
               <span class="pplbl" x-text="ph.photo_date"></span>
             </div>
           </template>
@@ -1629,6 +1637,17 @@
           if(error)throw error;
           await this.refreshDetail();
         }catch(e){this.detailError=e.message||'Could not set the cover.';}
+        finally{this.detailBusy=false;}
+      },
+      async toggleCover(ph){
+        // tap a non-cover star → make it the cover; tap the current cover's star → deselect (no cover)
+        this.detailBusy=true;this.detailError='';
+        try{
+          const next=this.detailPlant.cover_photo_id===ph.id?null:ph.id;
+          const {error}=await sb.from('plant').update({cover_photo_id:next}).eq('id',this.detailPlant.id);
+          if(error)throw error;
+          await this.refreshDetail();
+        }catch(e){this.detailError=e.message||'Could not update the cover.';}
         finally{this.detailBusy=false;}
       },
 
