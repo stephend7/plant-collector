@@ -27,3 +27,4 @@ Always run them in number order, and only once each. They're safe and non-destru
 | 001 | `001_acquisition_type_and_source_url.sql` | Adds `acquisition_type` + `source_url` to plant | ✅ APPLIED 2026-06-18 |
 | 002 | `002_photo_label_plant_flower.sql`        | Adds `plant_flower` to allowed photo labels     | ✅ APPLIED 2026-06-18 |
 | 003 | `003_event_log_and_care_fields.sql`       | Event-log columns on journal + species care fields | ✅ APPLIED 2026-06-18 |
+| 004 | `004_multi_photo_journal_entries.sql`     | `photo.journal_entry_id` so an entry can hold many photos (+ RLS guard) | ⬜ NOT APPLIED |

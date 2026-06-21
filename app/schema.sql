@@ -150,6 +150,7 @@ create table photo (
   comment       text,
   photo_date    date not null default current_date,
   sort_order    integer not null default 0,
+  -- journal_entry_id (a photo may belong to one entry) is added by migration 004
   created_at    timestamptz not null default now()
 );
 

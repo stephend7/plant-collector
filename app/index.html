@@ -220,6 +220,9 @@
   .sheet-photo{width:100%;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin-bottom:12px;cursor:pointer;background:var(--field);position:relative}
   .sheet-photo img{width:100%;display:block;max-height:48vh;object-fit:cover}
   .sheet-photo .zoom{position:absolute;right:8px;bottom:8px;background:rgba(15,20,16,.6);color:#fff;font-size:11px;padding:3px 9px;border-radius:20px}
+  .sheet-photos{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  .sheet-pthumb{width:calc((100% - 16px)/3);aspect-ratio:1/1;border-radius:10px;overflow:hidden;border:1px solid var(--line);cursor:pointer}
+  .sheet-pthumb img{width:100%;height:100%;object-fit:cover;display:block}
   .sheet-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
   .sheet-meta .d{color:var(--muted);font-size:13px}
   .sheet-note{font-size:15px;line-height:1.5;white-space:pre-wrap;margin:8px 0 14px}
@@ -662,14 +665,16 @@
               </template>
               <label>Note <span class="hint">(soil mix, fertilizer, which pest — anything)</span></label>
               <textarea rows="2" x-model="newEvent.note" placeholder="optional"></textarea>
-              <label>Photo for this event <span class="hint">(optional)</span></label>
-              <input type="file" x-ref="eventInput" accept="image/*" @change="onEventPhoto($event)" style="display:none">
-              <div x-show="!newEvent.photo && !newEvent.existingPhotoUrl">
-                <button type="button" class="filebtn" @click="$refs.eventInput.click()" :disabled="detailBusy">＋ Add Photo</button>
-              </div>
-              <div class="thumb" x-show="newEvent.photo || newEvent.existingPhotoUrl" style="margin-top:8px">
-                <button type="button" class="rm" @click="removeEventPhoto()">✕</button>
-                <img :src="newEvent.photo ? newEvent.photo.url : newEvent.existingPhotoUrl" alt="">
+              <label>Photos for this event <span class="hint">(optional — add several, e.g. before / after / roots)</span></label>
+              <input type="file" x-ref="eventInput" accept="image/*" multiple @change="onEventPhoto($event)" style="display:none">
+              <button type="button" class="filebtn" @click="$refs.eventInput.click()" :disabled="detailBusy">＋ Add Photo</button>
+              <div class="thumbs" x-show="keptExistingPhotos().length || newEvent.photos.length" style="margin-top:10px">
+                <template x-for="ph in keptExistingPhotos()" :key="ph.id">
+                  <div class="thumb"><button type="button" class="rm" @click="removeExistingEventPhoto(ph.id)">✕</button><img :src="ph.thumbUrl" alt=""></div>
+                </template>
+                <template x-for="ph in newEvent.photos" :key="ph.id">
+                  <div class="thumb"><button type="button" class="rm" @click="removeEventPhoto(ph.id)">✕</button><img :src="ph.url" alt=""></div>
+                </template>
               </div>
               <div class="formfoot">
                 <button class="primary" @click="saveEvent()" :disabled="detailBusy" x-text="detailBusy?'Saving…':(editEventId?'Save changes':'Save event')"></button>
@@ -695,7 +700,10 @@
                         <span x-show="it.ev.measure_value!=null" x-text="' '+(it.ev.measure_label?it.ev.measure_label+': ':'')+it.ev.measure_value+(it.ev.measure_unit?' '+it.ev.measure_unit:'')"></span>
                         <div x-show="it.ev.body" x-text="it.ev.body" style="margin-top:3px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical"></div>
                       </div>
-                      <img x-show="eventPhotoUrl(it.ev)" :src="eventPhotoUrl(it.ev)" alt="" class="tl-thumb" style="flex:0 0 auto">
+                      <div x-show="eventPhotoUrl(it.ev)" style="position:relative;flex:0 0 auto">
+                        <img :src="eventPhotoUrl(it.ev)" alt="" class="tl-thumb" style="display:block">
+                        <span x-show="eventPhotos(it.ev).length>1" x-text="'+'+(eventPhotos(it.ev).length-1)" style="position:absolute;right:-4px;bottom:-4px;background:var(--pine);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:9px;border:1.5px solid var(--card)"></span>
+                      </div>
                       <svg style="color:var(--muted);flex:0 0 auto;margin-top:2px" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 6 15 12 9 18" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </div>
                   </template>
@@ -775,14 +783,14 @@
             <button class="sheet-x" @click="closeSheet()" aria-label="Close">✕</button>
           </div>
           <div class="sheet-body">
-            <!-- photo (if any) -->
-            <div class="sheet-photo" x-show="sheetPhoto()" @click="sheetOpenPhoto()">
-              <img :src="sheetPhoto() && sheetPhoto().thumbUrl" alt="">
-              <span class="zoom">Tap to enlarge</span>
-            </div>
             <!-- event entry -->
             <template x-if="sheet.kind==='event'">
               <div>
+                <div class="sheet-photos" x-show="eventPhotos(sheet.ev).length">
+                  <template x-for="(ph,idx) in eventPhotos(sheet.ev)" :key="ph.id">
+                    <div class="sheet-pthumb" @click="sheetOpenEventPhoto(idx)"><img :src="ph.thumbUrl" alt=""></div>
+                  </template>
+                </div>
                 <div class="sheet-meta">
                   <span class="badge" x-text="eventTypeLabel(sheet.ev.event_type)"></span>
                   <span class="d" x-text="fmtDate(sheet.ev.entry_date)"></span>
@@ -792,9 +800,14 @@
                 </div>
                 <div class="sheet-meta" x-show="sheet.ev.cause"><span class="d" x-text="'Cause: '+sheet.ev.cause"></span></div>
                 <div class="sheet-note" x-show="sheet.ev.body" x-text="sheet.ev.body"></div>
-                <div class="hint" x-show="!sheet.ev.body && !sheetPhoto() && sheet.ev.measure_value==null" style="margin-bottom:12px">No note on this entry.</div>
+                <div class="hint" x-show="!sheet.ev.body && !eventPhotos(sheet.ev).length && sheet.ev.measure_value==null" style="margin-bottom:12px">No note on this entry.</div>
               </div>
             </template>
+            <!-- single photo (standalone entry) -->
+            <div class="sheet-photo" x-show="sheet.kind==='photo' && sheetPhoto()" @click="sheetOpenPhoto()">
+              <img :src="sheetPhoto() && sheetPhoto().thumbUrl" alt="">
+              <span class="zoom">Tap to enlarge</span>
+            </div>
             <!-- photo entry -->
             <template x-if="sheet.kind==='photo'">
               <div>
@@ -821,6 +834,9 @@
                     </div>
                     <div><label>Date</label><input type="date" x-model="sheetForm.date"></div>
                   </div>
+                  <label>Image</label>
+                  <input type="file" x-ref="replaceInput" accept="image/*" @change="onReplacePhoto($event)" style="display:none">
+                  <button type="button" class="filebtn" @click="$refs.replaceInput.click()" :disabled="detailBusy">⟳ Replace photo</button>
                   <div class="msg err" x-show="detailError" x-text="detailError" style="margin:6px 0"></div>
                   <div class="formfoot">
                     <button class="primary" @click="saveSheetPhoto()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save'"></button>
@@ -917,6 +933,10 @@
 
       <!-- LIST tab (text only, grouped by genus, filterable) -->
       <div x-show="tab==='list'">
+        <button class="backrow" @click="tabBack()">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
         <div class="homehead">
           <div><h1>All plants</h1><p class="homesub" x-text="listCount()+' shown'"></p></div>
           <button class="iconbtn" @click="exportCsv()" :disabled="!plants.length" title="Export to CSV" aria-label="Export to CSV">
@@ -943,7 +963,7 @@
 
       <!-- JOURNAL tab (whole collection, newest first) -->
       <div x-show="tab==='journal'">
-        <button class="backrow" @click="journalBack()">
+        <button class="backrow" @click="tabBack()">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           Back
         </button>
@@ -1003,6 +1023,10 @@
 
       <!-- CARE tab (placeholder) -->
       <div x-show="tab==='care'">
+        <button class="backrow" @click="tabBack()">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
         <div class="homehead"><div><h1>Care</h1><p class="homesub">Growing guides &amp; what needs doing</p></div></div>
         <div class="emptybox" style="margin-top:20px">
           <p style="margin:0 0 6px;font-size:15px;color:var(--ink)">Coming soon.</p>
@@ -1191,7 +1215,7 @@
       photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
       sheetOpen:false, sheet:null, sheetConfirmDelete:false, sheetEditing:false, sheetForm:{comment:'',label:'plant',date:''},
       prevTab:'plants',
-      newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null,existingPhotoId:null,existingPhotoUrl:null,photoRemoved:false},
+      newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photos:[],existingPhotos:[],removedPhotoIds:[]},
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
       journalFilter:'all', allPhotos:[], allPhotosLoaded:false,
@@ -1440,7 +1464,7 @@
       async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.sheetOpen=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
       closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;this.sheetOpen=false;},
       async loadDetailPhotos(plantId){
-        const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date,comment').eq('plant_id',plantId).order('sort_order');
+        const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date,comment,journal_entry_id').eq('plant_id',plantId).order('sort_order');
         const photos=data||[];
         if(photos.length){
           const {data:signed}=await sb.storage.from('photos').createSignedUrls(photos.map(p=>thumbOf(p.storage_path)),3600);
@@ -1454,7 +1478,8 @@
           .eq('plant_id',plantId).order('entry_date',{ascending:false}).order('created_at',{ascending:false});
         this.detailEvents=data||[];
       },
-      eventPhotoUrl(ev){ if(!ev.photo_id)return null; const p=this.detailPhotos.find(x=>x.id===ev.photo_id); return p?p.thumbUrl:null; },
+      eventPhotos(ev){ return this.detailPhotos.filter(p=>p.journal_entry_id===ev.id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||((a.photo_date||'')<(b.photo_date||'')?-1:1)); },
+      eventPhotoUrl(ev){ const ps=this.eventPhotos(ev); if(ps.length)return ps[0].thumbUrl||null; if(ev.photo_id){const p=this.detailPhotos.find(x=>x.id===ev.photo_id);return p?p.thumbUrl:null;} return null; },
       async refreshDetail(){
         await this.loadPlants();
         const fresh=this.plants.find(x=>x.id===this.detailPlant.id);
@@ -1465,11 +1490,10 @@
       timeline(){
         const items=[];
         const all=this.timelineFilter==='all';
-        const onEvents=new Set(this.detailEvents.map(e=>e.photo_id).filter(Boolean));
         if(all) for(const e of this.detailEvents) items.push({kind:'event',date:e.entry_date,sort:(e.entry_date||''),ev:e});
-        // In "All", a photo attached to an event is shown ON that event (skip the dupe).
+        // In "All", photos attached to an event are shown ON that event (skip them here).
         // In "Photos", show every photo so you can flip the full progression.
-        for(const p of this.detailPhotos){ if(all && onEvents.has(p.id))continue; items.push({kind:'photo',date:p.photo_date,sort:(p.photo_date||''),ph:p}); }
+        for(const p of this.detailPhotos){ if(all && p.journal_entry_id)continue; items.push({kind:'photo',date:p.photo_date,sort:(p.photo_date||''),ph:p}); }
         items.sort((a,b)=>(a.sort<b.sort?1:a.sort>b.sort?-1:0));
         return items;
       },
@@ -1484,84 +1508,71 @@
         const {error}=await sb.from('journal_entry').insert(row);
         if(error)throw error;
       },
-      startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.newEvent={type:'note',date:todayLocal(),note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null,existingPhotoId:null,existingPhotoUrl:null,photoRemoved:false};this.loggingEvent=true;},
+      _blankEvent(){return{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photos:[],existingPhotos:[],removedPhotoIds:[]};},
+      startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.newEvent=Object.assign(this._blankEvent(),{date:todayLocal()});this.loggingEvent=true;},
       startEditEvent(ev){
         this.eventDeleteId=null; this.detailError='';
         this.editEventId=ev.id;
-        this.newEvent={
+        this.newEvent=Object.assign(this._blankEvent(),{
           type:ev.event_type, date:ev.entry_date||todayLocal(), note:ev.body||'',
           measureLabel:ev.measure_label||'', measureValue:(ev.measure_value!=null?ev.measure_value:''), measureUnit:ev.measure_unit||'',
-          photo:null, existingPhotoId:ev.photo_id||null, existingPhotoUrl:ev.photo_id?this.eventPhotoUrl(ev):null, photoRemoved:false,
-        };
+          existingPhotos:this.eventPhotos(ev).map(p=>({id:p.id,thumbUrl:p.thumbUrl,storage_path:p.storage_path})),
+        });
         this.loggingEvent=true;
       },
-      cancelLogEvent(){ if(this.newEvent.photo){try{URL.revokeObjectURL(this.newEvent.photo.url);}catch(e){}} this.loggingEvent=false; this.editEventId=null; },
+      cancelLogEvent(){ (this.newEvent.photos||[]).forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}}); this.loggingEvent=false; this.editEventId=null; },
       async onEventPhoto(ev){
-        const file=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!file)return;
+        const files=[...(ev.target.files||[])]; ev.target.value=''; if(!files.length)return;
         this.detailBusy=true; this.detailError='';
-        try{ const {full,thumb}=await processImage(file); this.newEvent.photo={id:uid(),full,thumb,url:URL.createObjectURL(thumb)}; }
-        catch(e){ this.detailError = isHeic(file) ? 'That HEIC can’t be read here — open in Safari or save as JPEG.' : ('Couldn’t process that photo: '+((e&&e.message)||e)); }
-        finally{ this.detailBusy=false; }
+        for(const file of files){
+          try{ const {full,thumb}=await processImage(file); this.newEvent.photos.push({id:uid(),full,thumb,url:URL.createObjectURL(thumb)}); }
+          catch(e){ this.detailError = isHeic(file) ? 'That HEIC can’t be read here — open in Safari or save as JPEG.' : ('Couldn’t process that photo: '+((e&&e.message)||e)); }
+        }
+        this.detailBusy=false;
       },
-      removeEventPhoto(){
-        if(this.newEvent.photo){ try{URL.revokeObjectURL(this.newEvent.photo.url);}catch(e){} this.newEvent.photo=null; return; }
-        if(this.newEvent.existingPhotoUrl){ this.newEvent.photoRemoved=true; this.newEvent.existingPhotoUrl=null; }
-      },
+      removeEventPhoto(id){ const i=this.newEvent.photos.findIndex(p=>p.id===id); if(i>=0){try{URL.revokeObjectURL(this.newEvent.photos[i].url);}catch(e){} this.newEvent.photos.splice(i,1);} },
+      removeExistingEventPhoto(id){ if(!this.newEvent.removedPhotoIds.includes(id))this.newEvent.removedPhotoIds.push(id); },
+      keptExistingPhotos(){ return (this.newEvent.existingPhotos||[]).filter(p=>!this.newEvent.removedPhotoIds.includes(p.id)); },
       async saveEvent(){
         const e=this.newEvent; this.detailBusy=true; this.detailError='';
         try{
           const date=e.date||todayLocal();
+          const pid=this.detailPlant.id;
           const photoLabelFor=t=>({flowered:'flower',fruited:'flower',pest_treated:'pests'})[t]||'plant';
+          const measureCols=()=>{const m={measure_label:null,measure_value:null,measure_unit:null};if(e.type==='measured'){if((e.measureLabel||'').trim())m.measure_label=e.measureLabel.trim();if(e.measureValue!==''&&e.measureValue!=null)m.measure_value=Number(e.measureValue);if((e.measureUnit||'').trim())m.measure_unit=e.measureUnit.trim();}return m;};
 
-          // ---- EDIT an existing entry ----
-          if(this.editEventId){
-            let finalPhotoId = e.photoRemoved ? null : (e.existingPhotoId||null);
-            let oldPhotoIdToDrop = (e.photoRemoved && e.existingPhotoId) ? e.existingPhotoId : null;
-            if(e.photo){
-              if(e.existingPhotoId && !e.photoRemoved) oldPhotoIdToDrop = e.existingPhotoId;
-              const newId=e.photo.id;
-              await uploadPhoto(this.userId,newId,e.photo.full,e.photo.thumb);
-              const {error:perr}=await sb.from('photo').insert({id:newId,plant_id:this.detailPlant.id,storage_path:this.userId+'/'+newId+'.jpg',label:photoLabelFor(e.type),photo_date:date});
-              if(perr)throw perr;
-              finalPhotoId=newId;
-            }
-            const upd={event_type:e.type,entry_date:date,body:(e.note||'').trim()||null,photo_id:finalPhotoId,
-              measure_label:null,measure_value:null,measure_unit:null};
-            if(e.type==='measured'){ if((e.measureLabel||'').trim())upd.measure_label=e.measureLabel.trim(); if(e.measureValue!==''&&e.measureValue!=null)upd.measure_value=Number(e.measureValue); if((e.measureUnit||'').trim())upd.measure_unit=e.measureUnit.trim(); }
-            const {error}=await sb.from('journal_entry').update(upd).eq('id',this.editEventId);
-            if(error)throw error;
-            // drop the detached old photo (skip if it's the plant cover — keep it as a standalone photo)
-            if(oldPhotoIdToDrop && this.detailPlant.cover_photo_id!==oldPhotoIdToDrop){
-              const old=this.detailPhotos.find(x=>x.id===oldPhotoIdToDrop);
-              if(old){ try{ await sb.storage.from('photos').remove([old.storage_path,thumbOf(old.storage_path)]); }catch(_){} await sb.from('photo').delete().eq('id',oldPhotoIdToDrop); }
-            }
-            await this.loadDetailEvents(this.detailPlant.id);
-            await this.loadDetailPhotos(this.detailPlant.id);
-            this.loggingEvent=false; this.editEventId=null;
-            this.newEvent={type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null,existingPhotoId:null,existingPhotoUrl:null,photoRemoved:false};
-            return;
+          // event id — reuse on edit, create otherwise
+          let evId=this.editEventId;
+          if(!evId){
+            const row=Object.assign({plant_id:pid,event_type:e.type,entry_date:date},measureCols());
+            if((e.note||'').trim())row.body=e.note.trim();
+            const {data,error}=await sb.from('journal_entry').insert(row).select('id').single();
+            if(error)throw error; evId=data.id;
           }
 
-          // ---- CREATE a new entry ----
-          let photoId=null;
-          if(e.photo){
-            photoId=e.photo.id;
-            await uploadPhoto(this.userId,photoId,e.photo.full,e.photo.thumb);
-            const {error:perr}=await sb.from('photo').insert({id:photoId,plant_id:this.detailPlant.id,storage_path:this.userId+'/'+photoId+'.jpg',label:photoLabelFor(e.type),photo_date:date});
+          // delete any existing photos the user removed (skip the plant cover — keep it standalone)
+          for(const rid of e.removedPhotoIds){
+            if(this.detailPlant.cover_photo_id===rid)continue;
+            const old=this.detailPhotos.find(x=>x.id===rid);
+            if(old){ try{ await sb.storage.from('photos').remove([old.storage_path,thumbOf(old.storage_path)]); }catch(_){} await sb.from('photo').delete().eq('id',rid); }
+          }
+          // upload + attach the new photos to this entry
+          for(let i=0;i<e.photos.length;i++){
+            const ph=e.photos[i];
+            await uploadPhoto(this.userId,ph.id,ph.full,ph.thumb);
+            const {error:perr}=await sb.from('photo').insert({id:ph.id,plant_id:pid,journal_entry_id:evId,storage_path:this.userId+'/'+ph.id+'.jpg',label:photoLabelFor(e.type),photo_date:date,sort_order:i});
             if(perr)throw perr;
           }
-          const row={plant_id:this.detailPlant.id,event_type:e.type,entry_date:date};
-          if((e.note||'').trim())row.body=e.note.trim();
-          if(e.type==='measured'){ if((e.measureLabel||'').trim())row.measure_label=e.measureLabel.trim(); if(e.measureValue!==''&&e.measureValue!=null)row.measure_value=Number(e.measureValue); if((e.measureUnit||'').trim())row.measure_unit=e.measureUnit.trim(); }
-          if(photoId)row.photo_id=photoId;
-          const {data,error}=await sb.from('journal_entry').insert(row)
-            .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause,photo_id').single();
-          if(error)throw error;
-          // optimistic — update the screen in place, no reload
-          this.detailEvents.unshift(data);
-          if(e.photo){ this.detailPhotos.push({id:photoId,storage_path:this.userId+'/'+photoId+'.jpg',label:photoLabelFor(e.type),photo_date:date,thumbUrl:e.photo.url}); }
-          this.loggingEvent=false;
-          this.newEvent={type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null,existingPhotoId:null,existingPhotoUrl:null,photoRemoved:false};
+          // primary photo (for the whole-collection journal indicator) = first kept, else first new
+          const kept=this.keptExistingPhotos();
+          const primaryId=(kept[0]&&kept[0].id)||(e.photos[0]&&e.photos[0].id)||null;
+          const upd=Object.assign({event_type:e.type,entry_date:date,body:(e.note||'').trim()||null,photo_id:primaryId},measureCols());
+          const {error:uerr}=await sb.from('journal_entry').update(upd).eq('id',evId);
+          if(uerr)throw uerr;
+
+          await this.loadDetailEvents(pid); await this.loadDetailPhotos(pid);
+          if(this.tab==='journal'){ this.allPhotosLoaded=false; await this.loadAllEvents(); if(this.journalFilter==='photos')await this.loadAllPhotos(); }
+          this.loggingEvent=false; this.editEventId=null; this.newEvent=this._blankEvent();
         }catch(err){this.detailError=err.message||'Could not save the entry.';}
         finally{this.detailBusy=false;}
       },
@@ -1705,7 +1716,7 @@
       genusOf(p){return (p.species&&p.species.genus&&p.species.genus.name)||'Unfiled';},
       speciesLine(p){const s=p.species?p.species.name:'';const line=[s,p.form_descriptor].filter(Boolean).join(' ').trim();return line||this.displayName(p);},
       setTab(t){if(this.tab!==t)this.prevTab=this.tab;this.tab=t;this.screen='list';this.eventDeleteId=null;if(t==='journal'){this.loadAllEvents();this.allPhotosLoaded=false;if(this.journalFilter==='photos')this.loadAllPhotos();}},
-      journalBack(){const t=(this.prevTab&&this.prevTab!=='journal')?this.prevTab:'plants';this.setTab(t);},
+      tabBack(){const t=(this.prevTab&&this.prevTab!==this.tab)?this.prevTab:'plants';this.setTab(t);},
       generaGallery(){
         const list=this.galleryCatId?this.plants.filter(p=>(p.plant_category||[]).some(pc=>pc.category_id===this.galleryCatId)):this.plants;
         const by={};
@@ -1826,6 +1837,18 @@
         finally{ this.detailBusy=false; }
       },
       sheetOpenPhoto(){ const ph=this.sheetPhoto(); if(!ph)return; const aug=Object.assign({},ph,{plant_id:this.detailPlant&&this.detailPlant.id,plantName:this.sheet.plantName}); this.openViewer([aug],0,true); },
+      sheetOpenEventPhoto(idx){ const ps=this.eventPhotos(this.sheet.ev).map(p=>Object.assign({},p,{plant_id:this.detailPlant&&this.detailPlant.id,plantName:this.sheet.plantName})); if(ps.length)this.openViewer(ps,idx,true); },
+      async onReplacePhoto(ev){
+        const file=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!file||!this.sheet||this.sheet.kind!=='photo')return;
+        const ph=this.sheet.ph; this.detailBusy=true; this.detailError='';
+        try{
+          const {full,thumb}=await processImage(file);
+          await uploadPhoto(this.userId,ph.id,full,thumb); // upsert overwrites the same file
+          if(this.detailPlant){ await this.loadDetailPhotos(this.detailPlant.id); await this.loadDetailEvents(this.detailPlant.id); const fresh=this.detailPhotos.find(x=>x.id===ph.id); if(fresh)this.sheet.ph=fresh; }
+          if(this.tab==='journal'){ this.allPhotosLoaded=false; if(this.journalFilter==='photos')await this.loadAllPhotos(); }
+        }catch(e){ this.detailError = isHeic(file) ? 'That HEIC can’t be read here — open in Safari or save as JPEG.' : (e.message||'Could not replace the photo.'); }
+        finally{ this.detailBusy=false; }
+      },
       async sheetViewPlant(){ const p=this.detailPlant; this.closeSheet(); if(p) await this.openDetail(p); },
       async sheetEdit(){
         if(!this.sheet||this.sheet.kind!=='event')return;

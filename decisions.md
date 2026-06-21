@@ -4,6 +4,33 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-21 — Multiple photos per journal entry (migration 004)
+
+Stephen: a journal entry should hold MANY photos (a repot: before / after / roots) and let you
+replace an image. Needs a real relationship, so migration 004 adds `photo.journal_entry_id`
+(nullable FK → journal_entry, `on delete set null`). An entry's photos = photos pointing at it;
+`journal_entry_id is null` = a plant-level photo (unchanged). Kept `journal_entry.photo_id` as the
+entry's *primary* photo so the whole-collection Journal indicator stays a cheap single-column read.
+
+- **UI:** event editor reuses the add-plant multi-photo pattern (add several, remove each); the
+  focused sheet shows all of an entry's photos in a grid (tap → full-screen viewer w/ prev-next);
+  the timeline row shows the first photo + a "+N" badge. Standalone photo entries gained a
+  **Replace photo** (re-upload over the same storage path — `uploadPhoto` already `upsert:true`).
+- **Consistency:** the `‹ Back` button (returns to the previous tab via `prevTab`) is on Journal,
+  List, AND Care now, matching the plant/photo windows. (Plants is the home root — no back.)
+- **Security review of migration 004 (full-tier, isolation) — VERDICT: PASS.** Mirrors 003 exactly:
+  new FK guarded on write by `(journal_entry_id is null or app_owns_journal_entry(journal_entry_id))`
+  where the helper is SECURITY DEFINER + pinned `search_path`, ownership-only. Reads stay
+  `user_id`-scoped → A can't see/attach to B's entries. Policy swap is wrapped in a transaction
+  (atomic; RLS stays enabled = deny-all mid-swap). `on delete set null` orphans an entry's photos
+  to plant-level on delete — no data loss, no cross-tenant path. Backfill links existing
+  single-photo events the new way.
+- **Apply step (Stephen):** run `app/migrations/004_…sql` in Supabase BEFORE relying on the new
+  build — the app now selects `photo.journal_entry_id`, which errors until the column exists.
+- **Verification:** JS syntax-checked via `jsc` (clean); NOT browser-run (sandbox + Supabase login).
+
+---
+
 ## 2026-06-21 — Journal UX pass: focused-entry sheet + sticky plant header
 
 Screenshot-driven UX review with Stephen (full findings + the spectrum/analytics framing in
