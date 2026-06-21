@@ -228,6 +228,11 @@
   .ph-back{display:inline-flex;align-items:center;gap:4px;color:rgba(255,255,255,.72);font-size:14px;background:none;border:0;cursor:pointer;font-family:inherit;padding:0}
   .ph-back svg{width:15px;height:15px}
   .ph-edit{color:rgba(255,255,255,.8);font-size:14px;background:none;border:0;cursor:pointer;font-family:inherit;padding:0}
+  .plant-stuck{position:sticky;top:0;z-index:7;display:flex;align-items:center;gap:10px;background:var(--pine);padding:10px 12px;border-radius:0 0 12px 12px;box-shadow:0 4px 12px rgba(31,42,34,.18);margin-bottom:8px}
+  .ps-back{background:none;border:0;color:#fff;cursor:pointer;padding:2px;display:flex;flex:0 0 auto}
+  .ps-back svg{width:20px;height:20px}
+  .ps-name{flex:1;min-width:0;font-family:var(--serif);font-style:italic;font-size:17px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ps-edit{flex:0 0 auto;color:rgba(255,255,255,.85);font-size:14px;background:none;border:0;cursor:pointer;font-family:inherit;padding:2px 4px}
   .plant-hero h2{font-family:var(--serif);font-style:italic;font-weight:500;font-size:22px;color:#fff;margin:0;line-height:1.25}
   .ph-cats{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
   .ph-cat{font-size:11px;padding:2px 9px;border-radius:20px;background:rgba(255,255,255,.2);color:#fff}
@@ -461,10 +466,19 @@
 
     <!-- plant detail -->
     <template x-if="screen==='detail' && detailPlant">
-      <div style="padding-bottom:24px">
+      <div style="padding-bottom:24px" x-init="setupStuckHeader()">
+
+        <!-- slim sticky header — appears once the hero scrolls away -->
+        <div class="plant-stuck" x-show="stuckShow" x-transition.opacity x-cloak>
+          <button class="ps-back" @click="closeDetail()" aria-label="Back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span class="ps-name" x-text="displayName(detailPlant)"></span>
+          <button class="ps-edit" @click="editPlant()" :disabled="detailBusy">Edit</button>
+        </div>
 
         <!-- ── HERO: plant name + back ── -->
-        <div class="plant-hero">
+        <div class="plant-hero" x-ref="hero">
           <div class="ph-toprow">
             <button class="ph-back" @click="closeDetail()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1122,6 +1136,7 @@
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
       photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
       sheetOpen:false, sheet:null, sheetConfirmDelete:false,
+      stuckShow:false, _stuckObs:null,
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null,existingPhotoId:null,existingPhotoUrl:null,photoRemoved:false},
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
@@ -1369,7 +1384,7 @@
 
       /* ---- detail view ---- */
       async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.sheetOpen=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
-      closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;this.sheetOpen=false;},
+      closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;this.sheetOpen=false;if(this._stuckObs){this._stuckObs.disconnect();this._stuckObs=null;}this.stuckShow=false;},
       async loadDetailPhotos(plantId){
         const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date').eq('plant_id',plantId).order('sort_order');
         const photos=data||[];
@@ -1693,6 +1708,18 @@
       },
       async openPlantById(id){const p=this.plants.find(x=>x.id===id);if(p)await this.openDetail(p);},
       async viewPlantFromViewer(){const ph=this.viewerPhoto();if(!ph)return;const id=ph.plant_id;this.closeViewer();await this.openPlantById(id);},
+
+      /* ---- sticky condensed plant header on scroll ---- */
+      setupStuckHeader(){
+        this.stuckShow=false;
+        this.$nextTick(()=>{
+          const hero=this.$refs.hero, root=document.querySelector('.appscroll');
+          if(!hero||!root||typeof IntersectionObserver==='undefined')return;
+          if(this._stuckObs)this._stuckObs.disconnect();
+          this._stuckObs=new IntersectionObserver((es)=>{ this.stuckShow=!es[0].isIntersecting; },{root,threshold:0});
+          this._stuckObs.observe(hero);
+        });
+      },
 
       /* ---- focused journal-entry sheet ---- */
       // open from the per-plant timeline (detailPlant/detailEvents/detailPhotos already loaded)
