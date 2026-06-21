@@ -795,19 +795,45 @@
                 <div class="hint" x-show="!sheet.ev.body && !sheetPhoto() && sheet.ev.measure_value==null" style="margin-bottom:12px">No note on this entry.</div>
               </div>
             </template>
-            <!-- photo-only entry -->
+            <!-- photo entry -->
             <template x-if="sheet.kind==='photo'">
-              <div class="sheet-meta">
-                <span class="badge" x-text="photoLabel(sheet.ph.label)"></span>
-                <span class="d" x-text="fmtDate(sheet.ph.photo_date)"></span>
+              <div>
+                <!-- view -->
+                <div x-show="!sheetEditing">
+                  <div class="sheet-meta">
+                    <span class="badge" x-text="photoLabel(sheet.ph.label)"></span>
+                    <span class="d" x-text="fmtDate(sheet.ph.photo_date)"></span>
+                  </div>
+                  <div class="sheet-note" x-show="sheet.ph.comment" x-text="sheet.ph.comment"></div>
+                  <div class="hint" x-show="!sheet.ph.comment" style="margin-bottom:12px">No note on this photo.</div>
+                </div>
+                <!-- edit (add a note / change label or date) -->
+                <div class="evform" x-show="sheetEditing" style="margin-top:4px">
+                  <label>Note <span class="hint">(a caption for this photo)</span></label>
+                  <textarea rows="2" x-model="sheetForm.comment" placeholder="optional"></textarea>
+                  <div class="grid2">
+                    <div><label>Label</label>
+                      <select x-model="sheetForm.label">
+                        <option value="plant">Plant</option><option value="flower">Flower</option>
+                        <option value="plant_flower">Plant &amp; Flower</option><option value="tag">Tag</option>
+                        <option value="pests">Pests</option><option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div><label>Date</label><input type="date" x-model="sheetForm.date"></div>
+                  </div>
+                  <div class="msg err" x-show="detailError" x-text="detailError" style="margin:6px 0"></div>
+                  <div class="formfoot">
+                    <button class="primary" @click="saveSheetPhoto()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save'"></button>
+                    <button class="ghost" @click="cancelSheetEdit()" :disabled="detailBusy">Cancel</button>
+                  </div>
+                </div>
               </div>
             </template>
           </div>
-          <div class="sheet-acts">
+          <div class="sheet-acts" x-show="!sheetEditing">
             <button class="go" @click="sheetViewPlant()">View plant →</button>
-            <template x-if="sheet.kind==='event'">
-              <button @click="sheetEdit()">Edit</button>
-            </template>
+            <template x-if="sheet.kind==='event'"><button @click="sheetEdit()">Edit</button></template>
+            <template x-if="sheet.kind==='photo'"><button @click="startSheetEdit()">Edit</button></template>
             <button class="danger" @click="sheetDelete()" x-text="sheetConfirmDelete?'Tap to confirm':'Delete'"></button>
           </div>
         </div>
@@ -917,6 +943,10 @@
 
       <!-- JOURNAL tab (whole collection, newest first) -->
       <div x-show="tab==='journal'">
+        <button class="backrow" @click="journalBack()">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
         <div class="homehead"><div><h1>Journal</h1><p class="homesub" x-text="journalFilter==='photos'?'The whole collection, in pictures':'Everything that\'s happened, newest first'"></p></div></div>
 
         <div class="seg" x-show="plants.length" style="margin-top:13px">
@@ -1159,7 +1189,8 @@
       detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
       photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
-      sheetOpen:false, sheet:null, sheetConfirmDelete:false,
+      sheetOpen:false, sheet:null, sheetConfirmDelete:false, sheetEditing:false, sheetForm:{comment:'',label:'plant',date:''},
+      prevTab:'plants',
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null,existingPhotoId:null,existingPhotoUrl:null,photoRemoved:false},
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
@@ -1409,7 +1440,7 @@
       async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.sheetOpen=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
       closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;this.sheetOpen=false;},
       async loadDetailPhotos(plantId){
-        const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date').eq('plant_id',plantId).order('sort_order');
+        const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date,comment').eq('plant_id',plantId).order('sort_order');
         const photos=data||[];
         if(photos.length){
           const {data:signed}=await sb.storage.from('photos').createSignedUrls(photos.map(p=>thumbOf(p.storage_path)),3600);
@@ -1673,7 +1704,8 @@
       /* ---- redesigned home: tabs, genus gallery, text list, journal ---- */
       genusOf(p){return (p.species&&p.species.genus&&p.species.genus.name)||'Unfiled';},
       speciesLine(p){const s=p.species?p.species.name:'';const line=[s,p.form_descriptor].filter(Boolean).join(' ').trim();return line||this.displayName(p);},
-      setTab(t){this.tab=t;this.screen='list';this.eventDeleteId=null;if(t==='journal'){this.loadAllEvents();this.allPhotosLoaded=false;if(this.journalFilter==='photos')this.loadAllPhotos();}},
+      setTab(t){if(this.tab!==t)this.prevTab=this.tab;this.tab=t;this.screen='list';this.eventDeleteId=null;if(t==='journal'){this.loadAllEvents();this.allPhotosLoaded=false;if(this.journalFilter==='photos')this.loadAllPhotos();}},
+      journalBack(){const t=(this.prevTab&&this.prevTab!=='journal')?this.prevTab:'plants';this.setTab(t);},
       generaGallery(){
         const list=this.galleryCatId?this.plants.filter(p=>(p.plant_category||[]).some(pc=>pc.category_id===this.galleryCatId)):this.plants;
         const by={};
@@ -1751,7 +1783,7 @@
       /* ---- focused journal-entry sheet ---- */
       // open from the per-plant timeline (detailPlant/detailEvents/detailPhotos already loaded)
       openEntrySheet(kind,item){
-        this.sheetConfirmDelete=false;
+        this.sheetConfirmDelete=false; this.sheetEditing=false; this.detailError='';
         if(kind==='event'){
           const ph=item.photo_id?this.detailPhotos.find(x=>x.id===item.photo_id):null;
           this.sheet={kind:'event',ev:item,ph:ph||null,plantName:this.displayName(this.detailPlant)};
@@ -1772,7 +1804,27 @@
         else{ const ph=this.detailPhotos.find(x=>x.id===id); if(ph)this.openEntrySheet('photo',ph); }
       },
       sheetPhoto(){ return this.sheet ? this.sheet.ph : null; },
-      closeSheet(){ this.sheetOpen=false; this.sheetConfirmDelete=false; },
+      closeSheet(){ this.sheetOpen=false; this.sheetConfirmDelete=false; this.sheetEditing=false; },
+      startSheetEdit(){
+        if(!this.sheet||this.sheet.kind!=='photo')return;
+        const ph=this.sheet.ph;
+        this.sheetForm={comment:ph.comment||'',label:ph.label||'plant',date:ph.photo_date||todayLocal()};
+        this.detailError=''; this.sheetEditing=true;
+      },
+      cancelSheetEdit(){ this.sheetEditing=false; this.detailError=''; },
+      async saveSheetPhoto(){
+        if(!this.sheet||this.sheet.kind!=='photo')return;
+        const ph=this.sheet.ph; this.detailBusy=true; this.detailError='';
+        try{
+          const upd={comment:(this.sheetForm.comment||'').trim()||null,label:this.sheetForm.label,photo_date:this.sheetForm.date||todayLocal()};
+          const {error}=await sb.from('photo').update(upd).eq('id',ph.id); if(error)throw error;
+          Object.assign(ph,upd);
+          if(this.detailPlant){ await this.loadDetailPhotos(this.detailPlant.id); await this.loadDetailEvents(this.detailPlant.id); const fresh=this.detailPhotos.find(x=>x.id===ph.id); if(fresh)this.sheet.ph=fresh; }
+          if(this.tab==='journal'){ this.allPhotosLoaded=false; if(this.journalFilter==='photos')await this.loadAllPhotos(); await this.loadAllEvents(); }
+          this.sheetEditing=false;
+        }catch(e){ this.detailError=e.message||'Could not save the photo.'; }
+        finally{ this.detailBusy=false; }
+      },
       sheetOpenPhoto(){ const ph=this.sheetPhoto(); if(!ph)return; const aug=Object.assign({},ph,{plant_id:this.detailPlant&&this.detailPlant.id,plantName:this.sheet.plantName}); this.openViewer([aug],0,true); },
       async sheetViewPlant(){ const p=this.detailPlant; this.closeSheet(); if(p) await this.openDetail(p); },
       async sheetEdit(){
