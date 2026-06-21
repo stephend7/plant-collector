@@ -238,13 +238,16 @@
   .ps-back svg{width:20px;height:20px}
   .ps-name{flex:1;min-width:0;font-family:var(--serif);font-style:italic;font-size:17px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ps-edit{flex:0 0 auto;color:rgba(255,255,255,.85);font-size:14px;background:none;border:0;cursor:pointer;font-family:inherit;padding:2px 4px}
-  .plant-hero h2{font-family:var(--serif);font-style:italic;font-weight:500;font-size:22px;color:#fff;margin:0;line-height:1.25}
-  .ph-cover{display:block;width:100%;height:200px;border:0;padding:0;border-radius:12px;overflow:hidden;cursor:pointer;background:rgba(255,255,255,.1);position:relative;margin:2px 0 12px}
-  .ph-cover img{width:100%;height:100%;object-fit:cover;display:block}
-  .ph-cover-ph{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:rgba(255,255,255,.82)}
-  .ph-cover-ph svg{width:34px;height:34px;opacity:.85}
-  .ph-cover-ph span{font-size:13px}
-  .ph-cover-hint{position:absolute;right:8px;bottom:8px;background:rgba(15,20,16,.5);color:#fff;font-size:11px;padding:3px 10px;border-radius:20px;display:flex;align-items:center;gap:4px}
+  .plant-hero h2{font-family:var(--serif);font-style:italic;font-weight:500;font-size:21px;color:#fff;margin:0;line-height:1.2}
+  /* compact: thumbnail beside the name (flip sides with flex-direction:row-reverse) */
+  .ph-main{display:flex;flex-direction:row;gap:13px;align-items:flex-start;margin-top:2px}
+  .ph-text{flex:1;min-width:0}
+  .ph-thumb{flex:0 0 auto;width:84px;height:84px;border-radius:12px;overflow:hidden;border:0;padding:0;cursor:pointer;background:rgba(255,255,255,.1);position:relative}
+  .ph-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .ph-thumb-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.8)}
+  .ph-thumb-ph svg{width:30px;height:30px;opacity:.85}
+  .ph-thumb-badge{position:absolute;right:3px;bottom:3px;width:19px;height:19px;border-radius:50%;background:rgba(15,20,16,.55);display:flex;align-items:center;justify-content:center}
+  .ph-thumb-badge svg{width:11px;height:11px;color:#fff}
   .ph-loc{font-size:12.5px;color:rgba(255,255,255,.78);margin-top:5px;display:flex;align-items:center;gap:5px}
   .ph-loc svg{width:13px;height:13px;flex:0 0 auto;opacity:.85}
   .ph-cats{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
@@ -499,27 +502,29 @@
             </button>
             <button class="ph-edit" @click="editPlant()" :disabled="detailBusy">Edit</button>
           </div>
-          <!-- cover photo (eyes eat first) — tap to view / change in Photos -->
-          <button class="ph-cover" @click="openPhotos()" aria-label="View or change photo">
-            <img x-show="detailPlant.thumbUrl" :src="detailPlant.thumbUrl" alt="">
-            <div class="ph-cover-ph" x-show="!detailPlant.thumbUrl">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 21c0-7 4-12 14-13 0 8-5 13-12 13z"/><path d="M5 21c2-5 5-8 9-10" stroke-linecap="round"/></svg>
-              <span>Add a photo</span>
+          <!-- compact: cover thumbnail (eyes eat first) beside the name; tap to view / change -->
+          <div class="ph-main">
+            <button class="ph-thumb" @click="openPhotos()" aria-label="View or change photo">
+              <img x-show="detailPlant.thumbUrl" :src="detailPlant.thumbUrl" alt="">
+              <div class="ph-thumb-ph" x-show="!detailPlant.thumbUrl">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 21c0-7 4-12 14-13 0 8-5 13-12 13z"/><path d="M5 21c2-5 5-8 9-10" stroke-linecap="round"/></svg>
+              </div>
+              <span class="ph-thumb-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4" stroke-linecap="round"/></svg>
+              </span>
+            </button>
+            <div class="ph-text">
+              <h2 x-text="displayName(detailPlant)"></h2>
+              <div class="ph-loc" x-show="detailPlant.location_data">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
+                <span x-text="detailPlant.location_data"></span>
+              </div>
+              <div class="ph-cats" x-show="detailPlant.plant_category && detailPlant.plant_category.length">
+                <template x-for="pc in (detailPlant.plant_category||[])" :key="pc.category_id">
+                  <span class="ph-cat" x-text="pc.category && pc.category.name"></span>
+                </template>
+              </div>
             </div>
-            <span class="ph-cover-hint" x-show="detailPlant.thumbUrl">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4" stroke-linecap="round"/></svg>
-              View / change
-            </span>
-          </button>
-          <h2 x-text="displayName(detailPlant)"></h2>
-          <div class="ph-loc" x-show="detailPlant.location_data">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
-            <span x-text="detailPlant.location_data"></span>
-          </div>
-          <div class="ph-cats" x-show="detailPlant.plant_category && detailPlant.plant_category.length">
-            <template x-for="pc in (detailPlant.plant_category||[])" :key="pc.category_id">
-              <span class="ph-cat" x-text="pc.category && pc.category.name"></span>
-            </template>
           </div>
         </div>
 
