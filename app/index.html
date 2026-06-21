@@ -109,7 +109,9 @@
   .tl-item .when{flex:0 0 84px;color:var(--muted);font-size:12px;padding-top:2px}
   .tl-item .what{flex:1;min-width:0}
   .tl-thumb{width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid var(--line)}
-  .tl-del{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:11px;margin-top:4px;padding:0}
+  .tl-acts{display:flex;gap:14px;margin-top:5px}
+  .tl-edit{background:transparent;border:0;color:var(--pine-2);cursor:pointer;font-size:11px;padding:0;font-family:inherit}
+  .tl-del{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:11px;padding:0;font-family:inherit}
   .tl-del.arm{color:var(--danger)}
   /* ===== redesigned shell: tabbed home ===== */
   .home{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
@@ -205,7 +207,7 @@
   .ph-toprow{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
   .ph-back{display:inline-flex;align-items:center;gap:4px;color:rgba(255,255,255,.72);font-size:14px;background:none;border:0;cursor:pointer;font-family:inherit;padding:0}
   .ph-back svg{width:15px;height:15px}
-  .ph-edit{color:#fff;font-size:14px;font-weight:600;background:rgba(255,255,255,.16);border:0;cursor:pointer;font-family:inherit;padding:6px 14px;border-radius:8px}
+  .ph-edit{color:rgba(255,255,255,.8);font-size:14px;background:none;border:0;cursor:pointer;font-family:inherit;padding:0}
   .plant-hero h2{font-family:var(--serif);font-style:italic;font-weight:500;font-size:22px;color:#fff;margin:0;line-height:1.25}
   .ph-cats{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
   .ph-cat{font-size:11px;padding:2px 9px;border-radius:20px;background:rgba(255,255,255,.2);color:#fff}
@@ -571,10 +573,14 @@
             </div>
 
             <div class="evform" x-show="loggingEvent" x-transition>
+              <p class="hint" x-show="editEventId" style="margin:0 0 8px;color:var(--ink);font-weight:600">Edit entry</p>
               <div class="grid2">
                 <div>
                   <label>What happened</label>
                   <select x-model="newEvent.type">
+                    <template x-if="editEventId && !['note','flowered','fruited','repotted','fed','pest_treated','divided','dormant','woke','measured'].includes(newEvent.type)">
+                      <option :value="newEvent.type" x-text="eventTypeLabel(newEvent.type)"></option>
+                    </template>
                     <option value="note">Note</option>
                     <option value="flowered">Flowered</option>
                     <option value="fruited">Fruited / set seed</option>
@@ -602,15 +608,15 @@
               <textarea rows="2" x-model="newEvent.note" placeholder="optional"></textarea>
               <label>Photo for this event <span class="hint">(optional)</span></label>
               <input type="file" x-ref="eventInput" accept="image/*" @change="onEventPhoto($event)" style="display:none">
-              <div x-show="!newEvent.photo">
+              <div x-show="!newEvent.photo && !newEvent.existingPhotoUrl">
                 <button type="button" class="filebtn" @click="$refs.eventInput.click()" :disabled="detailBusy">＋ Add Photo</button>
               </div>
-              <div class="thumb" x-show="newEvent.photo" style="margin-top:8px">
+              <div class="thumb" x-show="newEvent.photo || newEvent.existingPhotoUrl" style="margin-top:8px">
                 <button type="button" class="rm" @click="removeEventPhoto()">✕</button>
-                <img :src="newEvent.photo&&newEvent.photo.url" alt="">
+                <img :src="newEvent.photo ? newEvent.photo.url : newEvent.existingPhotoUrl" alt="">
               </div>
               <div class="formfoot">
-                <button class="primary" @click="saveEvent()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save event'"></button>
+                <button class="primary" @click="saveEvent()" :disabled="detailBusy" x-text="detailBusy?'Saving…':(editEventId?'Save changes':'Save event')"></button>
                 <button class="ghost" @click="cancelLogEvent()" :disabled="detailBusy">Cancel</button>
               </div>
             </div>
@@ -632,7 +638,10 @@
                       <span x-show="it.ev.cause" class="hint" x-text="' · cause: '+it.ev.cause"></span>
                       <div x-show="it.ev.body" x-text="it.ev.body" style="margin-top:3px"></div>
                       <img x-show="eventPhotoUrl(it.ev)" :src="eventPhotoUrl(it.ev)" alt="" class="tl-thumb" style="margin-top:6px">
-                      <div><button class="tl-del" :class="eventDeleteId===it.ev.id?'arm':''" @click="deleteEvent(it.ev)" x-text="eventDeleteId===it.ev.id?'tap to confirm':'delete'"></button></div>
+                      <div class="tl-acts">
+                        <button class="tl-edit" @click="startEditEvent(it.ev)">edit</button>
+                        <button class="tl-del" :class="eventDeleteId===it.ev.id?'arm':''" @click="deleteEvent(it.ev)" x-text="eventDeleteId===it.ev.id?'tap to confirm':'delete'"></button>
+                      </div>
                     </div>
                   </template>
                 </div>
@@ -1038,10 +1047,10 @@
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'',
       screen:'list', editId:null, saving:false, formError:'', photoBusy:false, pendingPhotos:[], detectedNote:'',
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
-      detailEvents:[], timelineFilter:'all', loggingEvent:false, eventDeleteId:null,
+      detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
       photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
-      newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null},
+      newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null,existingPhotoId:null,existingPhotoUrl:null,photoRemoved:false},
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
       journalFilter:'all', allPhotos:[], allPhotosLoaded:false,
@@ -1287,8 +1296,8 @@
       },
 
       /* ---- detail view ---- */
-      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.eventDeleteId=null;this.careEditing=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
-      closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.detailError='';this.confirmingDelete=false;},
+      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
+      closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;},
       async loadDetailPhotos(plantId){
         const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date').eq('plant_id',plantId).order('sort_order');
         const photos=data||[];
@@ -1334,8 +1343,18 @@
         const {error}=await sb.from('journal_entry').insert(row);
         if(error)throw error;
       },
-      startLogEvent(){this.eventDeleteId=null;this.newEvent={type:'note',date:todayLocal(),note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null};this.loggingEvent=true;},
-      cancelLogEvent(){ if(this.newEvent.photo){try{URL.revokeObjectURL(this.newEvent.photo.url);}catch(e){}} this.loggingEvent=false; },
+      startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.newEvent={type:'note',date:todayLocal(),note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null,existingPhotoId:null,existingPhotoUrl:null,photoRemoved:false};this.loggingEvent=true;},
+      startEditEvent(ev){
+        this.eventDeleteId=null; this.detailError='';
+        this.editEventId=ev.id;
+        this.newEvent={
+          type:ev.event_type, date:ev.entry_date||todayLocal(), note:ev.body||'',
+          measureLabel:ev.measure_label||'', measureValue:(ev.measure_value!=null?ev.measure_value:''), measureUnit:ev.measure_unit||'',
+          photo:null, existingPhotoId:ev.photo_id||null, existingPhotoUrl:ev.photo_id?this.eventPhotoUrl(ev):null, photoRemoved:false,
+        };
+        this.loggingEvent=true;
+      },
+      cancelLogEvent(){ if(this.newEvent.photo){try{URL.revokeObjectURL(this.newEvent.photo.url);}catch(e){}} this.loggingEvent=false; this.editEventId=null; },
       async onEventPhoto(ev){
         const file=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!file)return;
         this.detailBusy=true; this.detailError='';
@@ -1343,17 +1362,51 @@
         catch(e){ this.detailError = isHeic(file) ? 'That HEIC can’t be read here — open in Safari or save as JPEG.' : ('Couldn’t process that photo: '+((e&&e.message)||e)); }
         finally{ this.detailBusy=false; }
       },
-      removeEventPhoto(){ if(this.newEvent.photo){try{URL.revokeObjectURL(this.newEvent.photo.url);}catch(e){}} this.newEvent.photo=null; },
+      removeEventPhoto(){
+        if(this.newEvent.photo){ try{URL.revokeObjectURL(this.newEvent.photo.url);}catch(e){} this.newEvent.photo=null; return; }
+        if(this.newEvent.existingPhotoUrl){ this.newEvent.photoRemoved=true; this.newEvent.existingPhotoUrl=null; }
+      },
       async saveEvent(){
         const e=this.newEvent; this.detailBusy=true; this.detailError='';
         try{
           const date=e.date||todayLocal();
+          const photoLabelFor=t=>({flowered:'flower',fruited:'flower',pest_treated:'pests'})[t]||'plant';
+
+          // ---- EDIT an existing entry ----
+          if(this.editEventId){
+            let finalPhotoId = e.photoRemoved ? null : (e.existingPhotoId||null);
+            let oldPhotoIdToDrop = (e.photoRemoved && e.existingPhotoId) ? e.existingPhotoId : null;
+            if(e.photo){
+              if(e.existingPhotoId && !e.photoRemoved) oldPhotoIdToDrop = e.existingPhotoId;
+              const newId=e.photo.id;
+              await uploadPhoto(this.userId,newId,e.photo.full,e.photo.thumb);
+              const {error:perr}=await sb.from('photo').insert({id:newId,plant_id:this.detailPlant.id,storage_path:this.userId+'/'+newId+'.jpg',label:photoLabelFor(e.type),photo_date:date});
+              if(perr)throw perr;
+              finalPhotoId=newId;
+            }
+            const upd={event_type:e.type,entry_date:date,body:(e.note||'').trim()||null,photo_id:finalPhotoId,
+              measure_label:null,measure_value:null,measure_unit:null};
+            if(e.type==='measured'){ if((e.measureLabel||'').trim())upd.measure_label=e.measureLabel.trim(); if(e.measureValue!==''&&e.measureValue!=null)upd.measure_value=Number(e.measureValue); if((e.measureUnit||'').trim())upd.measure_unit=e.measureUnit.trim(); }
+            const {error}=await sb.from('journal_entry').update(upd).eq('id',this.editEventId);
+            if(error)throw error;
+            // drop the detached old photo (skip if it's the plant cover — keep it as a standalone photo)
+            if(oldPhotoIdToDrop && this.detailPlant.cover_photo_id!==oldPhotoIdToDrop){
+              const old=this.detailPhotos.find(x=>x.id===oldPhotoIdToDrop);
+              if(old){ try{ await sb.storage.from('photos').remove([old.storage_path,thumbOf(old.storage_path)]); }catch(_){} await sb.from('photo').delete().eq('id',oldPhotoIdToDrop); }
+            }
+            await this.loadDetailEvents(this.detailPlant.id);
+            await this.loadDetailPhotos(this.detailPlant.id);
+            this.loggingEvent=false; this.editEventId=null;
+            this.newEvent={type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null,existingPhotoId:null,existingPhotoUrl:null,photoRemoved:false};
+            return;
+          }
+
+          // ---- CREATE a new entry ----
           let photoId=null;
           if(e.photo){
             photoId=e.photo.id;
-            const label={flowered:'flower',fruited:'flower',pest_treated:'pests'}[e.type]||'plant';
             await uploadPhoto(this.userId,photoId,e.photo.full,e.photo.thumb);
-            const {error:perr}=await sb.from('photo').insert({id:photoId,plant_id:this.detailPlant.id,storage_path:this.userId+'/'+photoId+'.jpg',label,photo_date:date});
+            const {error:perr}=await sb.from('photo').insert({id:photoId,plant_id:this.detailPlant.id,storage_path:this.userId+'/'+photoId+'.jpg',label:photoLabelFor(e.type),photo_date:date});
             if(perr)throw perr;
           }
           const row={plant_id:this.detailPlant.id,event_type:e.type,entry_date:date};
@@ -1365,10 +1418,10 @@
           if(error)throw error;
           // optimistic — update the screen in place, no reload
           this.detailEvents.unshift(data);
-          if(e.photo){ this.detailPhotos.push({id:photoId,storage_path:this.userId+'/'+photoId+'.jpg',label:{flowered:'flower',fruited:'flower',pest_treated:'pests'}[e.type]||'plant',photo_date:date,thumbUrl:e.photo.url}); }
+          if(e.photo){ this.detailPhotos.push({id:photoId,storage_path:this.userId+'/'+photoId+'.jpg',label:photoLabelFor(e.type),photo_date:date,thumbUrl:e.photo.url}); }
           this.loggingEvent=false;
-          this.newEvent={type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null};
-        }catch(err){this.detailError=err.message||'Could not log the event.';}
+          this.newEvent={type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null,existingPhotoId:null,existingPhotoUrl:null,photoRemoved:false};
+        }catch(err){this.detailError=err.message||'Could not save the entry.';}
         finally{this.detailBusy=false;}
       },
       async deleteEvent(ev){
