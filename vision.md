@@ -246,3 +246,53 @@ Why people open the app (Stephen's ranking + analysis). Frequency drives the des
 2. Season-aware care reminders (the daily-use hook; very CP-specific).
 3. Breeding/lineage tree (serious-grower crown jewel; impossible in a spreadsheet).
 4. Collection-origins world map (best "this isn't a spreadsheet" demo).
+
+---
+
+## Journal UX review — 2026-06-21 (Stephen, screenshot-driven)
+
+Stephen walked the journal with a UX lens. Findings + the agreed direction:
+
+### The focused-entry sheet (LOCKED + BUILT 2026-06-21)
+**Problem:** tapping an entry in the Journal tab dumped you at the *top* of the plant page
+(scroll-hunt to the journal, then Edit); only *event* rows had edit/delete (photo rows had
+none); and photo entries couldn't be opened full-size. Three dead-ends.
+**Principle:** *tapping a row should reveal THAT thing, not navigate to the object's top.*
+**Decision:** one **focused-entry bottom sheet**, reused in BOTH the per-plant journal and the
+whole-collection Journal tab. Shows the photo (tap → full-screen viewer), type/date/note/
+measurement/cause, and **Edit · Delete · View plant →**. Fixes all three at once with one
+consistent pattern. From the Journal tab it silently loads the plant's detail data so
+Edit/Delete reuse the existing detail functions; Edit lands in the entry editor (scrolled to),
+not the page header. *(Reuse the same sheet everywhere — consistency is half the win.)*
+
+### Sticky condensed plant header (LOCKED + BUILT 2026-06-21)
+Scrolling the plant page lost all "which plant am I on?" context. Apple large-title collapse:
+hero scrolls away → slim green bar (back + name + Edit) sticks at top. (IntersectionObserver,
+not plain CSS sticky, so it appears only AFTER the hero is gone — no redundant double header.)
+
+### Make the Journal tab actionable (NEXT — not yet built)
+Today it's read-only browsing. A whole-collection journal should let you DO things. Priority:
+1. **Create from the Journal tab** — quick "+ Log" that picks the plant inline. This is a
+   *stated speed goal* ("quick to add a journal entry") yet the only way to log today is
+   plant → open → scroll → Log. Biggest omission.
+2. **Search** — note text + plant names ("which plant did I treat for thrips?"). Turns the
+   journal into a queryable record; value compounds with every entry.
+3. **Filter by event type** (and plant/category) — grow the All/Photos toggle into this.
+4. **Sort / date-group** — newest-first default + "This week / June / Earlier" headers;
+   oldest-first option for reading a plant's story start-to-finish.
+
+### Time-pivoted journal = the bridge to analytics (LATER — capture-now, build-later)
+Stephen's insight: the most valuable journal questions are *temporal*, and they shade into
+analytics. A useful mental model — a spectrum:
+- **Feed** — "what happened, newest first" (today's journal).
+- **Recall** — "what happened *at this time*": what did I do last month / this month last
+  year / what's likely due next month. Still individual entries, pivoted by date. *Memory.*
+- **Analytics** — "what are the *patterns*": flowering calendar across years (phenology),
+  bloom-timing shifts, survival rates, spend/collection-size over time. *Aggregations/charts.*
+"What was in bloom this time last year" sits on the **Recall→Analytics seam** (one date = recall;
+across years = phenology = analytics). **All of it rides on data already captured** (typed
+`flowered` events + dated photos) — the payoff of the event-log spine; no new capture needed.
+**Where it lives:** Journal owns **Feed + Recall** (still about entries); true **Analytics
+graduates into the Care/Insights tab** (currently empty) — don't muddy the feed with charts.
+This stays a *later* phase per the roadmap, but it's the strongest "not a spreadsheet" moment
+and a natural anchor for the empty Care tab.

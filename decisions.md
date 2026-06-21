@@ -4,6 +4,34 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-21 — Journal UX pass: focused-entry sheet + sticky plant header
+
+Screenshot-driven UX review with Stephen (full findings + the spectrum/analytics framing in
+`vision.md` → "Journal UX review — 2026-06-21"). Shipped two, queued the rest.
+
+- **Focused-entry sheet (BUILT).** Tapping any journal entry — event or photo, in the per-plant
+  journal OR the whole-collection Journal tab — opens a bottom sheet (photo → full-screen viewer,
+  type/date/note/measurement/cause, **Edit · Delete · View plant →**). Fixes three dead-ends at
+  once: no more "dump at plant top + scroll-hunt"; every entry type now has edit/delete; photo
+  entries open full-size. Principle locked: **a row tap reveals THAT entry, not the object's top.**
+  One sheet reused everywhere (consistency). From the Journal tab it silently loads the plant's
+  detail data so Edit/Delete reuse existing detail fns; Edit lands in the editor (scrolled to).
+- **Sticky condensed plant header (BUILT).** Hero scrolls away → slim green bar (back + name +
+  Edit) sticks at top. IntersectionObserver (root = `.appscroll`) toggles it, so it appears only
+  after the hero is gone (no redundant double header); torn down in `closeDetail`.
+- **Per-plant timeline rows** are now single tappable rows (chevron, 2-line note clamp); inline
+  edit/delete removed (moved into the sheet).
+- **NEXT (queued, not built):** make the Journal tab *actionable* — (1) create-from-journal
+  (quick +Log, pick plant inline — a stated speed goal, biggest omission), (2) search notes +
+  plant names, (3) filter by event type, (4) date grouping / oldest-first.
+- **LATER:** time-pivoted "recall" lenses (this-month-last-year, next-month) + phenology/analytics
+  (flowering calendar, survival, spend) — graduate into the empty **Care/Insights tab**, not the
+  feed. All rides on data already captured (typed events + dated photos).
+- **Verification:** JS syntax-checked via JavaScriptCore (`jsc`), but NOT run in a real browser
+  this session (preview sandbox can't start + needs Supabase login). Stephen verifies on iPhone.
+
+---
+
 ## 2026-06-20 — Journal tab built out (staged redesign step 4)
 
 The whole-collection Journal tab was a stub (plain rows, generic dot). Built it up to the
