@@ -248,6 +248,7 @@
   .ph-thumb-ph svg{width:30px;height:30px;opacity:.85}
   .ph-thumb-badge{position:absolute;right:3px;bottom:3px;width:19px;height:19px;border-radius:50%;background:rgba(15,20,16,.55);display:flex;align-items:center;justify-content:center}
   .ph-thumb-badge svg{width:11px;height:11px;color:#fff}
+  .ph-form{font-size:13.5px;color:rgba(255,255,255,.9);margin-top:3px;font-style:italic;font-family:var(--serif)}
   .ph-loc{font-size:12.5px;color:rgba(255,255,255,.78);margin-top:5px;display:flex;align-items:center;gap:5px}
   .ph-loc svg{width:13px;height:13px;flex:0 0 auto;opacity:.85}
   .ph-cats{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
@@ -514,7 +515,8 @@
               </span>
             </button>
             <div class="ph-text">
-              <h2 x-text="displayName(detailPlant)"></h2>
+              <h2 x-text="botanicalName(detailPlant)"></h2>
+              <div class="ph-form" x-show="detailPlant.form_descriptor" x-text="detailPlant.form_descriptor"></div>
               <div class="ph-loc" x-show="detailPlant.location_data">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
                 <span x-text="detailPlant.location_data"></span>
@@ -1661,6 +1663,11 @@
         const g=p.species&&p.species.genus?p.species.genus.name:'';
         const s=p.species?p.species.name:'';
         return [g,s,p.form_descriptor].filter(Boolean).join(' ').trim()||'Unnamed plant';
+      },
+      botanicalName(p){
+        const g=p.species&&p.species.genus?p.species.genus.name:'';
+        const s=p.species?p.species.name:'';
+        return [g,s].filter(Boolean).join(' ').trim()||'Unnamed plant';
       },
       groupedPlants(){
         const f=this.filterCategoryIds;
