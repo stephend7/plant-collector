@@ -4,6 +4,34 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-20 — Journal tab built out (staged redesign step 4)
+
+The whole-collection Journal tab was a stub (plain rows, generic dot). Built it up to the
+locked spec from `vision.md` (single-line entries, type icons, photos filter):
+- **Per-event type icons** — `eventIconSvg(type)` returns a small inline SVG per event type
+  (note=pencil, flowered=blossom, repotted=pot, fed=drop, pest=bug, dormant=moon, woke=sun,
+  measured=ruler, divided/crossed, acquired/sold/traded/given_away share a tag icon, died=faded
+  leaf). Rendered in a rounded chip at the left of each row.
+- **Single-line rows** — `[icon] PlantName / event·note · date + right-side indicator`. The
+  right indicator follows the spec's "note / photo / none": a camera glyph when the event has a
+  photo, a filled pine dot when it has a note, a faint dot when neither. Needed `photo_id` added
+  to the `loadAllEvents` select (→ `hasPhoto`).
+- **Friendly dates** — `fmtDate()` renders `Jun 19` (adds the year only when not the current
+  year) instead of raw ISO.
+- **Photos filter (All / Photos)** — segmented toggle. "Photos" lazy-loads the whole collection's
+  photos (`loadAllPhotos`, signed thumbnails, newest-first) into a 2-col grid with the plant name
+  overlaid; tap opens the existing full-screen viewer in a new **read-only mode**
+  (`viewerReadonly`) that hides Set-cover/Delete and instead offers "View plant ›". This reuses
+  the per-plant viewer rather than building a second one.
+- Tapping any event row → that plant's detail page (`openPlantById`). Journal data refreshes on
+  each tab entry; photos re-fetch lazily (guarded by `allPhotosLoaded`, invalidated on tab entry).
+- **Not verified in-browser this session** — the Claude_Preview server still can't start in the
+  sandbox (`getcwd` permission error) and the app needs a Supabase login; Stephen verifies on his
+  phone after the Pages deploy. CSV export was found ALREADY built (List tab), so that Phase-1
+  loose end is closed.
+
+---
+
 ## 2026-06-18 — Event Log spine + species care fields (DESIGNED, pending sign-off)
 
 The "plan-now so later is easy" spine, distilled from the creative session (see `vision.md`).

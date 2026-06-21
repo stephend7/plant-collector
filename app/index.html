@@ -137,11 +137,24 @@
   .filterbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 2px}
   .fsel{display:inline-flex;align-items:center;gap:5px;background:var(--field);border:1px solid var(--line);border-radius:20px;padding:0}
   .fsel select{border:0;background:transparent;padding:7px 10px;font-size:13px;color:var(--ink);border-radius:20px}
-  .jrow{display:flex;gap:11px;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer;align-items:flex-start}
-  .jrow .jname{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--ink)}
-  .jrow .jevent{font-size:13px;color:var(--muted);margin-top:1px}
-  .jrow .jdate{color:var(--muted);font-size:12px;flex:0 0 auto;white-space:nowrap}
-  .jdot{width:8px;height:8px;border-radius:50%;background:var(--pine);flex:0 0 auto;margin-top:6px}
+  .jrow{display:flex;gap:11px;padding:11px 2px;border-bottom:1px solid var(--line);cursor:pointer;align-items:flex-start}
+  .jrow:active{background:var(--field)}
+  .jicon{width:32px;height:32px;border-radius:9px;background:var(--chip);display:flex;align-items:center;justify-content:center;flex:0 0 auto;margin-top:1px}
+  .jicon svg{width:17px;height:17px;color:var(--pine)}
+  .jrow .jmid{flex:1;min-width:0}
+  .jrow .jname{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jrow .jevent{font-size:13px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jrow .jevent b{color:var(--ink);font-weight:600}
+  .jrow .jright{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-top:2px}
+  .jrow .jdate{color:var(--muted);font-size:12px;white-space:nowrap}
+  .jind{width:14px;height:14px;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+  .jind svg{width:13px;height:13px;color:var(--pine)}
+  .jind .dot{width:7px;height:7px;border-radius:50%;background:var(--pine)}
+  .jind .dot.none{background:var(--line)}
+  .journal-photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  .jpcard{position:relative;aspect-ratio:1/1;border-radius:10px;overflow:hidden;border:1px solid var(--line);cursor:pointer;background:var(--field)}
+  .jpcard img{width:100%;height:100%;object-fit:cover;display:block}
+  .jpcard .jplbl{position:absolute;left:0;right:0;bottom:0;padding:14px 8px 5px;background:linear-gradient(transparent,rgba(20,30,22,.72));color:#fff;font-size:11px;font-family:var(--serif);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .tabbar{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;align-items:center;background:var(--card);border-top:1px solid var(--line);padding:7px 4px;padding-bottom:calc(7px + env(safe-area-inset-bottom));z-index:20}
   .tabbar .tab{display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--muted);font-size:11px;background:none;border:0;cursor:pointer;flex:1;padding:2px;font-family:inherit}
   .tabbar .tab.on{color:var(--pine)}
@@ -670,12 +683,14 @@
       <img :src="viewerUrl" alt="">
       <button class="vnav vnext" @click="viewerNext()" x-show="viewerList.length>1" aria-label="Next photo">›</button>
       <div class="vbar" x-show="viewerPhoto()">
+        <span x-show="viewerReadonly&&viewerPhoto()" style="font-family:var(--serif);font-style:italic;color:#fff" x-text="viewerPhoto()&&viewerPhoto().plantName"></span>
         <span x-text="viewerPhoto()&&viewerPhoto().photo_date"></span>
         <span x-text="viewerPhoto()?('· '+photoLabel(viewerPhoto().label)):''"></span>
-        <span style="margin-left:auto;display:flex;gap:14px">
+        <span style="margin-left:auto;display:flex;gap:14px" x-show="!viewerReadonly">
           <button x-show="detailPlant&&viewerPhoto()&&viewerPhoto().id!==detailPlant.cover_photo_id" @click="setCoverFromViewer()">Set cover</button>
           <button class="del" @click="deleteFromViewer()">Delete</button>
         </span>
+        <button x-show="viewerReadonly&&viewerPhoto()" style="margin-left:auto;color:#bfe3cf" @click="viewPlantFromViewer()">View plant ›</button>
       </div>
     </div>
 
@@ -782,23 +797,58 @@
 
       <!-- JOURNAL tab (whole collection, newest first) -->
       <div x-show="tab==='journal'">
-        <div class="homehead"><div><h1>Journal</h1><p class="homesub">Everything that's happened, newest first</p></div></div>
-        <div x-show="allEvents.length===0" class="emptybox" style="margin-top:18px">
-          <p style="margin:0 0 6px;font-size:15px;color:var(--ink)">No entries yet.</p>
-          <p style="margin:0">Open a plant and tap <strong>Log</strong> to start its story.</p>
+        <div class="homehead"><div><h1>Journal</h1><p class="homesub" x-text="journalFilter==='photos'?'The whole collection, in pictures':'Everything that\'s happened, newest first'"></p></div></div>
+
+        <div class="seg" x-show="plants.length" style="margin-top:13px">
+          <button :class="journalFilter==='all'?'on':''" @click="setJournalFilter('all')">All</button>
+          <button :class="journalFilter==='photos'?'on':''" @click="setJournalFilter('photos')">Photos</button>
         </div>
-        <div style="margin-top:6px">
-          <template x-for="e in allEvents" :key="e.id">
-            <div class="jrow" @click="openPlantById(e.plant_id)">
-              <div class="jdot"></div>
-              <div style="flex:1;min-width:0">
-                <div class="jname" x-text="e.plantName"></div>
-                <div class="jevent"><span x-text="eventTypeLabel(e.event_type)"></span><span x-show="e.body" x-text="' — '+e.body"></span></div>
-              </div>
-              <span class="jdate" x-text="e.entry_date"></span>
+
+        <!-- ALL: event feed -->
+        <template x-if="journalFilter==='all'">
+          <div>
+            <div x-show="allEvents.length===0" class="emptybox" style="margin-top:18px">
+              <p style="margin:0 0 6px;font-size:15px;color:var(--ink)">Your journal is empty.</p>
+              <p style="margin:0">Open any plant and tap <strong>＋ Log event</strong> to start its story.</p>
             </div>
-          </template>
-        </div>
+            <div style="margin-top:6px">
+              <template x-for="e in allEvents" :key="e.id">
+                <div class="jrow" @click="openPlantById(e.plant_id)">
+                  <div class="jicon" x-html="eventIconSvg(e.event_type)"></div>
+                  <div class="jmid">
+                    <div class="jname" x-text="e.plantName"></div>
+                    <div class="jevent"><b x-text="eventTypeLabel(e.event_type)"></b><span x-show="e.body" x-text="' · '+e.body"></span></div>
+                  </div>
+                  <div class="jright">
+                    <span class="jdate" x-text="fmtDate(e.entry_date)"></span>
+                    <span class="jind">
+                      <svg x-show="e.hasPhoto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3.2"/></svg>
+                      <span x-show="!e.hasPhoto" class="dot" :class="e.body?'':'none'"></span>
+                    </span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- PHOTOS: whole-collection progression grid -->
+        <template x-if="journalFilter==='photos'">
+          <div>
+            <div x-show="allPhotos.length===0" class="emptybox" style="margin-top:18px">
+              <p style="margin:0 0 6px;font-size:15px;color:var(--ink)">No photos yet.</p>
+              <p style="margin:0">Add photos to your plants and they'll gather here.</p>
+            </div>
+            <div class="journal-photo-grid">
+              <template x-for="(ph,idx) in allPhotos" :key="ph.id">
+                <div class="jpcard" @click="openViewer(allPhotos, idx, true)">
+                  <img :src="ph.thumbUrl" alt="">
+                  <span class="jplbl" x-text="ph.plantName"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- CARE tab (placeholder) -->
@@ -986,10 +1036,11 @@
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
       detailEvents:[], timelineFilter:'all', loggingEvent:false, eventDeleteId:null,
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
-      photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'',
+      photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photo:null},
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
+      journalFilter:'all', allPhotos:[], allPhotosLoaded:false,
       adding:{genus:false,species:false,vendor:false,location:false,category:false},
       newName:{genus:'',species:'',vendor:'',location:'',category:''},
       form:{genusId:'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:'',acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]},
@@ -1439,7 +1490,7 @@
       /* ---- redesigned home: tabs, genus gallery, text list, journal ---- */
       genusOf(p){return (p.species&&p.species.genus&&p.species.genus.name)||'Unfiled';},
       speciesLine(p){const s=p.species?p.species.name:'';const line=[s,p.form_descriptor].filter(Boolean).join(' ').trim();return line||this.displayName(p);},
-      setTab(t){this.tab=t;this.eventDeleteId=null;if(t==='journal')this.loadAllEvents();},
+      setTab(t){this.tab=t;this.eventDeleteId=null;if(t==='journal'){this.loadAllEvents();this.allPhotosLoaded=false;if(this.journalFilter==='photos')this.loadAllPhotos();}},
       generaGallery(){
         const list=this.galleryCatId?this.plants.filter(p=>(p.plant_category||[]).some(pc=>pc.category_id===this.galleryCatId)):this.plants;
         const by={};
@@ -1461,15 +1512,58 @@
       listCount(){return this.listGroups().reduce((t,g)=>t+g.plants.length,0);},
       async loadAllEvents(){
         const {data}=await sb.from('journal_entry')
-          .select('id,plant_id,entry_date,event_type,body,plant:plant_id(form_descriptor,species:species_id(name,genus:genus_id(name)))')
+          .select('id,plant_id,entry_date,event_type,body,photo_id,plant:plant_id(form_descriptor,species:species_id(name,genus:genus_id(name)))')
           .order('entry_date',{ascending:false}).order('created_at',{ascending:false}).limit(150);
         this.allEvents=(data||[]).map(e=>{
           const sp=e.plant&&e.plant.species,g=sp&&sp.genus?sp.genus.name:'',s=sp?sp.name:'';
           const name=[g,s,e.plant&&e.plant.form_descriptor].filter(Boolean).join(' ').trim()||'Plant';
-          return {id:e.id,plant_id:e.plant_id,entry_date:e.entry_date,event_type:e.event_type,body:e.body,plantName:name};
+          return {id:e.id,plant_id:e.plant_id,entry_date:e.entry_date,event_type:e.event_type,body:e.body,hasPhoto:!!e.photo_id,plantName:name};
         });
       },
+      async loadAllPhotos(){
+        const {data}=await sb.from('photo')
+          .select('id,plant_id,storage_path,label,photo_date,created_at,plant:plant_id(form_descriptor,species:species_id(name,genus:genus_id(name)))')
+          .order('photo_date',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}).limit(150);
+        const photos=data||[];
+        if(photos.length){
+          const {data:signed}=await sb.storage.from('photos').createSignedUrls(photos.map(p=>thumbOf(p.storage_path)),3600);
+          if(signed)photos.forEach((p,i)=>{if(signed[i]&&signed[i].signedUrl)p.thumbUrl=signed[i].signedUrl;});
+        }
+        this.allPhotos=photos.map(p=>{
+          const sp=p.plant&&p.plant.species,g=sp&&sp.genus?sp.genus.name:'',s=sp?sp.name:'';
+          const name=[g,s,p.plant&&p.plant.form_descriptor].filter(Boolean).join(' ').trim()||'Plant';
+          return {id:p.id,plant_id:p.plant_id,storage_path:p.storage_path,label:p.label,photo_date:p.photo_date,thumbUrl:p.thumbUrl,plantName:name};
+        });
+        this.allPhotosLoaded=true;
+      },
+      async setJournalFilter(f){this.journalFilter=f;if(f==='photos'&&!this.allPhotosLoaded)await this.loadAllPhotos();},
+      fmtDate(d){
+        if(!d)return ''; const m=(''+d).split('-'); if(m.length<3)return d;
+        const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][(+m[1])-1]||'';
+        return mo+' '+(+m[2])+(+m[0]!==(new Date()).getFullYear()?', '+m[0]:'');
+      },
+      eventIconSvg(t){
+        const ic={
+          note:'<path d="M4 20h4l10.5-10.5a2 2 0 0 0-3-3L5 17z"/><path d="M13.5 6.5l3 3"/>',
+          flowered:'<circle cx="12" cy="12" r="2.4"/><path d="M12 9.6c-.6-2.5 1-4.6 0-6-1 1.4.6 3.5 0 6M12 14.4c.6 2.5-1 4.6 0 6 1-1.4-.6-3.5 0-6M9.6 12c-2.5-.6-4.6 1-6 0 1.4-1 3.5.6 6 0M14.4 12c2.5.6 4.6-1 6 0-1.4 1-3.5-.6-6 0"/>',
+          fruited:'<circle cx="12" cy="14" r="5.5"/><path d="M12 8.5V4M12 4c1.5 0 3 .8 3 2.2"/>',
+          repotted:'<path d="M5 9h14l-1.3 8.6a2 2 0 0 1-2 1.7H8.3a2 2 0 0 1-2-1.7z"/><path d="M9 9c0-2.6 6-2.6 6 0"/>',
+          fed:'<path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"/>',
+          pest_treated:'<circle cx="12" cy="13" r="4"/><path d="M12 9V5M8.5 13H4M20 13h-4.5M9.2 16.8l-2.2 2.2M14.8 16.8l2.2 2.2M9.2 9.2 7 7M14.8 9.2 17 7"/>',
+          divided:'<circle cx="6.5" cy="6.5" r="2.5"/><circle cx="6.5" cy="17.5" r="2.5"/><path d="M8.7 7.7 19 13M8.7 16.3 19 11"/>',
+          dormant:'<path d="M21 12.8A8.5 8.5 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8z"/>',
+          woke:'<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/>',
+          measured:'<rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7.5 8v3M12 8v4M16.5 8v3"/>',
+          acquired:'<path d="M19 11.5 12.5 5H6a1 1 0 0 0-1 1v6.5L11.5 19a1.5 1.5 0 0 0 2.1 0l5.4-5.4a1.5 1.5 0 0 0 0-2.1z"/><circle cx="9" cy="9" r="1"/>',
+          crossed:'<path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"/>',
+          died:'<path d="M6 21c0-6 3.5-11 12-12 0 7-4.5 12-10.5 12z"/><path d="M6 21c1.5-4.5 4-7.5 8-9.5"/>',
+        };
+        const alias={sold:'acquired',traded:'acquired',given_away:'acquired'};
+        const inner=ic[alias[t]||t]||ic.note;
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+inner+'</svg>';
+      },
       async openPlantById(id){const p=this.plants.find(x=>x.id===id);if(p)await this.openDetail(p);},
+      async viewPlantFromViewer(){const ph=this.viewerPhoto();if(!ph)return;const id=ph.plant_id;this.closeViewer();await this.openPlantById(id);},
       /* ---- care guide (species-level) ---- */
       hasCare(){const s=this.detailPlant&&this.detailPlant.species;return !!(s&&(s.care_dormancy||s.care_water||s.care_feeding||s.care_light||s.care_photoperiod||s.care_humidity));},
       waterLevel(){const w=this.detailPlant&&this.detailPlant.species&&this.detailPlant.species.care_water;return {low:1,medium:2,high:3}[w]||0;},
@@ -1505,7 +1599,7 @@
       closePhotos(){this.screen='detail';},
       viewerPhoto(){return this.viewerList[this.viewerI]||null;},
       async _viewerLoad(){const ph=this.viewerList[this.viewerI];this.viewerUrl=ph?((await signFull(ph.storage_path))||ph.thumbUrl):'';},
-      async openViewer(list,i){this.viewerList=list;this.viewerI=i;this.viewerOpen=true;this.viewerUrl=(list[i]&&list[i].thumbUrl)||'';await this._viewerLoad();},
+      async openViewer(list,i,readonly){this.viewerReadonly=!!readonly;this.viewerList=list;this.viewerI=i;this.viewerOpen=true;this.viewerUrl=(list[i]&&list[i].thumbUrl)||'';await this._viewerLoad();},
       closeViewer(){this.viewerOpen=false;},
       async viewerNext(){if(this.viewerList.length<2)return;this.viewerI=(this.viewerI+1)%this.viewerList.length;await this._viewerLoad();},
       async viewerPrev(){if(this.viewerList.length<2)return;this.viewerI=(this.viewerI-1+this.viewerList.length)%this.viewerList.length;await this._viewerLoad();},
