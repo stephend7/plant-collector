@@ -4,6 +4,30 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-22 — Browser-testing via Claude-in-Chrome + first bug it caught (event-type dropdown)
+
+Set up a real test loop: Claude drives Chrome (the connected "Browser 1") against the LIVE site with a
+**throwaway account** (`test@test.com`) Stephen created (Claude can't create accounts / type passwords —
+safety rules). Verified end-to-end in Chrome: add-genus → add-species (genus→species scoping works),
+save plant (RLS write OK), genus-gallery home, drill-down, plant page, auto-created "Acquired" event,
+and the **focused-entry sheet with the View plant · Edit · Delete row fully visible** (the iOS fix holds
+in Blink too). **Caveat that stays true:** Chrome is Blink, the iPhone is WebKit — this loop catches
+logic/flow/console/most-layout bugs but NOT WebKit-specific rendering (the very class the tab-bar bug was).
+
+- **Bug it caught:** editing the auto-created **Acquired** event showed the "What happened" dropdown as
+  **"Note"**, not "Acquired". Root cause = the SAME nested-`<template x-if>`-in-the-`<select>` antipattern:
+  the dynamic `<option>` for non-curated types was inserted by `x-if` AFTER `x-model` had already bound, so
+  the select fell back to the first option and never re-synced. Confirmed via JS: `newEvent.type==='acquired'`
+  (data correct) but `select.value==='note'` (display wrong). `saveEvent` reads the DATA, so a no-touch Save
+  did NOT corrupt the type — but the display lied and was fragile.
+- **Fix (both editors — sheet + per-plant Log):** dropped the `<template x-if>`; all 16 event types are now
+  plain static `<option>`s (common ones flat, the five lifecycle/status types under a `<optgroup>` "Status
+  change"). `x-model` always finds the match → correct display, and you can now re-type any event when
+  editing. Matches the standing lesson: prefer plain elements over nested `x-if` in these forms.
+- Build bumped to `2026-06-22c`. HTML-only change (no JS touched).
+
+---
+
 ## 2026-06-22 — REAL bug behind the "missing Edit button": focused sheet trapped under the tab bar
 
 After the auto-update check shipped, Stephen force-loaded the new build and the focused-entry sheet

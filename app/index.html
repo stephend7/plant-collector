@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22b">
+<meta name="app-build" content="2026-06-22c">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -648,9 +648,6 @@
                 <div>
                   <label>What happened</label>
                   <select x-model="newEvent.type">
-                    <template x-if="editEventId && !['note','flowered','fruited','repotted','fed','pest_treated','divided','dormant','woke','measured'].includes(newEvent.type)">
-                      <option :value="newEvent.type" x-text="eventTypeLabel(newEvent.type)"></option>
-                    </template>
                     <option value="note">Note</option>
                     <option value="flowered">Flowered</option>
                     <option value="fruited">Fruited / set seed</option>
@@ -661,6 +658,14 @@
                     <option value="dormant">Went dormant</option>
                     <option value="woke">Woke from dormancy</option>
                     <option value="measured">Measured</option>
+                    <option value="crossed">Crossed</option>
+                    <optgroup label="Status change">
+                      <option value="acquired">Acquired</option>
+                      <option value="died">Died</option>
+                      <option value="sold">Sold</option>
+                      <option value="traded">Traded</option>
+                      <option value="given_away">Given away</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div><label>Date</label><input type="date" x-model="newEvent.date"></div>
@@ -821,14 +826,17 @@
                     <div>
                       <label>What happened</label>
                       <select x-model="newEvent.type">
-                        <template x-if="!['note','flowered','fruited','repotted','fed','pest_treated','divided','dormant','woke','measured'].includes(newEvent.type)">
-                          <option :value="newEvent.type" x-text="eventTypeLabel(newEvent.type)"></option>
-                        </template>
                         <option value="note">Note</option><option value="flowered">Flowered</option>
                         <option value="fruited">Fruited / set seed</option><option value="repotted">Repotted</option>
                         <option value="fed">Fed</option><option value="pest_treated">Pest / disease treated</option>
                         <option value="divided">Divided</option><option value="dormant">Went dormant</option>
                         <option value="woke">Woke from dormancy</option><option value="measured">Measured</option>
+                        <option value="crossed">Crossed</option>
+                        <optgroup label="Status change">
+                          <option value="acquired">Acquired</option><option value="died">Died</option>
+                          <option value="sold">Sold</option><option value="traded">Traded</option>
+                          <option value="given_away">Given away</option>
+                        </optgroup>
                       </select>
                     </div>
                     <div><label>Date</label><input type="date" x-model="newEvent.date"></div>
