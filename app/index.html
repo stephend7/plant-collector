@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22f">
+<meta name="app-build" content="2026-06-22g">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1490,13 +1490,19 @@
         await this.loadProducts();
         await this.loadPlants();
       },
-      async loadProducts(){
-        try{
-          const {data,error}=await sb.from('product').select('id,name,category').order('name');
-          if(error)throw error;
-          this.products=data||[];
-          await this.ensureSeedProducts();
-        }catch(e){ /* table may not exist yet — pickers just stay empty */ this.products=this.products||[]; }
+      // single-flight: init() calls loadData() from BOTH onAuthStateChange and getSession,
+      // so without this guard the first-run seed inserts the defaults twice.
+      loadProducts(){
+        if(this._productsLoad)return this._productsLoad;
+        this._productsLoad=(async()=>{
+          try{
+            const {data,error}=await sb.from('product').select('id,name,category').order('name');
+            if(error)throw error;
+            this.products=data||[];
+            await this.ensureSeedProducts();
+          }catch(e){ /* table may not exist yet — pickers just stay empty */ this.products=this.products||[]; }
+        })();
+        return this._productsLoad;
       },
       // first-run starter list so the dropdown isn't empty (per-user; skipped once seeded)
       async ensureSeedProducts(){
