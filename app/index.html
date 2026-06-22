@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22e">
+<meta name="app-build" content="2026-06-22f">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -679,6 +679,27 @@
                   </div>
                 </div>
               </template>
+              <template x-if="newEvent.type==='fed' || newEvent.type==='pest_treated'">
+                <div>
+                  <label x-text="newEvent.type==='fed'?'Fertilizer':'Product used'"></label>
+                  <div class="pickrow">
+                    <div>
+                      <select x-model="newEvent.productId" :disabled="addingProduct">
+                        <option value="">— none —</option>
+                        <template x-for="p in productOptions(productCat(newEvent.type))" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+                      </select>
+                    </div>
+                    <button type="button" class="mini" @click="startAddProduct()" x-show="!addingProduct">＋ New</button>
+                  </div>
+                  <div class="addbox" x-show="addingProduct" x-transition>
+                    <input type="text" :placeholder="newEvent.type==='fed'?'New fertilizer name':'New product name'" x-model="newProductName" @keydown.enter.prevent="confirmAddProduct('event',productCat(newEvent.type))">
+                    <button type="button" class="ok" @click="confirmAddProduct('event',productCat(newEvent.type))">Add</button>
+                    <button type="button" class="no" @click="cancelAddProduct()">✕</button>
+                  </div>
+                  <label x-text="newEvent.type==='fed'?'Mix / strength':'Mix / dilution'"></label>
+                  <input type="text" x-model="newEvent.doseNote" :placeholder="newEvent.type==='fed'?'e.g. 1/4 strength, 1 tsp/gal':'e.g. 2 ml/L, full strength'">
+                </div>
+              </template>
               <label>Note <span class="hint">(soil mix, fertilizer, which pest — anything)</span></label>
               <textarea rows="2" x-model="newEvent.note" placeholder="optional"></textarea>
               <label>Photos for this event <span class="hint">(optional — add several, e.g. before / after / roots)</span></label>
@@ -714,6 +735,7 @@
                       <div style="flex:1;min-width:0">
                         <span class="badge" x-text="eventTypeLabel(it.ev.event_type)"></span>
                         <span x-show="it.ev.measure_value!=null" x-text="' '+(it.ev.measure_label?it.ev.measure_label+': ':'')+it.ev.measure_value+(it.ev.measure_unit?' '+it.ev.measure_unit:'')"></span>
+                        <div x-show="eventProductLine(it.ev)" x-text="eventProductLine(it.ev)" style="margin-top:3px;color:var(--muted);font-size:13px"></div>
                         <div x-show="it.ev.body" x-text="it.ev.body" style="margin-top:3px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical"></div>
                       </div>
                       <div x-show="eventPhotoUrl(it.ev)" style="position:relative;flex:0 0 auto">
@@ -816,6 +838,7 @@
                   <div class="sheet-meta" x-show="sheet.ev.measure_value!=null">
                     <span x-text="(sheet.ev.measure_label?sheet.ev.measure_label+': ':'')+sheet.ev.measure_value+(sheet.ev.measure_unit?' '+sheet.ev.measure_unit:'')"></span>
                   </div>
+                  <div class="sheet-meta" x-show="eventProductLine(sheet.ev)"><span class="d" x-text="eventProductLine(sheet.ev)"></span></div>
                   <div class="sheet-meta" x-show="sheet.ev.cause"><span class="d" x-text="'Cause: '+sheet.ev.cause"></span></div>
                   <div class="sheet-note" x-show="sheet.ev.body" x-text="sheet.ev.body"></div>
                   <div class="hint" x-show="!sheet.ev.body && !eventPhotos(sheet.ev).length && sheet.ev.measure_value==null" style="margin-bottom:12px">No note on this entry.</div>
@@ -848,6 +871,27 @@
                         <div style="flex:1"><label>Value</label><input type="number" step="any" x-model="newEvent.measureValue"></div>
                         <div style="flex:1"><label>Unit</label><input type="text" x-model="newEvent.measureUnit" placeholder="cm"></div>
                       </div>
+                    </div>
+                  </template>
+                  <template x-if="newEvent.type==='fed' || newEvent.type==='pest_treated'">
+                    <div>
+                      <label x-text="newEvent.type==='fed'?'Fertilizer':'Product used'"></label>
+                      <div class="pickrow">
+                        <div>
+                          <select x-model="newEvent.productId" :disabled="addingProduct">
+                            <option value="">— none —</option>
+                            <template x-for="p in productOptions(productCat(newEvent.type))" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+                          </select>
+                        </div>
+                        <button type="button" class="mini" @click="startAddProduct()" x-show="!addingProduct">＋ New</button>
+                      </div>
+                      <div class="addbox" x-show="addingProduct" x-transition>
+                        <input type="text" :placeholder="newEvent.type==='fed'?'New fertilizer name':'New product name'" x-model="newProductName" @keydown.enter.prevent="confirmAddProduct('event',productCat(newEvent.type))">
+                        <button type="button" class="ok" @click="confirmAddProduct('event',productCat(newEvent.type))">Add</button>
+                        <button type="button" class="no" @click="cancelAddProduct()">✕</button>
+                      </div>
+                      <label x-text="newEvent.type==='fed'?'Mix / strength':'Mix / dilution'"></label>
+                      <input type="text" x-model="newEvent.doseNote" :placeholder="newEvent.type==='fed'?'e.g. 1/4 strength, 1 tsp/gal':'e.g. 2 ml/L, full strength'">
                     </div>
                   </template>
                   <label>Note <span class="hint">(soil mix, fertilizer, which pest — anything)</span></label>
@@ -980,6 +1024,27 @@
               </div>
               <div><label>Date</label><input type="date" x-model="quickLog.date"></div>
             </div>
+            <template x-if="quickLog.type==='fed' || quickLog.type==='pest_treated'">
+              <div>
+                <label x-text="quickLog.type==='fed'?'Fertilizer':'Product used'"></label>
+                <div class="pickrow">
+                  <div>
+                    <select x-model="quickLog.productId" :disabled="addingProduct">
+                      <option value="">— none —</option>
+                      <template x-for="p in productOptions(productCat(quickLog.type))" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+                    </select>
+                  </div>
+                  <button type="button" class="mini" @click="startAddProduct()" x-show="!addingProduct">＋ New</button>
+                </div>
+                <div class="addbox" x-show="addingProduct" x-transition>
+                  <input type="text" :placeholder="quickLog.type==='fed'?'New fertilizer name':'New product name'" x-model="newProductName" @keydown.enter.prevent="confirmAddProduct('quick',productCat(quickLog.type))">
+                  <button type="button" class="ok" @click="confirmAddProduct('quick',productCat(quickLog.type))">Add</button>
+                  <button type="button" class="no" @click="cancelAddProduct()">✕</button>
+                </div>
+                <label x-text="quickLog.type==='fed'?'Mix / strength':'Mix / dilution'"></label>
+                <input type="text" x-model="quickLog.doseNote" :placeholder="quickLog.type==='fed'?'e.g. 1/4 strength, 1 tsp/gal':'e.g. 2 ml/L, full strength'">
+              </div>
+            </template>
             <label>Note <span class="hint">(soil mix, fertilizer, which pest — anything)</span></label>
             <textarea rows="2" x-model="quickLog.note" placeholder="optional"></textarea>
             <div class="msg err" x-show="quickLogError" x-text="quickLogError" style="margin:6px 0"></div>
@@ -1123,7 +1188,7 @@
                   <div class="jicon" x-html="eventIconSvg(e.event_type)"></div>
                   <div class="jmid">
                     <div class="jname" x-text="e.plantName"></div>
-                    <div class="jevent"><b x-text="eventTypeLabel(e.event_type)"></b><span x-show="e.body" x-text="' · '+e.body"></span></div>
+                    <div class="jevent"><b x-text="eventTypeLabel(e.event_type)"></b><span x-show="eventProductLine(e)" x-text="' · '+eventProductLine(e)"></span><span x-show="e.body" x-text="' · '+e.body"></span></div>
                   </div>
                   <div class="jright">
                     <span class="jdate" x-text="fmtDate(e.entry_date)"></span>
@@ -1342,7 +1407,8 @@
   document.addEventListener('alpine:init', () => {
     Alpine.data('app', () => ({
       view:'loading', mode:'signin', email:'', password:'', message:'', ok:false, busy:false, userEmail:'', userId:'',
-      genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[],
+      genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[], products:[],
+      addingProduct:false, newProductName:'',
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'',
       screen:'list', editId:null, saving:false, formError:'', photoBusy:false, pendingPhotos:[], detectedNote:'',
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
@@ -1351,12 +1417,12 @@
       photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
       sheetOpen:false, sheet:null, sheetConfirmDelete:false, sheetEditing:false, sheetForm:{comment:'',label:'plant',date:''},
       prevTab:'plants', updateReady:false,
-      newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photos:[],existingPhotos:[],removedPhotoIds:[]},
+      newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',photos:[],existingPhotos:[],removedPhotoIds:[]},
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
       journalFilter:'all', allPhotos:[], allPhotosLoaded:false,
       quickLogOpen:false, quickLogBusy:false, quickLogError:'',
-      quickLog:{plantId:'',plantName:'',q:'',type:'note',date:'',note:''},
+      quickLog:{plantId:'',plantName:'',q:'',type:'note',date:'',note:'',productId:'',doseNote:''},
       adding:{genus:false,species:false,vendor:false,location:false,category:false},
       newName:{genus:'',species:'',vendor:'',location:'',category:''},
       form:{genusId:'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:'',acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]},
@@ -1421,7 +1487,29 @@
           sb.from('category').select('id,name').order('name'),
         ]);
         this.genera=g.data||[]; this.speciesAll=s.data||[]; this.vendors=v.data||[]; this.locations=l.data||[]; this.categories=cat.data||[];
+        await this.loadProducts();
         await this.loadPlants();
+      },
+      async loadProducts(){
+        try{
+          const {data,error}=await sb.from('product').select('id,name,category').order('name');
+          if(error)throw error;
+          this.products=data||[];
+          await this.ensureSeedProducts();
+        }catch(e){ /* table may not exist yet — pickers just stay empty */ this.products=this.products||[]; }
+      },
+      // first-run starter list so the dropdown isn't empty (per-user; skipped once seeded)
+      async ensureSeedProducts(){
+        if(this.products.length)return;
+        const key='seededProducts:'+this.userId;
+        if(localStorage.getItem(key))return;
+        const defaults=[['Maxsea','fertilizer'],['Schultz Cactus Fertilizer','fertilizer'],['MSU Orchid Fertilizer','fertilizer'],['Osmocote','fertilizer'],['Spinosad','pesticide'],['Neem oil','pesticide'],['Imidacloprid','pesticide']];
+        try{
+          const rows=defaults.map(([name,category])=>({name,category,user_id:this.userId}));
+          const {data,error}=await sb.from('product').insert(rows).select('id,name,category');
+          if(!error&&data)this.products=data.sort((a,b)=>a.name.localeCompare(b.name));
+          localStorage.setItem(key,'1');
+        }catch(e){/* ignore — user can add products manually */}
       },
       async loadPlants(){
         const {data,error}=await sb.from('plant').select(PLANT_SELECT);
@@ -1626,7 +1714,7 @@
       },
       async loadDetailEvents(plantId){
         const {data}=await sb.from('journal_entry')
-          .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause,photo_id')
+          .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause,photo_id,product_id,dose_note')
           .eq('plant_id',plantId).order('entry_date',{ascending:false}).order('created_at',{ascending:false});
         this.detailEvents=data||[];
       },
@@ -1660,13 +1748,14 @@
         const {error}=await sb.from('journal_entry').insert(row);
         if(error)throw error;
       },
-      _blankEvent(){return{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photos:[],existingPhotos:[],removedPhotoIds:[]};},
-      startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.newEvent=Object.assign(this._blankEvent(),{date:todayLocal()});this.loggingEvent=true;},
+      _blankEvent(){return{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',photos:[],existingPhotos:[],removedPhotoIds:[]};},
+      startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.addingProduct=false;this.newEvent=Object.assign(this._blankEvent(),{date:todayLocal()});this.loggingEvent=true;},
       _fillEventForm(ev){
-        this.editEventId=ev.id;
+        this.editEventId=ev.id; this.addingProduct=false;
         this.newEvent=Object.assign(this._blankEvent(),{
           type:ev.event_type, date:ev.entry_date||todayLocal(), note:ev.body||'',
           measureLabel:ev.measure_label||'', measureValue:(ev.measure_value!=null?ev.measure_value:''), measureUnit:ev.measure_unit||'',
+          productId:ev.product_id||'', doseNote:ev.dose_note||'',
           existingPhotos:this.eventPhotos(ev).map(p=>({id:p.id,thumbUrl:p.thumbUrl,storage_path:p.storage_path})),
         });
       },
@@ -1701,11 +1790,12 @@
           const pid=this.detailPlant.id;
           const photoLabelFor=t=>({flowered:'flower',fruited:'flower',pest_treated:'pests'})[t]||'plant';
           const measureCols=()=>{const m={measure_label:null,measure_value:null,measure_unit:null};if(e.type==='measured'){if((e.measureLabel||'').trim())m.measure_label=e.measureLabel.trim();if(e.measureValue!==''&&e.measureValue!=null)m.measure_value=Number(e.measureValue);if((e.measureUnit||'').trim())m.measure_unit=e.measureUnit.trim();}return m;};
+          const productCols=()=>{const isProd=(e.type==='fed'||e.type==='pest_treated');return {product_id:isProd?(e.productId||null):null,dose_note:isProd?((e.doseNote||'').trim()||null):null};};
 
           // event id — reuse on edit, create otherwise
           let evId=this.editEventId;
           if(!evId){
-            const row=Object.assign({plant_id:pid,event_type:e.type,entry_date:date},measureCols());
+            const row=Object.assign({plant_id:pid,event_type:e.type,entry_date:date},measureCols(),productCols());
             if((e.note||'').trim())row.body=e.note.trim();
             const {data,error}=await sb.from('journal_entry').insert(row).select('id').single();
             if(error)throw error; evId=data.id;
@@ -1727,7 +1817,7 @@
           // primary photo (for the whole-collection journal indicator) = first kept, else first new
           const kept=this.keptExistingPhotos();
           const primaryId=(kept[0]&&kept[0].id)||(e.photos[0]&&e.photos[0].id)||null;
-          const upd=Object.assign({event_type:e.type,entry_date:date,body:(e.note||'').trim()||null,photo_id:primaryId},measureCols());
+          const upd=Object.assign({event_type:e.type,entry_date:date,body:(e.note||'').trim()||null,photo_id:primaryId},measureCols(),productCols());
           const {error:uerr}=await sb.from('journal_entry').update(upd).eq('id',evId);
           if(uerr)throw uerr;
 
@@ -1899,12 +1989,12 @@
       listCount(){return this.listGroups().reduce((t,g)=>t+g.plants.length,0);},
       async loadAllEvents(){
         const {data}=await sb.from('journal_entry')
-          .select('id,plant_id,entry_date,event_type,body,photo_id,plant:plant_id(form_descriptor,species:species_id(name,genus:genus_id(name)))')
+          .select('id,plant_id,entry_date,event_type,body,photo_id,product_id,dose_note,plant:plant_id(form_descriptor,species:species_id(name,genus:genus_id(name)))')
           .order('entry_date',{ascending:false}).order('created_at',{ascending:false}).limit(150);
         this.allEvents=(data||[]).map(e=>{
           const sp=e.plant&&e.plant.species,g=sp&&sp.genus?sp.genus.name:'',s=sp?sp.name:'';
           const name=[g,s,e.plant&&e.plant.form_descriptor].filter(Boolean).join(' ').trim()||'Plant';
-          return {id:e.id,plant_id:e.plant_id,entry_date:e.entry_date,event_type:e.event_type,body:e.body,hasPhoto:!!e.photo_id,plantName:name};
+          return {id:e.id,plant_id:e.plant_id,entry_date:e.entry_date,event_type:e.event_type,body:e.body,product_id:e.product_id,dose_note:e.dose_note,hasPhoto:!!e.photo_id,plantName:name};
         });
       },
       async loadAllPhotos(){
@@ -2041,10 +2131,32 @@
         }catch(e){ this.detailError=e.message||'Could not delete the entry.'; }
         finally{ this.detailBusy=false; }
       },
+      /* ---- products (fertilizers / pesticides on fed & pest_treated events) ---- */
+      productCat(t){ return t==='fed'?'fertilizer':t==='pest_treated'?'pesticide':null; },
+      productOptions(cat){ return this.products.filter(p=>p.category===cat).sort((a,b)=>a.name.localeCompare(b.name)); },
+      startAddProduct(){ this.addingProduct=true; this.newProductName=''; },
+      cancelAddProduct(){ this.addingProduct=false; this.newProductName=''; },
+      async confirmAddProduct(target,category){
+        const name=(this.newProductName||'').trim(); if(!name){this.cancelAddProduct();return;}
+        try{
+          const {data,error}=await sb.from('product').insert({name,category,user_id:this.userId}).select('id,name,category').single();
+          if(error)throw error;
+          this.products.push(data);
+          if(target==='quick')this.quickLog.productId=data.id; else this.newEvent.productId=data.id;
+        }catch(e){/* likely a duplicate — ignore */}
+        this.cancelAddProduct();
+      },
+      // "Maxsea · 1/4 strength" — resolves product name from the global list + dose note
+      eventProductLine(ev){
+        if(!ev)return'';
+        const p=ev.product_id?this.products.find(x=>x.id===ev.product_id):null;
+        return [p&&p.name, ev.dose_note].filter(Boolean).join(' · ');
+      },
+
       /* ---- quick log (from Journal tab FAB) ---- */
       openQuickLog(){
-        this.quickLog={plantId:'',plantName:'',q:'',type:'note',date:todayLocal(),note:''};
-        this.quickLogError=''; this.quickLogOpen=true;
+        this.quickLog={plantId:'',plantName:'',q:'',type:'note',date:todayLocal(),note:'',productId:'',doseNote:''};
+        this.quickLogError=''; this.addingProduct=false; this.quickLogOpen=true;
         this.$nextTick(()=>{ const el=this.$refs.quickLogSearch; if(el)el.focus(); });
       },
       closeQuickLog(){ this.quickLogOpen=false; },
@@ -2061,6 +2173,10 @@
         try{
           const row={plant_id:pid,event_type:this.quickLog.type,entry_date:this.quickLog.date||todayLocal()};
           if((this.quickLog.note||'').trim())row.body=this.quickLog.note.trim();
+          if(this.quickLog.type==='fed'||this.quickLog.type==='pest_treated'){
+            if(this.quickLog.productId)row.product_id=this.quickLog.productId;
+            if((this.quickLog.doseNote||'').trim())row.dose_note=this.quickLog.doseNote.trim();
+          }
           const {error}=await sb.from('journal_entry').insert(row);
           if(error)throw error;
           this.closeQuickLog();
