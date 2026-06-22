@@ -28,6 +28,15 @@ entry's *primary* photo so the whole-collection Journal indicator stays a cheap 
 - **Apply step (Stephen):** run `app/migrations/004_…sql` in Supabase BEFORE relying on the new
   build — the app now selects `photo.journal_entry_id`, which errors until the column exists.
 - **Verification:** JS syntax-checked via `jsc` (clean); NOT browser-run (sandbox + Supabase login).
+- **Follow-up fix (2026-06-21, pushed):** Stephen reported "no Edit button at all." Cause: the
+  sheet's Edit button was rendered via a nested `<template x-if>` inside the flex action row and
+  didn't show reliably on iOS Safari. Fixed → one plain always-present Edit button that dispatches
+  by kind (`sheetEditEntry`). Also made **event editing INLINE in the sheet** (type/date/note/
+  measurement/multi-photo), matching photo-entry editing — no more jump to the plant page
+  (`startSheetEditEvent`/`saveSheetEvent`). Viewer now shows the cached thumb instantly on
+  prev/next then upgrades to full-res (swipe was laggy). **Still needs Stephen's on-device test:
+  confirm the Edit button now appears + inline edit works for both text and photo entries.**
+  Lesson: avoid nested `<template x-if>` in the focused sheet; prefer plain elements + x-show.
 
 ---
 
