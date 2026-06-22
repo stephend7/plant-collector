@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22c">
+<meta name="app-build" content="2026-06-22d">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -923,6 +923,75 @@
       </template>
     </div>
 
+    <!-- ===== quick-log sheet (from Journal tab FAB) ===== -->
+    <div class="sheet-back" x-show="quickLogOpen" x-cloak @click.self="closeQuickLog()">
+      <div class="sheet">
+        <div class="sheet-grab"></div>
+        <div class="sheet-hd">
+          <span class="nm" x-text="quickLog.plantId ? quickLog.plantName : 'Log an entry'"></span>
+          <button class="sheet-x" @click="closeQuickLog()" aria-label="Close">✕</button>
+        </div>
+        <div class="sheet-body">
+          <!-- step 1: pick a plant -->
+          <div x-show="!quickLog.plantId">
+            <p class="hint" style="margin:0 0 10px">Which plant?</p>
+            <div class="searchbar" style="margin:0 0 8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4" stroke-linecap="round"/></svg>
+              <input type="search" placeholder="Search plants…" x-model="quickLog.q" x-ref="quickLogSearch">
+            </div>
+            <div style="max-height:46vh;overflow-y:auto">
+              <template x-for="p in quickLogPlants()" :key="p.id">
+                <div class="lrow" @click="selectQuickLogPlant(p)">
+                  <span style="font-family:var(--serif);font-style:italic" x-text="displayName(p)"></span>
+                </div>
+              </template>
+              <div x-show="quickLogPlants().length===0" class="hint" style="padding:6px 0">No matches.</div>
+            </div>
+          </div>
+          <!-- step 2: event form -->
+          <div x-show="quickLog.plantId">
+            <button class="backrow" @click="quickLog.plantId='';quickLog.plantName=''" style="margin-bottom:10px">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+              Change plant
+            </button>
+            <div class="grid2">
+              <div>
+                <label>What happened</label>
+                <select x-model="quickLog.type">
+                  <option value="note">Note</option>
+                  <option value="flowered">Flowered</option>
+                  <option value="fruited">Fruited / set seed</option>
+                  <option value="repotted">Repotted</option>
+                  <option value="fed">Fed</option>
+                  <option value="pest_treated">Pest / disease treated</option>
+                  <option value="divided">Divided</option>
+                  <option value="dormant">Went dormant</option>
+                  <option value="woke">Woke from dormancy</option>
+                  <option value="measured">Measured</option>
+                  <option value="crossed">Crossed</option>
+                  <optgroup label="Status change">
+                    <option value="acquired">Acquired</option>
+                    <option value="died">Died</option>
+                    <option value="sold">Sold</option>
+                    <option value="traded">Traded</option>
+                    <option value="given_away">Given away</option>
+                  </optgroup>
+                </select>
+              </div>
+              <div><label>Date</label><input type="date" x-model="quickLog.date"></div>
+            </div>
+            <label>Note <span class="hint">(soil mix, fertilizer, which pest — anything)</span></label>
+            <textarea rows="2" x-model="quickLog.note" placeholder="optional"></textarea>
+            <div class="msg err" x-show="quickLogError" x-text="quickLogError" style="margin:6px 0"></div>
+          </div>
+        </div>
+        <div class="sheet-acts" x-show="quickLog.plantId">
+          <button class="go" @click="saveQuickLog()" :disabled="quickLogBusy" x-text="quickLogBusy?'Saving…':'Save entry'"></button>
+          <button @click="closeQuickLog()" :disabled="quickLogBusy">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== HOME (tabbed) ===== -->
     <div class="home" x-show="screen==='list'">
 
@@ -1046,7 +1115,7 @@
           <div>
             <div x-show="allEvents.length===0" class="emptybox" style="margin-top:18px">
               <p style="margin:0 0 6px;font-size:15px;color:var(--ink)">Your journal is empty.</p>
-              <p style="margin:0">Open any plant and tap <strong>＋ Log event</strong> to start its story.</p>
+              <p style="margin:0">Tap <strong>＋</strong> to log your first entry, or open any plant and tap <strong>＋ Log event</strong>.</p>
             </div>
             <div style="margin-top:6px">
               <template x-for="e in allEvents" :key="e.id">
@@ -1107,7 +1176,7 @@
    </div><!-- /appscroll -->
 
     <!-- floating add (home only) + bottom tabs (every page) -->
-    <button class="fab" x-show="screen==='list' && (tab==='plants'||tab==='list')" @click="openForm()" aria-label="Add a plant">
+    <button class="fab" x-show="screen==='list' && (tab==='plants'||tab==='list'||tab==='journal')" @click="tab==='journal'?openQuickLog():openForm()" aria-label="Add a plant or log an entry">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
     </button>
     <div class="tabbar">
@@ -1286,6 +1355,8 @@
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
       journalFilter:'all', allPhotos:[], allPhotosLoaded:false,
+      quickLogOpen:false, quickLogBusy:false, quickLogError:'',
+      quickLog:{plantId:'',plantName:'',q:'',type:'note',date:'',note:''},
       adding:{genus:false,species:false,vendor:false,location:false,category:false},
       newName:{genus:'',species:'',vendor:'',location:'',category:''},
       form:{genusId:'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:'',acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]},
@@ -1970,6 +2041,35 @@
         }catch(e){ this.detailError=e.message||'Could not delete the entry.'; }
         finally{ this.detailBusy=false; }
       },
+      /* ---- quick log (from Journal tab FAB) ---- */
+      openQuickLog(){
+        this.quickLog={plantId:'',plantName:'',q:'',type:'note',date:todayLocal(),note:''};
+        this.quickLogError=''; this.quickLogOpen=true;
+        this.$nextTick(()=>{ const el=this.$refs.quickLogSearch; if(el)el.focus(); });
+      },
+      closeQuickLog(){ this.quickLogOpen=false; },
+      quickLogPlants(){
+        const q=(this.quickLog.q||'').trim().toLowerCase();
+        const list=q?this.plants.filter(p=>this.displayName(p).toLowerCase().includes(q)):[...this.plants];
+        return list.sort((a,b)=>this.displayName(a).localeCompare(this.displayName(b))).slice(0,50);
+      },
+      selectQuickLogPlant(p){ this.quickLog.plantId=p.id; this.quickLog.plantName=this.displayName(p); this.quickLog.q=''; },
+      async saveQuickLog(){
+        if(!this.quickLog.plantId)return;
+        this.quickLogBusy=true; this.quickLogError='';
+        const pid=this.quickLog.plantId;
+        try{
+          const row={plant_id:pid,event_type:this.quickLog.type,entry_date:this.quickLog.date||todayLocal()};
+          if((this.quickLog.note||'').trim())row.body=this.quickLog.note.trim();
+          const {error}=await sb.from('journal_entry').insert(row);
+          if(error)throw error;
+          this.closeQuickLog();
+          await this.loadAllEvents();
+          if(this.detailPlant&&this.detailPlant.id===pid)await this.loadDetailEvents(pid);
+        }catch(e){ this.quickLogError=e.message||'Could not save the entry.'; }
+        finally{ this.quickLogBusy=false; }
+      },
+
       /* ---- care guide (species-level) ---- */
       hasCare(){const s=this.detailPlant&&this.detailPlant.species;return !!(s&&(s.care_dormancy||s.care_water||s.care_feeding||s.care_light||s.care_photoperiod||s.care_humidity));},
       waterLevel(){const w=this.detailPlant&&this.detailPlant.species&&this.detailPlant.species.care_water;return {low:1,medium:2,high:3}[w]||0;},
