@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
+<meta name="app-build" content="2026-06-22a">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -18,6 +19,11 @@
   body{background:var(--bg);color:var(--ink);
     font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     -webkit-text-size-adjust:100%}
+  .updatebar{position:fixed;left:0;right:0;top:0;z-index:200;display:flex;align-items:center;
+    justify-content:center;gap:14px;padding:max(8px,env(safe-area-inset-top)) 14px 8px;
+    background:var(--pine);color:#fff;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+  .updatebar button{background:#fff;color:var(--pine);border:0;border-radius:999px;
+    padding:5px 14px;font-size:13px;font-weight:600;cursor:pointer}
   .center{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
   .brand{display:flex;align-items:center;gap:9px;font-family:var(--serif);font-style:italic;font-size:20px;font-weight:500}
   .brand .leaf{font-size:24px}
@@ -264,6 +270,11 @@
 </head>
 <body>
 <div x-data="app" x-cloak>
+
+  <div class="updatebar" x-show="updateReady" x-cloak>
+    <span>A new version is available.</span>
+    <button @click="applyUpdate()">Refresh</button>
+  </div>
 
   <div x-show="view==='loading'" class="center" style="color:var(--muted)">Connecting to your collection…</div>
 
@@ -1262,7 +1273,7 @@
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
       photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
       sheetOpen:false, sheet:null, sheetConfirmDelete:false, sheetEditing:false, sheetForm:{comment:'',label:'plant',date:''},
-      prevTab:'plants',
+      prevTab:'plants', updateReady:false,
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photos:[],existingPhotos:[],removedPhotoIds:[]},
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
@@ -1281,7 +1292,21 @@
           if(data.session&&data.session.user){this.userEmail=data.session.user.email;this.userId=data.session.user.id;this.view='app';this.loadData();}
           else{this.view='login';}
         }).catch(()=>{this.view='login';this.fail('Couldn’t reach the server. Check your connection.');});
+        // notice when a newer build is deployed (beats iOS Safari's stale-page cache)
+        this._myBuild=(document.querySelector('meta[name="app-build"]')||{}).content||'';
+        this.checkForUpdate();
+        document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible')this.checkForUpdate(); });
       },
+      async checkForUpdate(){
+        if(this.updateReady||!this._myBuild)return;
+        try{
+          const r=await fetch('index.html?cb='+Date.now(),{cache:'no-store'});
+          if(!r.ok)return;
+          const m=(await r.text()).match(/name="app-build"\s+content="([^"]+)"/);
+          if(m&&m[1]&&m[1]!==this._myBuild)this.updateReady=true;
+        }catch(e){/* offline — ignore */}
+      },
+      applyUpdate(){ location.replace(location.pathname+'?u='+Date.now()); },
 
       /* ---- auth ---- */
       clearMsg(){this.message='';this.ok=false;},

@@ -4,6 +4,31 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-22 — "App won't update on my phone" → auto-update check (the real cause of the missing Edit button)
+
+Stephen reported the focused-sheet Edit button still didn't appear on his iPhone. **Diagnosis: NOT a
+code bug.** Verified the always-present Edit button (`sheetEditEntry`, index.html ~line 900) is correct
+locally AND on the live deploy (`curl` of the Pages URL had it; `last-modified` was current). His phone
+was running a **stale cached `index.html`.** Why his workflow hid it: he keeps the tab open and
+pull-to-refreshes, and iOS Safari serves the in-memory/disk-cached page rather than re-downloading — so
+pull-refresh never picked up new code. The app had **no cache-busting** (no SW, no manifest, GitHub Pages
+`cache-control: max-age=600`).
+
+- **Fix — lightweight auto-update check (no service worker; SW too risky for a durability-anxious,
+  non-technical owner — a bad SW can brick the app).** Single version marker `<meta name="app-build">`
+  in `<head>` = source of truth. On load + on every `visibilitychange→visible`, `checkForUpdate()`
+  fetches `index.html?cb=<ts>` with `{cache:'no-store'}`, regexes out the live `app-build`, and if it
+  differs from the running one flips `updateReady=true`. A fixed green **"A new version is available —
+  Refresh"** bar (`.updatebar`) then does `applyUpdate()` → `location.replace(pathname+'?u='+ts)`, a
+  unique URL = guaranteed fresh download. Offline fetch failures are swallowed.
+- **Deploy step on every future change:** bump the `app-build` content string so phones see the banner.
+- **Bootstrap caveat (one-time):** Stephen's currently-cached page predates this checker, so it can't
+  know to check. He must force-refresh ONCE — load
+  `https://stephend7.github.io/plant-collector/app/?u=1` — to pick up the build that contains the
+  checker (which also already has the Edit-button fix). After that, updates are automatic.
+- **Verification:** JS syntax-checked via JavaScriptCore (clean). Preview sandbox still can't start
+  (`getcwd` permission error). Stephen confirms on device.
+
 ## 2026-06-21 — Multiple photos per journal entry (migration 004)
 
 Stephen: a journal entry should hold MANY photos (a repot: before / after / roots) and let you
