@@ -4,6 +4,33 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-22 — REAL bug behind the "missing Edit button": focused sheet trapped under the tab bar
+
+After the auto-update check shipped, Stephen force-loaded the new build and the focused-entry sheet
+DID open (multi-photo grid, meta, note) — but the **action row (View plant · Edit · Delete) still
+wasn't visible**, hidden right where the bottom tab bar sits. So there were TWO problems stacked: a
+stale cache (fixed first) AND this layout bug. Screenshot was the giveaway — overlay dimmed the top of
+the screen but the tab bar stayed bright (= painting on top of the sheet).
+
+- **Root cause (classic iOS Safari):** both overlays (`.viewer`, `.sheet-back`) live INSIDE `.appscroll`,
+  the scrolling container, which had `-webkit-overflow-scrolling:touch`. On iOS that makes the scroll
+  container **contain `position:fixed` descendants and create a stacking context**, trapping the sheet's
+  z-index INSIDE `.appscroll`. The `.tabbar` (sibling of `.appscroll`, z-index:20) then painted over the
+  whole scroll subtree — including the sheet's z-index:45 action row. Confirmed it was the sole trap:
+  `.app` is only `position:relative` (no z-index → not a context) and no ancestor has transform/filter.
+- **Fix (CSS only, low risk):** (1) drop `-webkit-overflow-scrolling:touch` from `.appscroll` (momentum
+  scrolling is the default on modern iOS; the property is deprecated) so fixed overlays escape to the
+  viewport; (2) raise overlay z-index above the tab bar/fab — `.sheet-back` 45→60, `.viewer` 50→65
+  (viewer can open from the sheet, so it stays above it). No markup moved.
+- **Lesson:** a `position:fixed` overlay placed inside a `-webkit-overflow-scrolling:touch` scroll
+  container is trapped under sibling chrome on iOS — keep full-screen overlays OUT of the scroll
+  container, or don't put that property on the container.
+- **Build bumped to `2026-06-22b`** so the new auto-updater offers it. **Verification:** JS unchanged
+  (CSS-only); preview sandbox still can't start; Stephen confirms on device. If the row STILL hides,
+  next step is physically moving the overlays out of `.appscroll`.
+
+---
+
 ## 2026-06-22 — "App won't update on my phone" → auto-update check (the real cause of the missing Edit button)
 
 Stephen reported the focused-sheet Edit button still didn't appear on his iPhone. **Diagnosis: NOT a
