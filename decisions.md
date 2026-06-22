@@ -4,6 +4,34 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-22 — Products list (fertilizers/pesticides) on Fed & Pest-treated journal events
+
+Stephen wanted structured tracking of WHICH fertilizer/pesticide was used (a reusable, addable list —
+"Maxsea, Schultz Cactus Fert, etc. in the system to begin with") with the MIX/strength left free-form.
+Decision: this needed a real table, not free text, so it was worth doing NOW before journal entries
+accumulate — a saved picker can't be retrofitted onto free-text history cleanly.
+
+- **Schema (Stephen ran the SQL in Supabase):** new `product` table (`id`, `user_id`, `name`,
+  `category` check-constrained to fertilizer/pesticide/other, `created_at`) with RLS (`auth.uid() = user_id`).
+  Two new nullable columns on `journal_entry`: `product_id` (FK, on-delete set null) and `dose_note` (text).
+- **`user_id` caveat:** unlike the older tables (genus/vendor/…), this `product` table has NO
+  `default auth.uid()` on `user_id`, so the app passes `user_id` explicitly on insert. Worth adding the
+  column default later for consistency.
+- **UX:** the product dropdown + a free-text "Mix / strength" (Fed) / "Mix / dilution" (Pest) field appear
+  ONLY when the event type is `fed` or `pest_treated`, in all three editors (per-plant Log, focused sheet,
+  Journal-tab quick-log). `＋ New` adds inline; category is inferred from the event type. Dropdown is
+  filtered by category. Product+dose render as "Maxsea · 1/4 strength" in the timeline, sheet, and feed.
+- **First-run seed:** if the products table is empty (and a per-user localStorage flag isn't set), insert
+  a starter set — Maxsea, Schultz Cactus Fertilizer, MSU Orchid Fertilizer, Osmocote, Spinosad, Neem oil,
+  Imidacloprid.
+- **Bug the test loop caught immediately:** the seed ran TWICE → duplicate defaults (14 rows). Root cause:
+  `init()` calls `loadData()` from BOTH `onAuthStateChange` and `getSession()` (classic Supabase double-fire);
+  idempotent loads didn't care but seeding isn't idempotent. **Fix:** `loadProducts()` is now single-flight
+  (caches its own promise so concurrent callers share one fetch+seed). Existing dupes deleted from the DB.
+  *General lesson: any non-idempotent work in `loadData` must be guarded — it runs ~twice on startup.*
+- Builds `2026-06-22f` (feature) → `2026-06-22g` (seed fix). Also this session: `+ Log` FAB on the Journal
+  tab (quick-log sheet with plant search, build `d`); running build shown in the signed-in footer (build `e`).
+
 ## 2026-06-22 — Browser-testing via Claude-in-Chrome + first bug it caught (event-type dropdown)
 
 Set up a real test loop: Claude drives Chrome (the connected "Browser 1") against the LIVE site with a
