@@ -786,21 +786,70 @@
             <!-- event entry -->
             <template x-if="sheet.kind==='event'">
               <div>
-                <div class="sheet-photos" x-show="eventPhotos(sheet.ev).length">
-                  <template x-for="(ph,idx) in eventPhotos(sheet.ev)" :key="ph.id">
-                    <div class="sheet-pthumb" @click="sheetOpenEventPhoto(idx)"><img :src="ph.thumbUrl" alt=""></div>
+                <!-- view -->
+                <div x-show="!sheetEditing">
+                  <div class="sheet-photos" x-show="eventPhotos(sheet.ev).length">
+                    <template x-for="(ph,idx) in eventPhotos(sheet.ev)" :key="ph.id">
+                      <div class="sheet-pthumb" @click="sheetOpenEventPhoto(idx)"><img :src="ph.thumbUrl" alt=""></div>
+                    </template>
+                  </div>
+                  <div class="sheet-meta">
+                    <span class="badge" x-text="eventTypeLabel(sheet.ev.event_type)"></span>
+                    <span class="d" x-text="fmtDate(sheet.ev.entry_date)"></span>
+                  </div>
+                  <div class="sheet-meta" x-show="sheet.ev.measure_value!=null">
+                    <span x-text="(sheet.ev.measure_label?sheet.ev.measure_label+': ':'')+sheet.ev.measure_value+(sheet.ev.measure_unit?' '+sheet.ev.measure_unit:'')"></span>
+                  </div>
+                  <div class="sheet-meta" x-show="sheet.ev.cause"><span class="d" x-text="'Cause: '+sheet.ev.cause"></span></div>
+                  <div class="sheet-note" x-show="sheet.ev.body" x-text="sheet.ev.body"></div>
+                  <div class="hint" x-show="!sheet.ev.body && !eventPhotos(sheet.ev).length && sheet.ev.measure_value==null" style="margin-bottom:12px">No note on this entry.</div>
+                </div>
+                <!-- edit (inline, in the sheet) -->
+                <div class="evform" x-show="sheetEditing" style="margin-top:4px">
+                  <div class="grid2">
+                    <div>
+                      <label>What happened</label>
+                      <select x-model="newEvent.type">
+                        <template x-if="!['note','flowered','fruited','repotted','fed','pest_treated','divided','dormant','woke','measured'].includes(newEvent.type)">
+                          <option :value="newEvent.type" x-text="eventTypeLabel(newEvent.type)"></option>
+                        </template>
+                        <option value="note">Note</option><option value="flowered">Flowered</option>
+                        <option value="fruited">Fruited / set seed</option><option value="repotted">Repotted</option>
+                        <option value="fed">Fed</option><option value="pest_treated">Pest / disease treated</option>
+                        <option value="divided">Divided</option><option value="dormant">Went dormant</option>
+                        <option value="woke">Woke from dormancy</option><option value="measured">Measured</option>
+                      </select>
+                    </div>
+                    <div><label>Date</label><input type="date" x-model="newEvent.date"></div>
+                  </div>
+                  <template x-if="newEvent.type==='measured'">
+                    <div class="grid2">
+                      <div><label>Measure</label><input type="text" x-model="newEvent.measureLabel" placeholder="e.g. pitcher height"></div>
+                      <div style="display:flex;gap:8px">
+                        <div style="flex:1"><label>Value</label><input type="number" step="any" x-model="newEvent.measureValue"></div>
+                        <div style="flex:1"><label>Unit</label><input type="text" x-model="newEvent.measureUnit" placeholder="cm"></div>
+                      </div>
+                    </div>
                   </template>
+                  <label>Note <span class="hint">(soil mix, fertilizer, which pest — anything)</span></label>
+                  <textarea rows="2" x-model="newEvent.note" placeholder="optional"></textarea>
+                  <label>Photos <span class="hint">(add several — before / after / roots)</span></label>
+                  <input type="file" x-ref="sheetEvInput" accept="image/*" multiple @change="onEventPhoto($event)" style="display:none">
+                  <button type="button" class="filebtn" @click="$refs.sheetEvInput.click()" :disabled="detailBusy">＋ Add Photo</button>
+                  <div class="thumbs" x-show="keptExistingPhotos().length || newEvent.photos.length" style="margin-top:10px">
+                    <template x-for="ph in keptExistingPhotos()" :key="ph.id">
+                      <div class="thumb"><button type="button" class="rm" @click="removeExistingEventPhoto(ph.id)">✕</button><img :src="ph.thumbUrl" alt=""></div>
+                    </template>
+                    <template x-for="ph in newEvent.photos" :key="ph.id">
+                      <div class="thumb"><button type="button" class="rm" @click="removeEventPhoto(ph.id)">✕</button><img :src="ph.url" alt=""></div>
+                    </template>
+                  </div>
+                  <div class="msg err" x-show="detailError" x-text="detailError" style="margin:6px 0"></div>
+                  <div class="formfoot">
+                    <button class="primary" @click="saveSheetEvent()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save'"></button>
+                    <button class="ghost" @click="cancelSheetEdit()" :disabled="detailBusy">Cancel</button>
+                  </div>
                 </div>
-                <div class="sheet-meta">
-                  <span class="badge" x-text="eventTypeLabel(sheet.ev.event_type)"></span>
-                  <span class="d" x-text="fmtDate(sheet.ev.entry_date)"></span>
-                </div>
-                <div class="sheet-meta" x-show="sheet.ev.measure_value!=null">
-                  <span x-text="(sheet.ev.measure_label?sheet.ev.measure_label+': ':'')+sheet.ev.measure_value+(sheet.ev.measure_unit?' '+sheet.ev.measure_unit:'')"></span>
-                </div>
-                <div class="sheet-meta" x-show="sheet.ev.cause"><span class="d" x-text="'Cause: '+sheet.ev.cause"></span></div>
-                <div class="sheet-note" x-show="sheet.ev.body" x-text="sheet.ev.body"></div>
-                <div class="hint" x-show="!sheet.ev.body && !eventPhotos(sheet.ev).length && sheet.ev.measure_value==null" style="margin-bottom:12px">No note on this entry.</div>
               </div>
             </template>
             <!-- single photo (standalone entry) -->
@@ -848,8 +897,7 @@
           </div>
           <div class="sheet-acts" x-show="!sheetEditing">
             <button class="go" @click="sheetViewPlant()">View plant →</button>
-            <template x-if="sheet.kind==='event'"><button @click="sheetEdit()">Edit</button></template>
-            <template x-if="sheet.kind==='photo'"><button @click="startSheetEdit()">Edit</button></template>
+            <button @click="sheetEditEntry()">Edit</button>
             <button class="danger" @click="sheetDelete()" x-text="sheetConfirmDelete?'Tap to confirm':'Delete'"></button>
           </div>
         </div>
@@ -1510,15 +1558,24 @@
       },
       _blankEvent(){return{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',photos:[],existingPhotos:[],removedPhotoIds:[]};},
       startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.newEvent=Object.assign(this._blankEvent(),{date:todayLocal()});this.loggingEvent=true;},
-      startEditEvent(ev){
-        this.eventDeleteId=null; this.detailError='';
+      _fillEventForm(ev){
         this.editEventId=ev.id;
         this.newEvent=Object.assign(this._blankEvent(),{
           type:ev.event_type, date:ev.entry_date||todayLocal(), note:ev.body||'',
           measureLabel:ev.measure_label||'', measureValue:(ev.measure_value!=null?ev.measure_value:''), measureUnit:ev.measure_unit||'',
           existingPhotos:this.eventPhotos(ev).map(p=>({id:p.id,thumbUrl:p.thumbUrl,storage_path:p.storage_path})),
         });
-        this.loggingEvent=true;
+      },
+      startEditEvent(ev){ this.eventDeleteId=null; this.detailError=''; this._fillEventForm(ev); this.loggingEvent=true; },
+      // edit an event inline inside the focused sheet (consistent with photo-entry editing)
+      startSheetEditEvent(){ if(!this.sheet||this.sheet.kind!=='event')return; this.detailError=''; this._fillEventForm(this.sheet.ev); this.sheetEditing=true; },
+      async saveSheetEvent(){
+        const evId=this.editEventId;
+        await this.saveEvent();
+        if(this.detailError)return;            // stay in edit if the save failed
+        const ev=this.detailEvents.find(e=>e.id===evId);
+        if(ev)this.sheet.ev=ev;
+        this.sheetEditing=false;
       },
       cancelLogEvent(){ (this.newEvent.photos||[]).forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}}); this.loggingEvent=false; this.editEventId=null; },
       async onEventPhoto(ev){
@@ -1822,7 +1879,8 @@
         this.sheetForm={comment:ph.comment||'',label:ph.label||'plant',date:ph.photo_date||todayLocal()};
         this.detailError=''; this.sheetEditing=true;
       },
-      cancelSheetEdit(){ this.sheetEditing=false; this.detailError=''; },
+      sheetEditEntry(){ if(!this.sheet)return; if(this.sheet.kind==='event')this.startSheetEditEvent(); else this.startSheetEdit(); },
+      cancelSheetEdit(){ (this.newEvent.photos||[]).forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}}); this.editEventId=null; this.newEvent=this._blankEvent(); this.sheetEditing=false; this.detailError=''; },
       async saveSheetPhoto(){
         if(!this.sheet||this.sheet.kind!=='photo')return;
         const ph=this.sheet.ph; this.detailBusy=true; this.detailError='';
@@ -1913,7 +1971,7 @@
       openPhotos(){this.screen='photos';},
       closePhotos(){this.screen='detail';},
       viewerPhoto(){return this.viewerList[this.viewerI]||null;},
-      async _viewerLoad(){const ph=this.viewerList[this.viewerI];this.viewerUrl=ph?((await signFull(ph.storage_path))||ph.thumbUrl):'';},
+      async _viewerLoad(){const i=this.viewerI;const ph=this.viewerList[i];if(!ph){this.viewerUrl='';return;}this.viewerUrl=ph.thumbUrl||'';/* show cached thumb instantly */ const full=await signFull(ph.storage_path); if(this.viewerI===i&&full)this.viewerUrl=full;/* upgrade if still on this photo */},
       async openViewer(list,i,readonly){this.viewerReadonly=!!readonly;this.viewerList=list;this.viewerI=i;this.viewerOpen=true;this.viewerUrl=(list[i]&&list[i].thumbUrl)||'';await this._viewerLoad();},
       closeViewer(){this.viewerOpen=false;},
       async viewerNext(){if(this.viewerList.length<2)return;this.viewerI=(this.viewerI+1)%this.viewerList.length;await this._viewerLoad();},
