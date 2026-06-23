@@ -46,8 +46,15 @@ was painted, so the select fell back to its placeholder. (Same class as the 2026
 - **Verified live** (Chrome + javascript_tool): option existed + `form.speciesId` set, but
   `select.value===''`; clearing then re-asserting after `await $nextTick()` made it display
   `gigantea` (`matches:true`).
-- **Fix:** in `applyTagScan`, `await this.$nextTick()` so the new genus/species `<option>`s paint,
-  *then* assign `form.genusId` / `form.speciesId`. Build `n → o`.
+- **Fix:** in `applyTagScan`, wait for the new genus/species `<option>`s to render, *then* assign
+  `form.genusId` / `form.speciesId`. Build `n → o`.
+- **Refinement (build `p → q`):** the wait was first written as `await this.$nextTick()`, but Alpine's
+  `$nextTick` waits on a **repaint** (`requestAnimationFrame`) — so it *stalls in a backgrounded tab*
+  (caught while verifying: the genus/species rows were inserted in the DB but the function hung before
+  binding the selects). Switched both `applyTagScan` and `applyDetection` to a macrotask yield
+  (`await new Promise(r=>setTimeout(r))`): Alpine flushes the DOM on a microtask, so the `<option>`
+  exists by the next `setTimeout`, and `setTimeout` fires regardless of paint. Real users (foreground
+  tab) were unaffected either way, but this is robust + makes headless verification reliable.
 
 ## 2026-06-22 — Tag scanner (Claude Vision via Edge Function) — built + full-tier Security pass
 

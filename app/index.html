@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22p">
+<meta name="app-build" content="2026-06-22q">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1633,11 +1633,12 @@
               if(!s){ try{ const {data,error}=await sb.from('species').insert({name:match.species,genus_id:g.id}).select('id,name,genus_id').single(); if(!error&&data){s=data;this.speciesAll.push(s);} }catch(e){} }
               if(s){ sid=s.id; label+=' '+s.name; }
             }
-            // Wait for freshly-created <option>(s) to paint before binding the <select>s
-            // (same native-select render race fixed in applyTagScan).
-            await this.$nextTick();
+            // Yield a macrotask so the freshly-created <option>(s) render before binding the
+            // <select>s (same native-select race fixed in applyTagScan; setTimeout not
+            // $nextTick, which would stall in a backgrounded tab waiting on a repaint).
+            await new Promise(r=>setTimeout(r));
             this.form.genusId=g.id; this.onGenusChange();
-            if(sid){ await this.$nextTick(); this.form.speciesId=sid; }
+            if(sid){ await new Promise(r=>setTimeout(r)); this.form.speciesId=sid; }
             bits.push(label);
             if(match.notes && !this.form.notes) this.form.notes=match.notes;
           }
@@ -1695,13 +1696,14 @@
               if(!s){ try{ const {data,error}=await sb.from('species').insert({name:r.species,genus_id:g.id}).select('id,name,genus_id').single(); if(!error&&data){s=data;this.speciesAll.push(s);} }catch(e){} }
               if(s){ sid=s.id; label+=' '+s.name; }
             }
-            // A native <select> can't display a value whose x-for <option> hasn't been
-            // painted yet (a freshly-created genus/species), so wait a tick before binding
-            // the model — otherwise the dropdown stays on its placeholder even though the
-            // underlying form value is correct (which reads as "species didn't fill").
-            await this.$nextTick();
+            // A native <select> can't display a value whose x-for <option> hasn't rendered
+            // yet (a freshly-created genus/species), so yield a macrotask first (Alpine
+            // flushes the DOM on a microtask, so the <option> exists by the next setTimeout)
+            // before binding the model. NB: not $nextTick — that waits on a repaint and
+            // stalls in a backgrounded tab; setTimeout fires regardless.
+            await new Promise(r=>setTimeout(r));
             this.form.genusId=g.id; this.onGenusChange();
-            if(sid){ await this.$nextTick(); this.form.speciesId=sid; }
+            if(sid){ await new Promise(r=>setTimeout(r)); this.form.speciesId=sid; }
             bits.push(label);
           }
         }
