@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22h">
+<meta name="app-build" content="2026-06-22i">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -532,14 +532,18 @@
 
         <!-- ── INFO CARD: location tiles + detail fields ── -->
         <div class="info-card">
-          <div style="display:flex;gap:8px;margin-bottom:10px">
-            <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 11px">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--pine)" stroke-width="1.6" style="flex:0 0 auto"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div style="display:flex;gap:7px;margin-bottom:10px">
+            <div style="flex:1;min-width:0;display:flex;align-items:center;gap:7px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 10px">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="var(--pine)" stroke-width="1.6" style="flex:0 0 auto"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               <div style="min-width:0"><div style="font-size:10.5px;color:var(--muted)">Quantity</div><div style="font-size:13px" x-text="detailPlant.quantity"></div></div>
             </div>
-            <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 11px">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--pine)" stroke-width="1.6" style="flex:0 0 auto"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>
-              <div style="min-width:0"><div style="font-size:10.5px;color:var(--muted)">Growing spot</div><div style="font-size:13px" :style="detailPlant.growing_location?'':'color:var(--muted)'" x-text="detailPlant.growing_location ? detailPlant.growing_location.name : 'Not set'"></div></div>
+            <div style="flex:1;min-width:0;display:flex;align-items:center;gap:7px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 10px">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="var(--pine)" stroke-width="1.6" style="flex:0 0 auto"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.4 2.4 4.6-5.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <div style="min-width:0"><div style="font-size:10.5px;color:var(--muted)">Status</div><div style="font-size:13px" x-text="statusLabel(detailPlant.lifecycle_status)"></div></div>
+            </div>
+            <div style="flex:1;min-width:0;display:flex;align-items:center;gap:7px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 10px">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="var(--pine)" stroke-width="1.6" style="flex:0 0 auto"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>
+              <div style="min-width:0"><div style="font-size:10.5px;color:var(--muted)">Location</div><div style="font-size:13px" :style="detailPlant.growing_location?'':'color:var(--muted)'" x-text="detailPlant.growing_location ? detailPlant.growing_location.name : 'Not set'"></div></div>
             </div>
           </div>
           <dl class="fields" style="margin:0">
@@ -548,8 +552,7 @@
             <div x-show="detailPlant.acquisition_type"><dt>How acquired</dt><dd x-text="acqTypeLabel(detailPlant.acquisition_type)"></dd></div>
             <div x-show="detailPlant.price!=null"><dt>Price</dt><dd x-text="detailPlant.price"></dd></div>
             <div x-show="detailPlant.accession_id"><dt>Accession ID</dt><dd x-text="detailPlant.accession_id"></dd></div>
-            <div x-show="detailPlant.source_url"><dt>Purchase link</dt><dd><a :href="detailPlant.source_url" target="_blank" rel="noopener noreferrer" x-text="detailPlant.source_url" style="color:var(--pine-2);word-break:break-all"></a></dd></div>
-            <div><dt>Status</dt><dd x-text="statusLabel(detailPlant.lifecycle_status)"></dd></div>
+            <div x-show="detailPlant.source_url"><dt>Purchase link</dt><dd><a :href="detailPlant.source_url" target="_blank" rel="noopener noreferrer" x-text="linkLabel(detailPlant)" style="color:var(--pine-2)"></a></dd></div>
             <div x-show="detailPlant.notes"><dt>Notes</dt><dd x-text="detailPlant.notes"></dd></div>
           </dl>
         </div>
@@ -1956,6 +1959,10 @@
         const g=p.species&&p.species.genus?p.species.genus.name:'';
         const s=p.species?p.species.name:'';
         return [g,s,p.form_descriptor].filter(Boolean).join(' ').trim()||'Unnamed plant';
+      },
+      // friendly text for the purchase-link <a> instead of the raw URL: vendor → plant name → fallback
+      linkLabel(p){
+        return (p.vendor && p.vendor.name) || this.displayName(p) || 'View listing';
       },
       botanicalName(p){
         const g=p.species&&p.species.genus?p.species.genus.name:'';
