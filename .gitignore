@@ -4,6 +4,7 @@
 # PRIVATE DATA — never publish these
 *.xlsx
 Photos - Just purchased plants want to enter them into the database/
+docs/ModelPairedDev.pdf
 
 # Local editor/agent tooling
 .claude/

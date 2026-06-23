@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22l">
+<meta name="app-build" content="2026-06-22m">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -318,7 +318,9 @@
         <label>Photos</label>
         <p class="hint">Snap the tag (to read the label) and a clean shot. On a phone you can take a photo or pick from your library. The first photo becomes the cover.</p>
         <input type="file" x-ref="addInput" accept="image/*" multiple @change="onPhotoFiles($event)" style="display:none">
-        <button type="button" class="filebtn" @click="$refs.addInput.click()" :disabled="photoBusy">＋ Add Photo</button>
+        <input type="file" x-ref="scanInput" accept="image/*" @change="onScanFile($event)" style="display:none">
+        <button type="button" class="filebtn" @click="$refs.addInput.click()" :disabled="photoBusy||scanBusy">＋ Add Photo</button>
+        <button type="button" class="filebtn" @click="$refs.scanInput.click()" :disabled="photoBusy||scanBusy" style="margin-left:8px" x-text="scanBusy?'Scanning tag…':'🏷 Scan Tag'"></button>
         <div x-show="photoBusy" class="hint">Processing photos…</div>
         <div x-show="detectedNote" x-transition class="detected">
           <span x-text="detectedNote"></span>
@@ -485,7 +487,7 @@
 
       <div class="msg err" x-text="formError"></div>
       <div class="formfoot">
-        <button class="primary" @click="savePlant()" :disabled="saving||photoBusy" x-text="saving?'Saving…':(editId?'Save changes':'Save plant')"></button>
+        <button class="primary" @click="savePlant()" :disabled="saving||photoBusy||scanBusy" x-text="saving?'Saving…':(editId?'Save changes':'Save plant')"></button>
         <button class="ghost" @click="closeForm()" :disabled="saving">Cancel</button>
       </div>
     </div>
@@ -1425,7 +1427,7 @@
       genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[], products:[],
       addingProduct:false, newProductName:'',
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'',
-      screen:'list', editId:null, saving:false, formError:'', photoBusy:false, pendingPhotos:[], detectedNote:'',
+      screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], detectedNote:'',
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
       detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
@@ -1635,6 +1637,72 @@
       },
       removePending(id){const i=this.pendingPhotos.findIndex(p=>p.id===id);if(i>=0){try{URL.revokeObjectURL(this.pendingPhotos[i].url);}catch(e){}this.pendingPhotos.splice(i,1);}},
       clearPendingPhotos(){this.pendingPhotos.forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}});this.pendingPhotos=[];},
+
+      /* ---- tag scanner ---- */
+      onScanFile(ev){const f=ev.target.files[0];ev.target.value='';if(f)this.scanTag(f);},
+      async scanTag(file){
+        if(this.scanBusy)return;
+        this.scanBusy=true; this.formError='';
+        try{
+          // Convert to JPEG (handles HEIC on Safari/iOS)
+          let blob;
+          try{ blob=await resizeImage(file,1600,.9); }
+          catch(e){ if(isHeic(file)){ const j=await heicToJpeg(file); blob=await resizeImage(j,1600,.9); } else throw e; }
+          // base64-encode
+          const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(blob);});
+          // auth token
+          const {data:{session}}=await sb.auth.getSession();
+          if(!session)throw new Error('Not signed in');
+          // call the edge function
+          const resp=await fetch(`${SUPABASE_URL}/functions/v1/scan-tag`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},
+            body:JSON.stringify({imageBase64:base64,mimeType:'image/jpeg'})
+          });
+          if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error||'Scan failed ('+resp.status+')');}
+          const result=await resp.json();
+          await this.applyTagScan(result);
+        }catch(e){
+          this.formError='Tag scan failed — '+(e.message||'try again');
+        }finally{
+          this.scanBusy=false;
+        }
+      },
+      async applyTagScan(r){
+        const bits=[];
+        // Genus + Species: look up or create, same pattern as applyDetection
+        if(r.genus && !this.form.genusId){
+          let g=this.genera.find(x=>x.name.toLowerCase()===r.genus.toLowerCase());
+          if(!g){ try{ const {data,error}=await sb.from('genus').insert({name:r.genus}).select('id,name').single(); if(!error&&data){g=data;this.genera.push(g);} }catch(e){} }
+          if(g){
+            this.form.genusId=g.id; this.onGenusChange();
+            let label=g.name;
+            if(r.species){
+              let s=this.speciesAll.find(x=>x.genus_id===g.id&&x.name.toLowerCase()===r.species.toLowerCase());
+              if(!s){ try{ const {data,error}=await sb.from('species').insert({name:r.species,genus_id:g.id}).select('id,name,genus_id').single(); if(!error&&data){s=data;this.speciesAll.push(s);} }catch(e){} }
+              if(s){ this.form.speciesId=s.id; label+=' '+s.name; }
+            }
+            bits.push(label);
+          }
+        }
+        if(r.form && !this.form.formDescriptor){ this.form.formDescriptor=r.form; bits.push('form'); }
+        if(r.locality && !this.form.locationData){ this.form.locationData=r.locality; bits.push('location data'); }
+        if(r.accession && !this.form.accessionId){ this.form.accessionId=r.accession; bits.push('accession'); }
+        if(r.price && this.form.price===''){
+          const p=String(r.price).replace(/[^0-9.]/g,'');
+          if(p){ this.form.price=p; bits.push('price $'+p); }
+        }
+        // Vendor: find existing or create new
+        if(r.vendor && !this.form.vendorId){
+          let v=this.vendors.find(x=>x.name.toLowerCase()===r.vendor.toLowerCase());
+          if(!v){ try{ const {data,error}=await sb.from('vendor').insert({name:r.vendor}).select('id,name').single(); if(!error&&data){v=data;this.vendors.push(v);} }catch(e){} }
+          if(v){ this.form.vendorId=v.id; bits.push('vendor'); }
+        }
+        if(r.careNotes && !this.form.notes){ this.form.notes=r.careNotes; bits.push('care notes'); }
+        this.detectedNote=bits.length
+          ? 'Filled from tag: '+bits.join(', ')+' — correct anything below.'
+          : 'Tag scanned — nothing detected. Check the photo and fill in the fields below.';
+      },
 
       /* ---- form open/close/save ---- */
       openForm(){this.editId=null;this.resetForm();this.screen='form';},

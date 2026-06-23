@@ -4,6 +4,42 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-22 — Tag scanner (Claude Vision via Edge Function) — built + full-tier Security pass
+
+The first **Edge Function** in the project: photograph a plant tag → Claude vision reads it →
+structured fields pre-fill the add-plant form (user confirms before save). Mirrors the shipped
+`applyDetection` (filename/EXIF) flow, but text comes from the tag's pixels read **server-side**,
+because the `ANTHROPIC_API_KEY` cannot live in the browser. Contract: `docs/scan-tag-plan.md`.
+
+- **Files:** new `supabase/functions/scan-tag/index.ts` (Deno; `npm:@anthropic-ai/sdk`;
+  `claude-sonnet-4-6` — Stephen chose it over Haiku for accuracy on handwritten/grow-light tags;
+  no dated snapshot exists for Sonnet 4.6, so the bare alias is the canonical pin); `app/index.html` gains `🏷 Scan Tag` button + `scanBusy`
+  state + `onScanFile`/`scanTag`/`applyTagScan` (build `2026-06-22l → m`).
+- **Process honesty (Model-Paired Dev):** the code was written **ahead of the pipeline** (Builder
+  before Architect/Security). Corrected by writing the contract + running a **separated, read-only
+  Security sub-agent (Sonnet)** against plan + code. This is a Full-tier surface (network egress,
+  secret, auth, untrusted file input, no analog shipped) — exactly where [[feedback-dev-method]]
+  mandates spawned adversarial review.
+- **Security VERDICT: CONDITIONAL PASS.** Fundamentals solid: secret stays server-side (C1,
+  independently re-verified by grep), anonymous callers 401'd before any Anthropic spend (C2),
+  service-role key scoped to `auth.getUser` only — no cross-tenant path (C3), no SQL/DOM injection,
+  RLS-scoped inserts (C7), confirm-don't-clobber + no auto-save (C5), fails safe (C8).
+- **Blocking findings FIXED in the function:** C4 HIGH (no server-side `mimeType` validation →
+  added allowlist before the cast); C10 MED (no payload cap → 2M-char/413 guard); C11 MED
+  (`err.message` leaked → generic "Internal error" + `console.error` server-side); LOW token-parse
+  robustness (`slice(7)`). C9 MED (no rate limit) → **accepted risk for solo MVP**, documented in a
+  code comment; revisit before multi-user.
+- **One Security finding DECLINED (verify-your-verification):** "gitignore `supabase/`." Rejected —
+  the function has no secret, the repo is already public app code, and Edge Function source *belongs*
+  in version control. Kept tracked.
+- **Model choice (RESOLVED with Stephen):** chose **Sonnet** (`claude-sonnet-4-6`) over Haiku 4.5 —
+  better on handwriting + purple grow-light tags per [[tag-scanning-findings]], ~3–4× cost, which fits
+  his "quality over cost, I can be patient" stance. One-line revert to Haiku if scans feel too slow/pricey.
+- **Verification status (no false green):** static only — preview sandbox can't start here (known
+  `getcwd` limit) and the function isn't deployed. End-to-end is **gated on: deploy the function +
+  on-device test** against the 18-photo corpus in [[tag-scanning-findings]]. Secret-absence + client
+  brace-balance verified by command.
+
 ## 2026-06-22 — Products list (fertilizers/pesticides) on Fed & Pest-treated journal events
 
 Stephen wanted structured tracking of WHICH fertilizer/pesticide was used (a reusable, addable list —
