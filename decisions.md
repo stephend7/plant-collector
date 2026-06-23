@@ -4,6 +4,27 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-22 — Tag scanner bugfix: species (and genus) silently dropped on scan
+
+**Found in real use by Stephen** (deployed build `m`): a scan filled notes/price/vendor but left
+species blank and quietly kept the old genus. **Root cause:** `applyTagScan` gated the entire
+genus+species block on `if(r.genus && !this.form.genusId)`, but `resetForm` pre-fills
+`form.genusId` with `lastGenusId` (last-picked genus, for fast manual entry). So for any returning
+user `form.genusId` is already set → the guard is false → genus AND species are skipped; the
+other fields (separate lines) still fill. Stephen's guess "maybe it can't create the species" was
+half right — it never *reached* the create-species code.
+
+- **Verified live via Chrome + javascript_tool** (test@test.com): with genus pre-set to Drosera,
+  feeding `{genus:'Pinguicula',species:'gigantea',…}` left genus=Drosera, species='' (bug
+  reproduced). Clearing the genus first and re-running the *same* handler created+selected
+  Pinguicula → gigantea, correctly scoped (create path is fine).
+- **Fix:** drop the `!this.form.genusId` condition → `if(r.genus)`. A tag scan is an *explicit*
+  "read this label" action, so it OVERRIDES the convenience default; confirm-don't-clobber still
+  holds for fields the user actually typed. One-line change in `app/index.html`; build `m → n`.
+- **Note for follow-up:** the filename/EXIF `applyDetection` has the *same* `!this.form.genusId`
+  guard — likely the same latent issue when adding a photo with a returning user. Left unchanged
+  (separate, noisier signal); flagged to Stephen to decide whether to apply the same fix.
+
 ## 2026-06-22 — Tag scanner (Claude Vision via Edge Function) — built + full-tier Security pass
 
 The first **Edge Function** in the project: photograph a plant tag → Claude vision reads it →

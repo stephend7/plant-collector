@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22m">
+<meta name="app-build" content="2026-06-22n">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1670,8 +1670,12 @@
       },
       async applyTagScan(r){
         const bits=[];
-        // Genus + Species: look up or create, same pattern as applyDetection
-        if(r.genus && !this.form.genusId){
+        // Genus + Species: look up or create. A tag scan is an EXPLICIT "read this
+        // label" action, so it OVERRIDES the convenience default the form pre-fills
+        // (lastGenusId) — otherwise the whole genus+species block is skipped for any
+        // returning user and the species silently never lands. (Confirm-don't-clobber
+        // still holds for fields the user actually typed; genusId here is just a default.)
+        if(r.genus){
           let g=this.genera.find(x=>x.name.toLowerCase()===r.genus.toLowerCase());
           if(!g){ try{ const {data,error}=await sb.from('genus').insert({name:r.genus}).select('id,name').single(); if(!error&&data){g=data;this.genera.push(g);} }catch(e){} }
           if(g){
