@@ -25,6 +25,22 @@ half right — it never *reached* the create-species code.
   guard — likely the same latent issue when adding a photo with a returning user. Left unchanged
   (separate, noisier signal); flagged to Stephen to decide whether to apply the same fix.
 
+### Second bug (found while verifying the fix on live build `n`): species `<select>` not displaying
+
+Even with the guard fixed, the species **dropdown** kept showing "— choose species —" while the
+underlying `form.speciesId` was correctly set (Save would have worked, but it *looked* like the
+species still didn't fill — matching Stephen's complaint). **Root cause:** a native `<select>`
+can't bind a value whose `x-for` `<option>` hasn't rendered yet; the scanner set
+`form.speciesId`/`form.genusId` synchronously, *before* the freshly-created species/genus option
+was painted, so the select fell back to its placeholder. (Same class as the 2026-06-22 nested-
+`<template>`-in-`<select>` bug.)
+
+- **Verified live** (Chrome + javascript_tool): option existed + `form.speciesId` set, but
+  `select.value===''`; clearing then re-asserting after `await $nextTick()` made it display
+  `gigantea` (`matches:true`).
+- **Fix:** in `applyTagScan`, `await this.$nextTick()` so the new genus/species `<option>`s paint,
+  *then* assign `form.genusId` / `form.speciesId`. Build `n → o`.
+
 ## 2026-06-22 — Tag scanner (Claude Vision via Edge Function) — built + full-tier Security pass
 
 The first **Edge Function** in the project: photograph a plant tag → Claude vision reads it →

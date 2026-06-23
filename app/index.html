@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22n">
+<meta name="app-build" content="2026-06-22o">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1679,13 +1679,19 @@
           let g=this.genera.find(x=>x.name.toLowerCase()===r.genus.toLowerCase());
           if(!g){ try{ const {data,error}=await sb.from('genus').insert({name:r.genus}).select('id,name').single(); if(!error&&data){g=data;this.genera.push(g);} }catch(e){} }
           if(g){
-            this.form.genusId=g.id; this.onGenusChange();
-            let label=g.name;
+            let label=g.name, sid='';
             if(r.species){
               let s=this.speciesAll.find(x=>x.genus_id===g.id&&x.name.toLowerCase()===r.species.toLowerCase());
               if(!s){ try{ const {data,error}=await sb.from('species').insert({name:r.species,genus_id:g.id}).select('id,name,genus_id').single(); if(!error&&data){s=data;this.speciesAll.push(s);} }catch(e){} }
-              if(s){ this.form.speciesId=s.id; label+=' '+s.name; }
+              if(s){ sid=s.id; label+=' '+s.name; }
             }
+            // A native <select> can't display a value whose x-for <option> hasn't been
+            // painted yet (a freshly-created genus/species), so wait a tick before binding
+            // the model — otherwise the dropdown stays on its placeholder even though the
+            // underlying form value is correct (which reads as "species didn't fill").
+            await this.$nextTick();
+            this.form.genusId=g.id; this.onGenusChange();
+            if(sid){ await this.$nextTick(); this.form.speciesId=sid; }
             bits.push(label);
           }
         }
