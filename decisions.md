@@ -4,6 +4,25 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-23 — Session close: tag scanner shipped+verified; NEXT = spreadsheet import
+
+Tag scanner is **live on build `2026-06-22q`** and confirmed working on a real handwritten tag.
+The four entries below (2026-06-22/23) cover it end to end: built (full-tier, separated Security
+pass), the two real-use bugs (genus/species guard; native-`<select>` render race), and the
+`$nextTick → setTimeout` robustness fix, applied to both `applyTagScan` and the filename/EXIF
+`applyDetection`.
+
+**NEXT FEATURE (new session): spreadsheet import — FULL TIER.** Untrusted-file import → per the
+dev method, **spawn a real separate Security agent** (don't inline-review). Architect should read,
+in order: `architecture.md` (Phase 1 "spreadsheet import with field-mapping"), the
+`legacy-data-findings` memory (his two sheets + friend's sheet; **field-mapping UI is essential** —
+single combined name column vs split genus/species, parse via the `plant-naming-rules` memory;
+`Sheet11` = 133-species seed list to de-dupe; `Source` tab = vendor seed), and `schema.sql`. The
+three real `.xlsx` files live in the repo root (gitignored). **Small loose ends:** clean throwaway
+test data on `test@test.com`; `scan-tag` has no per-user rate limit (accepted MVP risk).
+
+---
+
 ## 2026-06-22 — Tag scanner bugfix: species (and genus) silently dropped on scan
 
 **Found in real use by Stephen** (deployed build `m`): a scan filled notes/price/vendor but left
