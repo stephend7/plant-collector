@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22g">
+<meta name="app-build" content="2026-06-22h">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -380,6 +380,12 @@
       <label>Form / Descriptor</label>
       <input type="text" x-model="form.formDescriptor" placeholder="optional — e.g. White form, giant clone">
 
+      <label>Location data <span class="hint">(where it's from in nature)</span></label>
+      <input type="text" x-model="form.locationData" placeholder="optional — e.g. Warby Range, Victoria, Australia">
+
+      <label>Accession / clone ID</label>
+      <input type="text" x-model="form.accessionId" placeholder="optional — e.g. BE-3390">
+
       <div class="grid2">
         <div>
           <label>Source / Vendor</label>
@@ -437,14 +443,8 @@
         <div><label>Price</label><input type="number" min="0" step="0.01" x-model="form.price" placeholder="optional"></div>
       </div>
 
-      <label>Accession / clone ID</label>
-      <input type="text" x-model="form.accessionId" placeholder="optional — e.g. BE-3390">
-
       <label>Purchase link <span class="hint">(listing page — often has grow info)</span></label>
       <input type="url" x-model="form.sourceUrl" placeholder="optional — https://…">
-
-      <label>Location data <span class="hint">(where it's from in nature)</span></label>
-      <input type="text" x-model="form.locationData" placeholder="optional — e.g. Warby Range, Victoria, Australia">
 
       <label>Status</label>
       <select x-model="form.lifecycleStatus">
@@ -543,7 +543,6 @@
             </div>
           </div>
           <dl class="fields" style="margin:0">
-            <div x-show="detailPlant.form_descriptor"><dt>Form/Descriptor</dt><dd x-text="detailPlant.form_descriptor"></dd></div>
             <div><dt>Vendor</dt><dd x-text="detailPlant.vendor ? detailPlant.vendor.name : '—'"></dd></div>
             <div x-show="detailPlant.acquisition_date"><dt>Acquired</dt><dd x-text="detailPlant.acquisition_date"></dd></div>
             <div x-show="detailPlant.acquisition_type"><dt>How acquired</dt><dd x-text="acqTypeLabel(detailPlant.acquisition_type)"></dd></div>
@@ -555,8 +554,10 @@
           </dl>
         </div>
 
-        <!-- ── CARE section ── -->
-        <div class="sec-wrap">
+        <!-- sections wrapped in a flex column so Care can be ordered last (kept in DOM order for simple diffs) -->
+        <div style="display:flex;flex-direction:column">
+        <!-- ── CARE section (order:2 → renders below Photos & Journal) ── -->
+        <div class="sec-wrap" style="order:2">
           <div class="sec-hd">
             <!-- leaf / care icon -->
             <svg class="sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 21c0-6 3.5-11 12-12 0 7-4.5 12-10.5 12z"/><path d="M6 21c1.5-4.5 4-7.5 8-9.5" stroke-linecap="round"/></svg>
@@ -652,7 +653,7 @@
                     <option value="flowered">Flowered</option>
                     <option value="fruited">Fruited / set seed</option>
                     <option value="repotted">Repotted</option>
-                    <option value="fed">Fed</option>
+                    <option value="fed">Fertilize</option>
                     <option value="pest_treated">Pest / disease treated</option>
                     <option value="divided">Divided</option>
                     <option value="dormant">Went dormant</option>
@@ -668,7 +669,7 @@
                     </optgroup>
                   </select>
                 </div>
-                <div><label>Date</label><input type="date" x-model="newEvent.date"></div>
+                <div style="order:-1"><label>Date</label><input type="date" x-model="newEvent.date"></div>
               </div>
               <template x-if="newEvent.type==='measured'">
                 <div class="grid2">
@@ -751,6 +752,8 @@
             </div>
           </div>
         </div>
+
+        </div><!-- /sections flex wrap -->
 
         <div class="formfoot" style="margin-top:4px">
           <button class="ghost danger" @click="deletePlant()" :disabled="detailBusy" x-text="confirmingDelete?'Tap again to delete':'Delete plant'"></button>
@@ -851,7 +854,7 @@
                       <select x-model="newEvent.type">
                         <option value="note">Note</option><option value="flowered">Flowered</option>
                         <option value="fruited">Fruited / set seed</option><option value="repotted">Repotted</option>
-                        <option value="fed">Fed</option><option value="pest_treated">Pest / disease treated</option>
+                        <option value="fed">Fertilize</option><option value="pest_treated">Pest / disease treated</option>
                         <option value="divided">Divided</option><option value="dormant">Went dormant</option>
                         <option value="woke">Woke from dormancy</option><option value="measured">Measured</option>
                         <option value="crossed">Crossed</option>
@@ -862,7 +865,7 @@
                         </optgroup>
                       </select>
                     </div>
-                    <div><label>Date</label><input type="date" x-model="newEvent.date"></div>
+                    <div style="order:-1"><label>Date</label><input type="date" x-model="newEvent.date"></div>
                   </div>
                   <template x-if="newEvent.type==='measured'">
                     <div class="grid2">
@@ -1006,7 +1009,7 @@
                   <option value="flowered">Flowered</option>
                   <option value="fruited">Fruited / set seed</option>
                   <option value="repotted">Repotted</option>
-                  <option value="fed">Fed</option>
+                  <option value="fed">Fertilize</option>
                   <option value="pest_treated">Pest / disease treated</option>
                   <option value="divided">Divided</option>
                   <option value="dormant">Went dormant</option>
@@ -1022,7 +1025,7 @@
                   </optgroup>
                 </select>
               </div>
-              <div><label>Date</label><input type="date" x-model="quickLog.date"></div>
+              <div style="order:-1"><label>Date</label><input type="date" x-model="quickLog.date"></div>
             </div>
             <template x-if="quickLog.type==='fed' || quickLog.type==='pest_treated'">
               <div>
@@ -1144,9 +1147,15 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12M8 11l4 4 4-4M5 20h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </div>
+        <div class="filterbar" x-show="plants.length>0 && categories.length>0">
+          <button type="button" class="cat-chip" :class="listCatIds.length===0?'selected':''" @click="listCatIds=[]">All categories</button>
+          <template x-for="c in categories" :key="c.id">
+            <button type="button" class="cat-chip" :class="listCatIds.includes(c.id)?'selected':''" @click="toggleListCat(c.id)" x-text="c.name"></button>
+          </template>
+        </div>
         <div class="filterbar" x-show="plants.length>0">
-          <span class="fsel"><select x-model="listCatId"><option value="">Category: All</option><template x-for="c in categories" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select></span>
           <span class="fsel"><select x-model="listGenusName"><option value="">Genus: All</option><template x-for="gn in genusNames()" :key="gn"><option :value="gn" x-text="gn"></option></template></select></span>
+          <span class="hint" x-show="listCatIds.length>1" style="align-self:center">matching all <span x-text="listCatIds.length"></span> categories</span>
         </div>
         <div x-show="plants.length===0" class="hint" style="margin-top:16px">No plants yet.</div>
         <template x-for="grp in listGroups()" :key="grp.genus">
@@ -1419,7 +1428,7 @@
       prevTab:'plants', updateReady:false,
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',photos:[],existingPhotos:[],removedPhotoIds:[]},
       filterCategoryIds:[],
-      tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatId:'', listGenusName:'', allEvents:[],
+      tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatIds:[], listGenusName:'', allEvents:[],
       journalFilter:'all', allPhotos:[], allPhotosLoaded:false,
       quickLogOpen:false, quickLogBusy:false, quickLogError:'',
       quickLog:{plantId:'',plantName:'',q:'',type:'note',date:'',note:'',productId:'',doseNote:''},
@@ -1732,7 +1741,7 @@
         if(fresh){this.detailPlant=fresh;await this.loadDetailPhotos(fresh.id);await this.loadDetailEvents(fresh.id);}
       },
       /* ---- event log ---- */
-      eventTypeLabel(t){return{note:'Note',acquired:'Acquired',flowered:'Flowered',fruited:'Fruited / set seed',divided:'Divided',repotted:'Repotted',fed:'Fed',pest_treated:'Pest / disease treated',dormant:'Went dormant',woke:'Woke from dormancy',measured:'Measured',died:'Died',sold:'Sold',traded:'Traded',given_away:'Given away',crossed:'Crossed'}[t]||t;},
+      eventTypeLabel(t){return{note:'Note',acquired:'Acquired',flowered:'Flowered',fruited:'Fruited / set seed',divided:'Divided',repotted:'Repotted',fed:'Fertilize',pest_treated:'Pest / disease treated',dormant:'Went dormant',woke:'Woke from dormancy',measured:'Measured',died:'Died',sold:'Sold',traded:'Traded',given_away:'Given away',crossed:'Crossed'}[t]||t;},
       timeline(){
         const items=[];
         const all=this.timelineFilter==='all';
@@ -1967,6 +1976,7 @@
         return `${t} plant${t!==1?'s':''} · ${gc} gen${gc===1?'us':'era'}`;
       },
       toggleFilter(id){const i=this.filterCategoryIds.indexOf(id);if(i>=0)this.filterCategoryIds.splice(i,1);else this.filterCategoryIds.push(id);},
+      toggleListCat(id){const i=this.listCatIds.indexOf(id);if(i>=0)this.listCatIds.splice(i,1);else this.listCatIds.push(id);},
       toggleCategory(id){const i=this.form.categoryIds.indexOf(id);if(i>=0)this.form.categoryIds.splice(i,1);else this.form.categoryIds.push(id);},
 
       /* ---- redesigned home: tabs, genus gallery, text list, journal ---- */
@@ -1986,7 +1996,7 @@
       genusNames(){const s=new Set();for(const p of this.plants){const g=p.species&&p.species.genus&&p.species.genus.name;if(g)s.add(g);}return[...s].sort((a,b)=>a.localeCompare(b));},
       listGroups(){
         let list=this.plants;
-        if(this.listCatId)list=list.filter(p=>(p.plant_category||[]).some(pc=>pc.category_id===this.listCatId));
+        if(this.listCatIds.length)list=list.filter(p=>{const ids=(p.plant_category||[]).map(pc=>pc.category_id);return this.listCatIds.every(id=>ids.includes(id));});
         if(this.listGenusName)list=list.filter(p=>this.genusOf(p)===this.listGenusName);
         const by={};
         for(const p of list){const g=this.genusOf(p);(by[g]=by[g]||[]).push(p);}
