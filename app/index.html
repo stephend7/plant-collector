@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22o">
+<meta name="app-build" content="2026-06-22p">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1590,9 +1590,11 @@
         let first=true;
         for(const file of files){
           try{
-            // Auto-detect name from the photo's filename/caption until we have a genus,
-            // and grab the photo's date on the first one. Always confirm-don't-clobber.
-            if(!this.form.genusId || (first && !this.form.acquisitionDate)){
+            // On the first photo of a fresh add, read its filename/caption to auto-fill —
+            // this now runs even when the form pre-filled the last-used genus (the bug that
+            // made detection a no-op for returning users). Gated on "no photos yet" so a
+            // later batch can't clobber what you've entered since.
+            if(first && this.pendingPhotos.length===0){
               try{ const det=await detectFromFile(file,this.genusNameList()); await this.applyDetection(det); }catch(e){}
             }
             first=false;
@@ -1617,17 +1619,25 @@
         if(!det)return;
         const {match,date}=det;
         const bits=[];
-        if(match && match.genus && !this.form.genusId){
+        // Override the genus DEFAULT (or empty) — but not a genus the user deliberately
+        // changed to something else. Filename detection is an implicit signal (you just
+        // added a photo), unlike the explicit Scan Tag, so it stays out of a manual pick's way.
+        const genusIsDefault = !this.form.genusId || this.form.genusId===this.lastGenusId;
+        if(match && match.genus && genusIsDefault){
           let g=this.genera.find(x=>x.name.toLowerCase()===match.genus.toLowerCase());
           if(!g){ try{ const {data,error}=await sb.from('genus').insert({name:match.genus}).select('id,name').single(); if(!error&&data){g=data;this.genera.push(g);} }catch(e){} }
           if(g){
-            this.form.genusId=g.id; this.onGenusChange();
-            let label=g.name;
+            let label=g.name, sid='';
             if(match.species){
               let s=this.speciesAll.find(x=>x.genus_id===g.id && x.name.toLowerCase()===match.species.toLowerCase());
               if(!s){ try{ const {data,error}=await sb.from('species').insert({name:match.species,genus_id:g.id}).select('id,name,genus_id').single(); if(!error&&data){s=data;this.speciesAll.push(s);} }catch(e){} }
-              if(s){ this.form.speciesId=s.id; label+=' '+s.name; }
+              if(s){ sid=s.id; label+=' '+s.name; }
             }
+            // Wait for freshly-created <option>(s) to paint before binding the <select>s
+            // (same native-select render race fixed in applyTagScan).
+            await this.$nextTick();
+            this.form.genusId=g.id; this.onGenusChange();
+            if(sid){ await this.$nextTick(); this.form.speciesId=sid; }
             bits.push(label);
             if(match.notes && !this.form.notes) this.form.notes=match.notes;
           }

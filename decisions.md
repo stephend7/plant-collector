@@ -24,6 +24,14 @@ half right — it never *reached* the create-species code.
 - **Note for follow-up:** the filename/EXIF `applyDetection` has the *same* `!this.form.genusId`
   guard — likely the same latent issue when adding a photo with a returning user. Left unchanged
   (separate, noisier signal); flagged to Stephen to decide whether to apply the same fix.
+  **→ DONE (build `o → p`):** Stephen asked to apply it. Two guards were blocking it: the *caller*
+  (`onPhotoFiles`) only ran detection when `!form.genusId || (first && !acquisitionDate)` — both
+  false for a returning user (genus pre-filled, date defaults to today) — and the inner
+  `!this.form.genusId`. Fix: caller now runs detection on the first photo of a fresh add
+  (`first && pendingPhotos.length===0`, so a later batch can't clobber later edits); inner guard
+  changed to `genusIsDefault = !genusId || genusId===lastGenusId` (overrides the *default* but NOT
+  a deliberately-changed genus — filename is implicit vs. the explicit Scan Tag) + the same
+  `await $nextTick()` render fix. Verified live on build `p`.
 
 ### Second bug (found while verifying the fix on live build `n`): species `<select>` not displaying
 
