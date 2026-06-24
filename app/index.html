@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-22q">
+<meta name="app-build" content="2026-06-23r">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -266,6 +266,37 @@
   .sec-hd h3{margin:0;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;flex:1;color:#fff}
   .sec-act{color:rgba(255,255,255,.8);font-size:13px;background:none;border:0;cursor:pointer;font-family:inherit;padding:0}
   .sec-body{background:var(--card);border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:14px}
+  /* ---- spreadsheet import ---- */
+  .imp-back{position:fixed;inset:0;background:var(--bg);z-index:70;display:flex;flex-direction:column}
+  .imp-head{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg)}
+  .imp-head h2{margin:0;font-size:17px;flex:1}
+  .imp-body{flex:1;overflow:auto;padding:16px;max-width:760px;width:100%;margin:0 auto}
+  .imp-x{background:none;border:0;font-size:22px;color:var(--muted);cursor:pointer;line-height:1;padding:4px}
+  .imp-drop{border:2px dashed var(--line);border-radius:14px;padding:34px 18px;text-align:center;color:var(--muted);cursor:pointer}
+  .imp-drop:hover{border-color:var(--pine);color:var(--ink)}
+  .imp-sheet{display:flex;justify-content:space-between;align-items:center;width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:11px;background:var(--card);margin-bottom:8px;cursor:pointer;font-size:15px;color:var(--ink)}
+  .imp-sheet:hover{border-color:var(--pine)}
+  .imp-sheet small{color:var(--muted)}
+  .imp-maprow{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
+  .imp-maprow label{font-size:13px;color:var(--ink);font-weight:600}
+  .imp-maprow small{display:block;color:var(--muted);font-weight:400;font-size:11px}
+  .imp-counts{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
+  .imp-pill{background:var(--chip);border-radius:10px;padding:9px 13px;font-size:13px;color:var(--ink)}
+  .imp-pill b{font-size:18px;display:block;font-family:var(--serif)}
+  .imp-tbl{width:100%;border-collapse:collapse;font-size:12px}
+  .imp-tbl th,.imp-tbl td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  .imp-tbl th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--bg)}
+  .imp-warn{color:#8A5A12}
+  .imp-seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:8px}
+  .imp-seg button{background:var(--card);border:0;padding:8px 14px;font-size:13px;cursor:pointer;color:var(--muted);font-family:inherit}
+  .imp-seg button.on{background:var(--pine);color:#fff}
+  .imp-note{background:#F6ECD4;color:#8A5A12;border-radius:10px;padding:9px 12px;font-size:13px;margin-bottom:12px}
+  .imp-err{background:#FBE7E3;color:#9A3528;border-radius:10px;padding:9px 12px;font-size:13px;margin-bottom:12px}
+  .imp-batch{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+  .imp-batch .grow{flex:1}
+  .imp-batch small{color:var(--muted)}
+  .btnrow{display:flex;gap:10px;margin-top:18px}
+  .btn-ghost{flex:1;padding:13px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:15px;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
@@ -1151,9 +1182,14 @@
         </button>
         <div class="homehead">
           <div><h1>All plants</h1><p class="homesub" x-text="listCount()+' shown'"></p></div>
-          <button class="iconbtn" @click="exportCsv()" :disabled="!plants.length" title="Export to CSV" aria-label="Export to CSV">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12M8 11l4 4 4-4M5 20h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
+          <div style="display:flex;gap:8px">
+            <button class="iconbtn" @click="openImport()" title="Import from a spreadsheet" aria-label="Import from a spreadsheet">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21V9M8 13l4-4 4 4M5 4h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="iconbtn" @click="exportCsv()" :disabled="!plants.length" title="Export to CSV" aria-label="Export to CSV">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12M8 11l4 4 4-4M5 20h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
         </div>
         <div class="filterbar" x-show="plants.length>0 && categories.length>0">
           <button type="button" class="cat-chip" :class="listCatIds.length===0?'selected':''" @click="listCatIds=[]">All categories</button>
@@ -1256,6 +1292,198 @@
     </div>
 
    </div><!-- /appscroll -->
+
+    <!-- ===================== SPREADSHEET IMPORT ===================== -->
+    <div class="imp-back" x-show="importOpen" x-cloak style="display:none">
+      <div class="imp-head">
+        <h2 x-text="importStep==='done' ? 'Import complete' : 'Import a spreadsheet'"></h2>
+        <button class="imp-x" @click="closeImport()" aria-label="Close">✕</button>
+      </div>
+      <div class="imp-body">
+        <template x-if="importError"><div class="imp-err" x-text="importError"></div></template>
+        <template x-if="importNote"><div class="imp-note" x-text="importNote"></div></template>
+
+        <!-- STEP: pick a file -->
+        <div x-show="importStep==='pick'">
+          <label class="imp-drop">
+            <input type="file" accept=".xlsx,.xls,.csv" class="visually-hidden" style="display:none" @change="onImportFile($event)">
+            <div x-show="!importBusy">
+              <div style="font-size:15px;color:var(--ink);margin-bottom:4px">Choose an Excel or CSV file</div>
+              <div>Tap to pick a <strong>.xlsx</strong> or <strong>.csv</strong> from Excel or Google Sheets</div>
+            </div>
+            <div x-show="importBusy">Reading <span x-text="importFileName"></span>…</div>
+          </label>
+          <p style="font-size:12px;color:var(--muted);margin-top:10px">Nothing is added to your collection until you review a preview and confirm. Files up to 15 MB.</p>
+
+          <template x-if="importBatches.length">
+            <div style="margin-top:22px">
+              <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Previous imports</h3>
+              <template x-for="b in importBatches" :key="b.id">
+                <div class="imp-batch">
+                  <div class="grow"><span x-text="b.source_name||'Import'"></span><br><small x-text="(b.plant_count||0)+' plants · '+((b.started_at||'').slice(0,16).replace('T',' '))"></small></div>
+                  <template x-if="importUndoId!==b.id">
+                    <button class="imp-x" style="font-size:13px;color:var(--pine-2)" :disabled="importBatchBusy" @click="importUndoId=b.id" x-text="importBatchBusy===b.id?'…':'Undo'"></button>
+                  </template>
+                  <template x-if="importUndoId===b.id">
+                    <span style="display:flex;gap:8px;align-items:center"><small x-text="'Delete '+(b.plant_count||0)+' plants?'"></small>
+                      <button class="imp-x" style="font-size:13px;color:#9A3528" @click="undoImportBatch(b)">Yes</button>
+                      <button class="imp-x" style="font-size:13px" @click="importUndoId=''">No</button></span>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+
+        <!-- STEP: pick a tab -->
+        <div x-show="importStep==='sheet'">
+          <p style="color:var(--muted);font-size:13px">This workbook has several tabs. Which one holds the plants?</p>
+          <template x-for="s in importSheets" :key="s.name">
+            <button class="imp-sheet" @click="chooseSheet(s.name)">
+              <span x-text="s.name"></span><small x-text="s.rows+' rows · '+s.cols+' cols'"></small>
+            </button>
+          </template>
+          <div class="btnrow"><button class="btn-ghost" @click="importStep='pick'">← Back</button></div>
+        </div>
+
+        <!-- STEP: map columns -->
+        <div x-show="importStep==='map'">
+          <p style="color:var(--muted);font-size:13px;margin-top:0">Tell us which of your columns is which. We guessed where we could — fix anything wrong.</p>
+
+          <div class="imp-seg">
+            <button :class="importNameMode==='split'?'on':''" @click="importNameMode='split'">Genus &amp; Species in 2 columns</button>
+            <button :class="importNameMode==='combined'?'on':''" @click="importNameMode='combined'">One combined name column</button>
+          </div>
+
+          <template x-if="importNameMode==='split'">
+            <div>
+              <div class="imp-maprow"><label>Genus <small>required</small></label>
+                <select x-model="importMap.genus"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+              <div class="imp-maprow"><label>Species <small>blank → "sp."</small></label>
+                <select x-model="importMap.species"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+            </div>
+          </template>
+          <template x-if="importNameMode==='combined'">
+            <div class="imp-maprow"><label>Combined name <small>"Nepenthes ampullaria 'Lime Twist', BE-3390"</small></label>
+              <select x-model="importMap.combinedName"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          </template>
+
+          <div class="imp-maprow"><label>Form / descriptor</label>
+            <select x-model="importMap.formDescriptor"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          <div class="imp-maprow"><label>Vendor / source</label>
+            <div><select x-model="importMap.vendor"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select>
+              <label style="display:flex;gap:6px;align-items:center;font-weight:400;font-size:12px;margin-top:5px;color:var(--muted)"><input type="checkbox" style="width:auto" x-model="importSourceAsNotes"> It's a description, not a vendor name → put in notes</label></div></div>
+          <div class="imp-maprow"><label>Acquisition date</label>
+            <select x-model="importMap.acquisitionDate"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          <div class="imp-maprow"><label>Price paid</label>
+            <select x-model="importMap.price"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          <div class="imp-maprow"><label>Accession / clone ID <small>stored exactly as-is</small></label>
+            <select x-model="importMap.accessionId"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          <div class="imp-maprow"><label>Purchase link</label>
+            <select x-model="importMap.sourceUrl"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          <div class="imp-maprow"><label>Location data <small>wild origin</small></label>
+            <select x-model="importMap.locationData"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          <div class="imp-maprow"><label>Notes</label>
+            <select x-model="importMap.notes"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          <div class="imp-maprow"><label>Acquisition type <small>plant / seed / trade…</small></label>
+            <select x-model="importMap.acquisitionType"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          <div class="imp-maprow"><label>Wishlist flag <small>these rows are skipped</small></label>
+            <select x-model="importMap.wishlist"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+
+          <div class="imp-maprow"><label>Status column</label>
+            <select x-model="importMap.status" @change="buildStatusRules()"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          <div class="imp-maprow" x-show="importMap.status===''"><label>Default status for all rows</label>
+            <select x-model="importDefaultStatus"><template x-for="s in ['in_collection','dead','sold','traded','given_away']" :key="s"><option :value="s" x-text="statusLabel(s)"></option></template></select></div>
+
+          <template x-if="importMap.status!=='' && importStatusRules.length">
+            <div style="margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:12px">
+              <div style="font-size:13px;font-weight:600;margin-bottom:6px">Your status words → our statuses</div>
+              <template x-for="rule in importStatusRules" :key="rule.key">
+                <div class="imp-maprow" style="border-top:0;padding:5px 0"><label x-text="rule.raw" style="font-weight:400"></label>
+                  <select x-model="rule.target">
+                    <template x-for="s in ['in_collection','dead','sold','traded','given_away']" :key="s"><option :value="s" x-text="statusLabel(s)"></option></template>
+                    <option value="__notes">Keep word in notes</option>
+                    <option value="__skip">Skip these rows</option>
+                  </select></div>
+              </template>
+            </div>
+          </template>
+
+          <div class="btnrow">
+            <button class="btn-ghost" @click="importStep = importSheets.length>1 ? 'sheet':'pick'">← Back</button>
+            <button class="primary" style="flex:1;margin-top:0" @click="buildImportPreview()">Preview →</button>
+          </div>
+        </div>
+
+        <!-- STEP: preview -->
+        <div x-show="importStep==='preview' && importPreview">
+          <p style="margin-top:0;color:var(--muted);font-size:13px">Here's exactly what will be created. Nothing is saved yet.</p>
+          <div class="imp-counts">
+            <div class="imp-pill"><b x-text="importPreview && importPreview.plants.length"></b>plants</div>
+            <div class="imp-pill"><b x-text="importPreview && importPreview.newGenera.length"></b>new genera</div>
+            <div class="imp-pill"><b x-text="importPreview && importPreview.newSpeciesCount"></b>new species</div>
+            <div class="imp-pill"><b x-text="importPreview && importPreview.newVendors.length"></b>new vendors</div>
+            <div class="imp-pill" x-show="importPreview && importPreview.warnCount"><b x-text="importPreview && importPreview.warnCount"></b>to review</div>
+            <div class="imp-pill" x-show="importPreview && importPreview.skipped.length"><b x-text="importPreview && importPreview.skipped.length"></b>skipped</div>
+          </div>
+
+          <div style="overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:340px">
+            <table class="imp-tbl">
+              <thead><tr><th>#</th><th>Genus</th><th>Species</th><th>Vendor</th><th>Date</th><th>Price</th><th>Status</th><th>Notes</th></tr></thead>
+              <tbody>
+                <template x-for="p in importPreviewSample()" :key="p.row">
+                  <tr>
+                    <td x-text="p.row"></td><td x-text="p.genus"></td><td x-text="p.species"></td>
+                    <td x-text="p.vendorName"></td>
+                    <td><span x-text="p.acquisitionDate||'—'"></span><span x-show="p.acquisitionDatePrecision&&p.acquisitionDatePrecision!=='day'" class="imp-warn" x-text="' ('+p.acquisitionDatePrecision+')'"></span></td>
+                    <td x-text="p.price==null?'':('$'+p.price)"></td>
+                    <td x-text="statusLabel(p.status)"></td>
+                    <td class="imp-warn" x-text="p.warnings.join(', ')"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <p style="font-size:12px;color:var(--muted)" x-show="importPreview && importPreview.plants.length>12" x-text="'…and '+(importPreview.plants.length-12)+' more rows'"></p>
+          <p style="font-size:12px;color:var(--muted)" x-show="importPreview && importPreview.skipped.length" x-text="'Skipped: '+importPreview.skipped.slice(0,8).map(s=>'row '+s.row+' ('+s.reason+')').join(', ')+(importPreview.skipped.length>8?'…':'')"></p>
+
+          <div class="btnrow">
+            <button class="btn-ghost" @click="importStep='map'">← Back</button>
+            <button class="primary" style="flex:1;margin-top:0" :disabled="!importPreview.plants.length" @click="runImport()" x-text="'Import '+(importPreview?importPreview.plants.length:0)+' plants'"></button>
+          </div>
+        </div>
+
+        <!-- STEP: running -->
+        <div x-show="importStep==='running'" style="text-align:center;padding:40px 0">
+          <p style="font-size:16px" x-text="'Importing… '+importProgress+' / '+importProgressTotal"></p>
+          <p style="color:var(--muted);font-size:13px">Please keep this screen open.</p>
+        </div>
+
+        <!-- STEP: done -->
+        <div x-show="importStep==='done' && importResult">
+          <div class="imp-counts" style="margin-top:4px">
+            <div class="imp-pill"><b x-text="importResult && importResult.created"></b>plants added</div>
+            <div class="imp-pill"><b x-text="importResult && importResult.genera"></b>genera</div>
+            <div class="imp-pill"><b x-text="importResult && importResult.species"></b>species</div>
+            <div class="imp-pill"><b x-text="importResult && importResult.vendors"></b>vendors</div>
+            <div class="imp-pill" x-show="importResult && importResult.skipped"><b x-text="importResult && importResult.skipped"></b>skipped</div>
+          </div>
+          <p style="color:var(--muted);font-size:13px">Your collection is updated. Changed your mind? Undo this import below.</p>
+          <template x-if="importBatches.length">
+            <div style="margin-top:8px">
+              <template x-for="b in importBatches" :key="b.id">
+                <div class="imp-batch">
+                  <div class="grow"><span x-text="b.source_name||'Import'"></span><br><small x-text="(b.plant_count||0)+' plants · '+((b.started_at||'').slice(0,16).replace('T',' '))"></small></div>
+                  <template x-if="importUndoId!==b.id"><button class="imp-x" style="font-size:13px;color:var(--pine-2)" :disabled="importBatchBusy" @click="importUndoId=b.id">Undo</button></template>
+                  <template x-if="importUndoId===b.id"><span style="display:flex;gap:8px;align-items:center"><small x-text="'Delete '+(b.plant_count||0)+'?'"></small><button class="imp-x" style="font-size:13px;color:#9A3528" @click="undoImportBatch(b)">Yes</button><button class="imp-x" style="font-size:13px" @click="importUndoId=''">No</button></span></template>
+                </div>
+              </template>
+            </div>
+          </template>
+          <div class="btnrow"><button class="primary" style="flex:1;margin-top:0" @click="closeImport()">Done</button></div>
+        </div>
+      </div>
+    </div>
 
     <!-- floating add (home only) + bottom tabs (every page) -->
     <button class="fab" x-show="screen==='list' && (tab==='plants'||tab==='list'||tab==='journal')" @click="tab==='journal'?openQuickLog():openForm()" aria-label="Add a plant or log an entry">
@@ -1421,6 +1649,90 @@
     return {match:hit,date};
   }
 
+  /* ===================== SPREADSHEET IMPORT — pure helpers =====================
+   * Deterministic parsing for the import preview. No DOM, no network. Every guess
+   * here is surfaced in the preview for the user to confirm (nothing silent). */
+  const IMPORT_MONTHS={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  function normWS(s){ return String(s==null?'':s).replace(/\s+/g,' ').trim(); }
+  // normalize smart quotes to straight (safe; matches the species naming convention) — display use
+  function normQuotes(s){ return normWS(s).replace(/[‘’]/g,"'").replace(/[“”]/g,'"'); }
+  function normKey(s){ return normQuotes(s).toLowerCase(); }     // dedup key (case+space+quote-insensitive)
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function expandYear(y){ y=Number(y); if(y>=100) return y; return y<=49?2000+y:1900+y; }
+  // Parse one acquisition-date cell. Returns {iso, precision:'day'|'month'|'year'|null, warn}.
+  // Partial dates (month-only / year-only) get the 1st of the period + a precision marker.
+  function parseImportDate(raw){
+    const s=normWS(raw); if(!s) return {iso:null,precision:null,warn:false};
+    let m;
+    if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})\b/)))                                  // ISO (from a real date cell)
+      return {iso:`${m[1]}-${m[2]}-${m[3]}`,precision:'day',warn:false};
+    if((m=s.match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})\b/))){              // M/D/Y (US sheets)
+      const mo=+m[1],da=+m[2],yr=expandYear(m[3]);
+      if(mo>=1&&mo<=12&&da>=1&&da<=31) return {iso:`${yr}-${pad2(mo)}-${pad2(da)}`,precision:'day',warn:mo<=12&&da<=12};
+    }
+    if((m=s.match(/\b([A-Za-z]{3,})\.?\s+(\d{4})\b/))){                            // "August 2020"
+      const mo=IMPORT_MONTHS[m[1].slice(0,3).toLowerCase()];
+      if(mo) return {iso:`${m[2]}-${pad2(mo)}-01`,precision:'month',warn:true};
+    }
+    if((m=s.match(/\b(\d{1,2})[\/.\-](\d{4})\b/))){                                // M/YYYY
+      const mo=+m[1]; if(mo>=1&&mo<=12) return {iso:`${m[2]}-${pad2(mo)}-01`,precision:'month',warn:true};
+    }
+    if((m=s.match(/\b(19|20)\d{2}\b/)))                                            // year only
+      return {iso:`${m[0]}-01-01`,precision:'year',warn:true};
+    return {iso:null,precision:null,warn:true};                                    // unparseable → flag, don't block
+  }
+  // Split a COMBINED "Genus species 'Cultivar', CODE" cell. Genus = first token; a trailing
+  // ", CODE" / clear accession code is peeled off. Abbreviated genus ("N.") is left for the
+  // user to fix. Accession is preserved verbatim and NEVER date-mined.
+  function parseCombinedName(raw){
+    let s=normQuotes(raw); let accession='';
+    const acc=s.match(/,\s*([A-Za-z]{1,5}[-\s]?\d{2,}[A-Za-z0-9\-]*)\s*$/);        // ", BE-3390"
+    if(acc){ accession=acc[1].replace(/\s+/g,''); s=s.slice(0,acc.index).trim(); }
+    const tok=s.match(/^(\S+)\s+(.*)$/);
+    if(!tok) return {genus:'',species:s,accession,warn:!!s};                        // single token, no species
+    let genus=tok[1], species=normWS(tok[2]);
+    if(/^[A-Za-z]{1,2}\.?$/.test(genus)) return {genus:'',species:s,accession,warn:true}; // abbrev → flag
+    genus=genus.charAt(0).toUpperCase()+genus.slice(1).toLowerCase();
+    return {genus,species,accession,warn:false};
+  }
+  // Pull a "$NN" amount out of a name when there's no dedicated price column. A guess (WARN).
+  function scrapePrice(raw){ const m=String(raw==null?'':raw).match(/\$\s*([0-9]+(?:\.[0-9]{1,2})?)/); return m?Number(m[1]):null; }
+  function cleanPrice(raw){ const s=String(raw==null?'':raw).replace(/[^0-9.]/g,''); return s===''?null:(isNaN(Number(s))?null:Number(s)); }
+  // Best-effort header→field guesses (user confirms on the mapping screen).
+  function guessImportMap(headers){
+    const map={genus:'',species:'',combinedName:'',formDescriptor:'',vendor:'',acquisitionDate:'',price:'',accessionId:'',sourceUrl:'',locationData:'',notes:'',status:'',wishlist:'',acquisitionType:''};
+    headers.forEach((h,i)=>{
+      const t=normKey(h); if(!t) return; const set=(k)=>{ if(map[k]==='') map[k]=String(i); };
+      if(/genus/.test(t)) set('genus');
+      else if(/species\s*name|plant\s*name|^name$/.test(t)) set('combinedName');
+      else if(/species|hybrid/.test(t)) set('species');
+      if(/url|link|website/.test(t)) set('sourceUrl');
+      else if(/source|vendor|origin|seller|grower|from\b/.test(t)) set('vendor');
+      if(/accession|clone|my\s*plant\s*id|plant\s*id/.test(t)) set('accessionId');
+      if(/date|obtained|purchased|acquired/.test(t)) set('acquisitionDate');
+      if(/cost|price|paid|amount|\$/.test(t)) set('price');
+      if(/locality|country|wild|location\s*data|^location$/.test(t)) set('locationData');
+      if(/note|descr|comment|growing/.test(t)) set('notes');
+      if(/status/.test(t)) set('status');
+      if(/^want$|wish|interested/.test(t)) set('wishlist');
+      if(/^type$|how.*acqui|acqui.*type/.test(t)) set('acquisitionType');
+      if(/descriptor|form\b|variety|cultivar/.test(t)) set('formDescriptor');
+    });
+    return map;
+  }
+  // Map a free-text legacy status word to our lifecycle enum, else null (user decides).
+  function guessStatus(raw){
+    const t=normKey(raw);
+    if(!t) return 'in_collection';
+    if(/dead|died|lost|rot|kill/.test(t)) return 'dead';
+    if(/sold/.test(t)) return 'sold';
+    if(/trade/.test(t)) return 'traded';
+    if(/gave|given|gift/.test(t)) return 'given_away';
+    if(/alive|collection|have|active|growing|own|keep/.test(t)) return 'in_collection';
+    return null;   // unknown → status-mapping step asks
+  }
+  const LIFECYCLE_STATUSES=['in_collection','dead','sold','traded','given_away'];
+
   document.addEventListener('alpine:init', () => {
     Alpine.data('app', () => ({
       view:'loading', mode:'signin', email:'', password:'', message:'', ok:false, busy:false, userEmail:'', userId:'',
@@ -1443,6 +1755,16 @@
       adding:{genus:false,species:false,vendor:false,location:false,category:false},
       newName:{genus:'',species:'',vendor:'',location:'',category:''},
       form:{genusId:'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:'',acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]},
+
+      /* ---- spreadsheet import ---- */
+      importOpen:false, importStep:'pick', importBusy:false, importError:'', importNote:'',
+      importFileName:'', importSheets:[], importSheetName:'', importRows:[], importHeaders:[],
+      importNameMode:'split',
+      importMap:{genus:'',species:'',combinedName:'',formDescriptor:'',vendor:'',acquisitionDate:'',price:'',accessionId:'',sourceUrl:'',locationData:'',notes:'',status:'',wishlist:'',acquisitionType:''},
+      importSourceAsNotes:false, importDefaultStatus:'in_collection',
+      importStatusRules:[], importUndoId:'',
+      importPreview:null, importResult:null, importProgress:0, importProgressTotal:0,
+      importBatches:[], importBatchBusy:'', _importWorker:null,
 
       init(){
         sb.auth.onAuthStateChange((event,session)=>{
@@ -2347,7 +2669,10 @@
       /* ---- CSV export ---- */
       exportCsv(){
         const head=['Genus','Species','Form/Descriptor','Vendor','Growing location','Quantity','Price','Accession ID','Purchase link','Location data','Acquisition date','How acquired','Status','Notes','Categories'];
-        const esc=v=>{v=(v==null?'':String(v));return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+        // Neutralize spreadsheet formula injection: a cell starting with = + - @ (or tab/CR)
+        // is prefixed with ' so Excel/Sheets treats it as text, not a live formula. Matters
+        // now that imported (untrusted) data can flow back out through this export.
+        const esc=v=>{v=(v==null?'':String(v));if(/^[=+\-@\t\r]/.test(v))v="'"+v;return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
         const rows=this.plants.map(p=>[
           p.species&&p.species.genus?p.species.genus.name:'', p.species?p.species.name:'',
           p.form_descriptor||'', p.vendor?p.vendor.name:'', p.growing_location?p.growing_location.name:'',
@@ -2359,6 +2684,158 @@
         const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
         a.download='plant-collection-'+todayLocal()+'.csv';
         a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+      },
+
+      /* ---- spreadsheet import (FULL TIER; parsing is sandboxed in lib/import-worker.js) ---- */
+      _importWorkerInit(){
+        if(this._importWorker) return this._importWorker;
+        const w=new Worker('lib/import-worker.js');
+        w.onmessage=(e)=>this._onImportWorker(e.data);
+        w.onerror=()=>{ this.importBusy=false; this.importError='The file reader failed. Try a different file.'; };
+        this._importWorker=w; return w;
+      },
+      openImport(){
+        this.importStep='pick'; this.importError=''; this.importNote=''; this.importFileName='';
+        this.importSheets=[]; this.importSheetName=''; this.importRows=[]; this.importHeaders=[];
+        this.importNameMode='split'; this.importSourceAsNotes=false; this.importDefaultStatus='in_collection';
+        this.importStatusRules=[]; this.importPreview=null; this.importResult=null; this.importUndoId='';
+        for(const k in this.importMap) this.importMap[k]='';
+        this.importOpen=true; this.loadImportBatches();
+      },
+      closeImport(){ this.importOpen=false; if(this._importWorker){ try{this._importWorker.postMessage({kind:'reset'});}catch(e){} } },
+      async onImportFile(ev){
+        const file=ev.target.files&&ev.target.files[0]; ev.target.value='';
+        if(!file) return;
+        if(file.size>15*1024*1024){ this.importError='That file is over the 15 MB import limit.'; return; }
+        this.importError=''; this.importNote=''; this.importBusy=true; this.importFileName=file.name;
+        try{ const buf=await file.arrayBuffer(); this._importWorkerInit().postMessage({kind:'load',buffer:buf},[buf]); }
+        catch(e){ this.importBusy=false; this.importError='Could not read that file.'; }
+      },
+      _onImportWorker(d){
+        this.importBusy=false;
+        if(!d||!d.ok){ this.importError=(d&&d.error)||'Could not read that file.'; return; }
+        if(d.kind==='sheets'){
+          this.importSheets=d.sheets||[];
+          if(!this.importSheets.length){ this.importError='That file has no readable tabs.'; return; }
+          this.importStep='sheet';
+          if(this.importSheets.length===1) this.chooseSheet(this.importSheets[0].name);
+        } else if(d.kind==='rows'){ this._receiveRows(d); }
+      },
+      chooseSheet(name){ this.importSheetName=name; this.importError=''; this.importBusy=true; this._importWorkerInit().postMessage({kind:'rows',sheetName:name}); },
+      _receiveRows(d){
+        const rows=d.rows||[];
+        if(rows.length<1){ this.importError='That tab looks empty.'; this.importStep='sheet'; return; }
+        this.importHeaders=(rows[0]||[]).map((h,i)=>normWS(h)||('Column '+(i+1)));
+        this.importRows=rows.slice(1);
+        this.importNote = d.rowCapped ? ('Only the first '+d.rowCap+' rows were read (the limit).') : (d.truncatedCells ? (d.truncatedCells+' very long cell(s) were shortened.') : '');
+        const g=guessImportMap(this.importHeaders);
+        for(const k in this.importMap) this.importMap[k]=g[k]||'';
+        this.importNameMode=(g.genus!==''&&g.species!=='')?'split':(g.combinedName!==''?'combined':'split');
+        this.importStep='map';
+      },
+      importSampleRows(){ return this.importRows.slice(0,6); },
+      cellAt(row,key){ const i=this.importMap[key]; return (i===''||i==null)?'':normWS(row[Number(i)]); },
+      buildStatusRules(){
+        const seen=new Map();
+        if(this.importMap.status!==''){ const ci=Number(this.importMap.status);
+          for(const r of this.importRows){ const v=normWS(r[ci]); if(!v) continue; const k=normKey(v);
+            if(!seen.has(k)) seen.set(k,{raw:v,key:k,target:(guessStatus(v)||'__notes')}); } }
+        this.importStatusRules=[...seen.values()];
+      },
+      statusTargetFor(raw){ const k=normKey(raw); const r=this.importStatusRules.find(x=>x.key===k); return r?r.target:null; },
+      _imp(row,key){ const i=this.importMap[key]; return (i===''||i==null)?'':normWS(row[Number(i)]); },
+      buildImportPreview(){
+        this.importError='';
+        if(this.importNameMode==='split' && this.importMap.genus===''){ this.importError='Map your Genus column (or switch to a single combined-name column).'; return; }
+        if(this.importNameMode==='combined' && this.importMap.combinedName===''){ this.importError='Map the combined name column.'; return; }
+        this.buildStatusRules();
+        const genusByKey=new Map(this.genera.map(g=>[normKey(g.name),g]));
+        const speciesByKey=new Map(this.speciesAll.map(s=>[s.genus_id+'|'+normKey(s.name),s]));
+        const vendorByKey=new Map(this.vendors.map(v=>[normKey(v.name),v]));
+        const newGenera=new Map(), newSpecies=new Map(), newVendors=new Map();
+        const plants=[], skipped=[]; let warnCount=0;
+        this.importRows.forEach((row,idx)=>{
+          const rowNo=idx+2, warnings=[];
+          if(this.importMap.wishlist!==''){ const w=normKey(this._imp(row,'wishlist')); if(['true','yes','x','1','wish','y'].includes(w)){ skipped.push({row:rowNo,reason:'wishlist row'}); return; } }
+          let genus='',species='',accession='',extraNotes='';
+          if(this.importNameMode==='combined'){ const p=parseCombinedName(this._imp(row,'combinedName')); genus=p.genus; species=p.species; if(p.accession)accession=p.accession; if(p.warn)warnings.push('name needs review'); }
+          else { genus=normQuotes(this._imp(row,'genus')); species=normQuotes(this._imp(row,'species')); }
+          if(this.importMap.accessionId!=='') accession=this._imp(row,'accessionId')||accession;   // verbatim; never parsed
+          const formDesc=this._imp(row,'formDescriptor');
+          if(!genus){ skipped.push({row:rowNo,reason:'no genus'}); return; }
+          if(!species){ species='sp.'; warnings.push('blank species → "sp."'); }
+          const gk=normKey(genus);
+          const gExisting=genusByKey.get(gk); if(!gExisting&&!newGenera.has(gk)) newGenera.set(gk,genus);
+          const spKey=normKey(species);
+          const newSpKey=gk+'|'+spKey;
+          const sExisting=gExisting?speciesByKey.get(gExisting.id+'|'+spKey):null;
+          if(!sExisting&&!newSpecies.has(newSpKey)) newSpecies.set(newSpKey,{genus,species});
+          let vendorName='',vendorToNotes='';
+          if(this.importMap.vendor!==''){ const raw=this._imp(row,'vendor'); const vk=normKey(raw);
+            if(raw){ if(this.importSourceAsNotes||vk==='none'||vk==='n/a'){ vendorToNotes=raw; } else { vendorName=raw; if(!vendorByKey.has(vk)&&!newVendors.has(vk)) newVendors.set(vk,raw); } } }
+          let dateIso=null,datePrec=null;
+          if(this.importMap.acquisitionDate!==''){ const dp=parseImportDate(this._imp(row,'acquisitionDate')); dateIso=dp.iso; datePrec=dp.precision; if(dp.warn)warnings.push('date unclear'); }
+          let price=null;
+          if(this.importMap.price!=='') price=cleanPrice(this._imp(row,'price'));
+          if(price==null){ const src=this._imp(row,this.importNameMode==='combined'?'combinedName':'species'); const sp=scrapePrice(src); if(sp!=null){ price=sp; warnings.push('price $'+sp+' from name'); } }
+          let status=this.importDefaultStatus;
+          if(this.importMap.status!==''){ const raw=this._imp(row,'status'); const tgt=this.statusTargetFor(raw);
+            if(tgt==='__skip'){ skipped.push({row:rowNo,reason:'status: '+raw}); return; }
+            else if(tgt&&tgt!=='__notes'){ status=tgt; } else if(raw){ extraNotes='Status: '+raw; } }
+          let acqType=null;
+          if(this.importMap.acquisitionType!==''){ const t=normKey(this._imp(row,'acquisitionType'));
+            if(/seed/.test(t))acqType='seed'; else if(/trade/.test(t))acqType='traded'; else if(/gift/.test(t))acqType='gift'; else if(/divi/.test(t))acqType='division'; else if(/buy|bought|purchas/.test(t))acqType='bought'; }
+          let notes=this._imp(row,'notes');
+          if(vendorToNotes) notes=(notes?notes+' · ':'')+'Source: '+vendorToNotes;
+          if(extraNotes) notes=(notes?notes+' · ':'')+extraNotes;
+          if(warnings.length) warnCount++;
+          plants.push({ row:rowNo, genus, species, gKey:gk, formDescriptor:formDesc, accession, vendorName, vendorKey:vendorName?normKey(vendorName):'', sourceUrl:this._imp(row,'sourceUrl'), locationData:this._imp(row,'locationData'), acquisitionDate:dateIso, acquisitionDatePrecision:datePrec, price, status, acquisitionType:acqType, notes, warnings });
+        });
+        this.importPreview={ plants, newGenera:[...newGenera.values()], newSpeciesCount:newSpecies.size, newVendors:[...newVendors.values()], skipped, warnCount };
+        this.importStep='preview';
+      },
+      importPreviewSample(){ return this.importPreview?this.importPreview.plants.slice(0,12):[]; },
+      async runImport(){
+        if(!this.importPreview) return;
+        const P=this.importPreview;
+        this.importStep='running'; this.importError=''; this.importProgress=0; this.importProgressTotal=P.plants.length;
+        try{
+          const {data:batch,error:bErr}=await sb.from('import_batch').insert({source_name:this.importFileName+(this.importSheetName?(' · '+this.importSheetName):''),source_kind:'file'}).select('id').single();
+          if(bErr) throw bErr; const batchId=batch.id;
+          const genusByKey=new Map(this.genera.map(g=>[normKey(g.name),g]));
+          const toAddG=P.newGenera.filter(n=>!genusByKey.has(normKey(n)));
+          if(toAddG.length){ const {data,error}=await sb.from('genus').insert(toAddG.map(name=>({name}))).select('id,name'); if(error) throw error; data.forEach(g=>{ this.genera.push(g); genusByKey.set(normKey(g.name),g); }); }
+          const speciesByKey=new Map(this.speciesAll.map(s=>[s.genus_id+'|'+normKey(s.name),s]));
+          const wantSpecies=new Map();
+          for(const pl of P.plants){ const g=genusByKey.get(pl.gKey); if(!g) continue; const key=g.id+'|'+normKey(pl.species); if(!speciesByKey.has(key)&&!wantSpecies.has(key)) wantSpecies.set(key,{genus_id:g.id,name:pl.species}); }
+          const spArr=[...wantSpecies.values()];
+          for(let i=0;i<spArr.length;i+=200){ const {data,error}=await sb.from('species').insert(spArr.slice(i,i+200)).select('id,name,genus_id'); if(error) throw error; data.forEach(s=>{ this.speciesAll.push(s); speciesByKey.set(s.genus_id+'|'+normKey(s.name),s); }); }
+          const vendorByKey=new Map(this.vendors.map(v=>[normKey(v.name),v]));
+          const toAddV=P.newVendors.filter(n=>!vendorByKey.has(normKey(n)));
+          if(toAddV.length){ const {data,error}=await sb.from('vendor').insert(toAddV.map(name=>({name}))).select('id,name'); if(error) throw error; data.forEach(v=>{ this.vendors.push(v); vendorByKey.set(normKey(v.name),v); }); }
+          const rows=[];
+          for(const pl of P.plants){ const g=genusByKey.get(pl.gKey); if(!g) continue; const s=speciesByKey.get(g.id+'|'+normKey(pl.species)); if(!s) continue;
+            const v=pl.vendorKey?vendorByKey.get(pl.vendorKey):null;
+            rows.push({ species_id:s.id, form_descriptor:pl.formDescriptor||null, vendor_id:v?v.id:null, acquisition_date:pl.acquisitionDate||null, acquisition_date_precision:pl.acquisitionDatePrecision||null, acquisition_type:pl.acquisitionType||null, acquisition_price:pl.price, accession_id:pl.accession||null, source_url:pl.sourceUrl||null, location_data:pl.locationData||null, lifecycle_status:pl.status||'in_collection', notes:pl.notes||null, import_batch_id:batchId }); }
+          let created=0;
+          for(let i=0;i<rows.length;i+=200){ const {error}=await sb.from('plant').insert(rows.slice(i,i+200)); if(error) throw error; created+=Math.min(200,rows.length-i); this.importProgress=created;
+            await sb.from('import_batch').update({plant_count:created}).eq('id',batchId); }   // keep count honest even on partial failure (so undo's confirm is accurate)
+          this.importResult={ created, genera:toAddG.length, species:spArr.length, vendors:toAddV.length, skipped:P.skipped.length, warnings:P.warnCount };
+          this.importStep='done';
+          await this.loadData(); await this.loadImportBatches();
+        }catch(e){ this.importError='Import failed: '+(e.message||e)+'. Anything already added is in the batch list below — you can undo it.'; this.importStep='preview'; await this.loadImportBatches(); }
+      },
+      async loadImportBatches(){ try{ const {data}=await sb.from('import_batch').select('id,source_name,started_at,plant_count').order('started_at',{ascending:false}); this.importBatches=data||[]; }catch(e){ this.importBatches=[]; } },
+      async undoImportBatch(b){
+        if(this.importBatchBusy) return; this.importBatchBusy=b.id; this.importUndoId='';
+        try{
+          const {error,count}=await sb.from('plant').delete({count:'exact'}).eq('import_batch_id',b.id);
+          if(error) throw error;
+          await sb.from('import_batch').delete().eq('id',b.id);
+          await this.loadData(); await this.loadImportBatches();
+          this.importNote='Removed '+(count==null?(b.plant_count||0):count)+' imported plants.';
+        }catch(e){ this.importError='Could not undo that import: '+(e.message||e); }
+        finally{ this.importBatchBusy=''; }
       },
     }));
   });

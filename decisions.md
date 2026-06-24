@@ -4,6 +4,116 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-23 — Spreadsheet import BUILT (full tier) + separated Security pass
+
+Builder implemented v1 file-upload import: a SheetJS-in-a-Worker parse sandbox
+(`app/lib/import-worker.js` + pinned `xlsx.full.min.js` 0.20.3), the mapping → preview → import →
+undo UI and logic in `app/index.html`, and migration `005_import_batch_and_date_precision.sql`
+(import_batch table + `plant.import_batch_id` + `acquisition_date_precision`, RLS fails-closed).
+Build marker → `2026-06-23r`. Full plan + trap table: `docs/spreadsheet-import-plan.md`.
+
+**Separated Security agent (reviewer ≠ author) verdict: SHIP-WITH-FIXES.** Held sound: Worker
+isolation, no-write-before-confirm (`buildImportPreview` has no DB calls), prototype safety (Maps +
+array-of-rules), XSS (`x-text`), migration-005 RLS. **Three fixes applied + re-verified in
+JavaScriptCore:** (1) **CSV/formula-injection on the existing `exportCsv`** — now that untrusted
+imported data can flow back out, `esc` prefixes `'` to cells starting `=+-@\t\r` (9/9 payloads
+defanged); (2) **clamped-range materialization** so a hostile `!ref` can't OOM the worker (residual
+zip-bomb is *contained by Worker isolation*, documented honestly); (3) per-chunk `plant_count` so a
+partial-failure undo confirm is accurate.
+
+**Verification done vs owed (honest, per the method):** deterministic parser core + the export fix
+were EXECUTED against the real sheet strings/payloads (JavaScriptCore — no node/DB/usable preview
+browser in this env). **Still owed = the Tester gate on the LIVE app:** apply migration 005, then run
+all THREE real `.xlsx` (worker reads real xlsx; preview counts reconcile with `select count(*)`;
+import + undo verified by row counts) on `test@test.com`, Safari included. NOT yet committed/pushed.
+
+---
+
+## 2026-06-23 — Import & sync: design steer from Stephen (pre-build)
+
+Architect read the brain + ground-truthed all three real `.xlsx` files; Stephen then told the
+story in his own words. Plan lives in `docs/spreadsheet-import-plan.md`. Decisions captured:
+
+1. **Sync's PURPOSE is data-durability, not convenience.** Stephen's deepest fear is "the app
+   disappears and I lose a decade of data" — the exact reason he used AppSheet (Google-Sheets-
+   backed = portable to any DB). So keeping the spreadsheet in step is an **insurance promise**,
+   not a feature nicety. "Eventually"-consistent is the bar (no real-time needed). Ties to
+   [[platform-risk-concern]] and the architecture's day-one "Sheets sync + CSV export" pledge.
+
+2. **Two export-back shapes, because "don't lose anything" differs per person.** (a) Write back
+   into *the shape they designed* (their familiar single sheet); (b) export to *multiple
+   tabs/sheets from which a relational DB could be rebuilt*. Both are backups, different audiences.
+   Photos are the acknowledged hard gap — a spreadsheet backup can't hold the image files
+   (the very thing that makes the app worth leaving the spreadsheet for; see #4).
+
+3. **Don't replicate multiple lists — TAG the plant.** Collectors keep collection / trade / sale
+   / wish as separate lists today, but in the app these are AXES on a plant
+   (`offer_status` + Phase-3 lists), not parallel tables. Implication for IMPORT: the importer
+   must ingest *multiple* lists and fold them onto those axes — "import my trade list" marks
+   those plants for-trade; a single sheet with a trade/for-sale COLUMN maps that column to the
+   axis. Full multi-list import is a later increment; v1 builds the mapping core that enables it.
+
+4. **The photo-journal-tied-to-the-plant is the wedge.** The #1 thing spreadsheet users say they
+   CAN'T do. It's why someone tolerates leaving a spreadsheet they love. Protect it as the headline
+   value; it's also why photos can't round-trip to the sheet backup (the honest gap in #2).
+
+5. **One feature family, build the shared back half once.** Mapping → preview → reconcile is
+   identical whether rows come from an uploaded file, a published-sheet URL, or a connected
+   account. Order: (1) **file upload** now → (2) **published-sheet URL read** (no OAuth) →
+   (3) account OAuth → (4) true two-way sync. Nothing built for upload is wasted later.
+
+6. **Import batch + undo (rollback safety net).** Every import run records an `import_batch`
+   (`started_at` + source filename); every plant created points back to it (`plant.import_batch_id`,
+   migration 005). The user can review a batch, delete individual rows, or **undo the whole batch**.
+   Deliberate semantics: undo deletes the batch's *plants only* (reference rows kept — they may be
+   used by hand-entered plants; `plant.species_id … on delete restrict` guards this); FK is
+   `on delete set null` (deleting the batch record never silently cascades to plants); the undo
+   action deletes plant rows with a **counted confirm**. Side benefit: `import_batch_id = null`
+   distinguishes hand-entered from imported plants. New table → Security reviews it (full tier).
+
+7. **A Plant is a lineage/provenance, not a tally of look-alikes.** Captured in architecture.md
+   (2026-06-23). Two same-species rows (different sources) stay separate; quantity counts
+   propagation within a lineage. Import NEVER merges plant rows by genus+species (reference rows
+   still de-dupe). This settles **Open Q1: always create plant rows.**
+
+8. **Pre-mortem traps + three handling principles** (full table in the plan doc, "Import traps the
+   preview must catch"). Principles: (a) **errors block a row, warnings never do** — fuzzy dates /
+   scraped prices / low-confidence splits are accept-in-bulk, not mandatory fixes; (b)
+   **deterministic-first, AI only as optional assist**, and prefer AI on DISTINCT-VALUE sets
+   (status vocab, vendor clusters — cheap) over per-row calls (costly/slow/privacy); (c) **nothing
+   silent** — every guess/skip/transform shows in the preview. Specific rulings from Stephen:
+   - **Dates:** partial → 1st-of-month + precision marker; ambiguous never guessed silently.
+   - **Accession codes are private formats** (`S-06062026-al-01`): store VERBATIM, never parse,
+     and **never mine the embedded date into acquisition_date** (date detection is scoped to the
+     mapped date column only). The `-01/-02/-03` suffix is the lineage/division signal — preserved.
+   - **`$` in a name** → scrape to price only if price empty, shown as a guess; bail on ranges.
+   - **`Type=Seed`** → `acquisition_type='seed'` (existing enum value; no schema change).
+   - **Free-text source that's prose** (Giane's `Origin`) → mappable to notes, not vendor.
+
+9. **Prerequisites for import (sequenced).** Only ONE thing truly blocks importing *Stephen's*
+   data: a **status-mapping step** (distinct source statuses → lifecycle enum | keyword/tag |
+   notes; unknowns kept in notes + default `in_collection`) — and its minimal form needs **no
+   schema change** beyond the `import_batch` table (005). Deferred without data loss: **wishlist
+   rows** (v1 flags + SKIPS them; real non-owned holding state is a lists-phase feature);
+   **`common_name` + nullable `plant.species_id`** (migration 006 — fast-follow; needed before
+   *other people's* messy/common-name sheets, not Stephen's clean files; resolves the "don't be a
+   plant snob" gap); **AI assist passes**; **stable sync-ID column** (write a per-plant id INTO the
+   sheet so re-import matches on it — row number is unsafe because sheets get re-sorted, per
+   Stephen; design now, wire up with the sync increment).
+
+10. **Three decisions LOCKED by Stephen (2026-06-23).** (a) Parser = **SheetJS in a Web Worker**,
+    upload the file directly (no CSV-export step). (b) Partial dates → **1st-of-month + a new
+    `plant.acquisition_date_precision` column** (`day`/`month`/`year`) — stored date sorts right,
+    marker keeps display honest and stops date-aware features assuming an unknown day; this column
+    joins the pre-import model migration. (c) Accession codes stored **verbatim**.
+
+**Security tier unchanged: FULL.** Untrusted-file parse → still spawn a REAL separate Security
+agent against the *Conditions for Builder* in the plan doc (Web-Worker sandbox, hard caps,
+formula/proto/XSS inertness, no-write-before-confirm). Open questions remaining before code:
+re-import dedup policy (Q1), friend's `,BE-3390` → accession vs notes (Q3), status-from-tabs (Q4).
+
+---
+
 ## 2026-06-23 — Session close: tag scanner shipped+verified; NEXT = spreadsheet import
 
 Tag scanner is **live on build `2026-06-22q`** and confirmed working on a real handwritten tag.

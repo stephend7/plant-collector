@@ -34,6 +34,16 @@ the status of any old one. Maybe you just bought another that looks a little dif
 "how many times have I bought this and killed it" fall out later — but only from statuses
 *you* set, never inferred.
 
+**A Plant is a lineage/provenance, not a tally of look-alikes (2026-06-23).** Two rows of the
+same species are NOT redundant: a *Pinguicula cyclosecta* from Rainbow Carnivorous and one from
+California Carnivores stay **separate plants**, even when visually identical or the difference
+isn't worth noting — the *origin* is the identity. Because plants propagate (leaf pullings strike,
+clumps divide), **quantity counts the offspring *within* one lineage** (your 3 become 5), which is
+why quantity lives on the individual row and is never summed across a species. **Never merge
+same-species rows into one count** — that erases provenance and propagation history. (Import
+consequence: the importer must not auto-collapse rows sharing genus+species; more plants than
+species is normal, not a dedup opportunity.)
+
 ---
 
 ## Naming: Genus → Species → Form/Descriptor
