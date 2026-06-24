@@ -21,11 +21,15 @@ defanged); (2) **clamped-range materialization** so a hostile `!ref` can't OOM t
 zip-bomb is *contained by Worker isolation*, documented honestly); (3) per-chunk `plant_count` so a
 partial-failure undo confirm is accurate.
 
-**Verification done vs owed (honest, per the method):** deterministic parser core + the export fix
-were EXECUTED against the real sheet strings/payloads (JavaScriptCore — no node/DB/usable preview
-browser in this env). **Still owed = the Tester gate on the LIVE app:** apply migration 005, then run
-all THREE real `.xlsx` (worker reads real xlsx; preview counts reconcile with `select count(*)`;
-import + undo verified by row counts) on `test@test.com`, Safari included. NOT yet committed/pushed.
+**Verification DONE — committed, pushed (build `2026-06-23r`), and VERIFIED END-TO-END on the live
+deployed app** (Chrome, `test@test.com`). Deterministic core + export fix executed in JavaScriptCore.
+Then on the live app: parse pipeline (CSV + real `.xlsx` zip path + multi-tab picker), combined &
+split shapes, all transforms (accession peel from an in-cell comma, partial-date precision, price
+scrape, status mapping incl. `quarantine`→notes, wishlist skip, hybrid verbatim). After Stephen
+applied migration 005: **real DB import + undo, counts reconcile 1→4→1** — 3 identical rows made 3
+plant instances (never-merge), no new reference rows (reused existing), undo removed only the batch's
+plants and left refs intact; test account back to baseline (clean). **Remaining (low):** Stephen's
+iPhone/Safari pass (Chrome=Blink) + loading his three real files when ready. Feature is SHIPPED.
 
 ---
 

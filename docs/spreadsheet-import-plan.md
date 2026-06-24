@@ -284,10 +284,23 @@ unique. **Fixes applied + re-verified in JavaScriptCore:**
   passes): combined/split name split, accession verbatim (no date-mining), partial-date precision,
   price scrape, status→enum, header auto-map for both shapes, whitespace/case/quote dedup.
 - ✅ Export formula-injection fix executed against 9 payloads.
-- ⬜ **Tester gate still owed (needs the live app — could not run in this sandbox: no DB, preview
-  browser couldn't reach localhost):** apply migration 005 to Supabase, then run all THREE real `.xlsx`
-  through the live app — worker reads real xlsx, preview counts reconcile with `select count(*)`,
-  import + **undo** verified by row counts, on `test@test.com`, Safari included.
+- ✅ **Deployed (build `2026-06-23r`) and the PARSE→MAP→PREVIEW pipeline verified LIVE on the
+  deployed app** (Chrome, signed in as `test@test.com`, 2026-06-23): the real Web Worker + SheetJS
+  parsed fed files; **combined mode** peeled `BE-3390`→accession, `August 2020`→2020-08-01 (month),
+  `Carnivero`→vendor; **split mode** skipped the wishlist row, kept `agnata 'True Blue'` verbatim,
+  mapped `alive→in_collection`/`dead→dead`/`quarantine→kept in notes`, scraped price. Preview makes
+  zero DB calls (re-confirmed). This is the worker + full pipeline the sandbox couldn't run.
+- ✅ **DB import + undo VERIFIED LIVE (2026-06-23, after Stephen applied migration 005), counts
+  reconcile with real numbers:** on `test@test.com`, plants 1 → **4** (imported 3) → **1** (undo).
+  Import created 3 plants under a batch with **no new reference rows** (reused existing
+  `Drosera capensis`/vendor) — and **3 identical rows became 3 separate plant instances** (the
+  never-merge rule) while species count held at 7. Undo removed exactly the batch's 3 plants,
+  left genus/species/vendor untouched, deleted the batch record, account back to baseline (clean).
+- ✅ **Real `.xlsx` zip path + multi-tab picker VERIFIED LIVE:** a generated 2-sheet xlsx binary
+  read by the worker → tab picker listed both tabs w/ dims → combined-name parse on a genuine
+  **in-cell** comma peeled `BE-3390`→accession (the real friend scenario, no CSV artifact).
+- ⬜ Remaining (low): a pass on Stephen's iPhone (Safari/WebKit) — Chrome is Blink; and running his
+  three actual files when he's ready to load his real collection.
 
 ## Open questions for Stephen (decide before Builder starts)
 
