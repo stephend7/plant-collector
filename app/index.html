@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-23r">
+<meta name="app-build" content="2026-06-23s">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1320,7 +1320,7 @@
               <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Previous imports</h3>
               <template x-for="b in importBatches" :key="b.id">
                 <div class="imp-batch">
-                  <div class="grow"><span x-text="b.source_name||'Import'"></span><br><small x-text="(b.plant_count||0)+' plants · '+((b.started_at||'').slice(0,16).replace('T',' '))"></small></div>
+                  <div class="grow" @click="viewImportBatch(b)" style="cursor:pointer"><span x-text="b.source_name||'Import'"></span> <span style="color:var(--pine-2);font-size:12px">View ›</span><br><small x-text="(b.plant_count||0)+' plants · '+((b.started_at||'').slice(0,16).replace('T',' '))"></small></div>
                   <template x-if="importUndoId!==b.id">
                     <button class="imp-x" style="font-size:13px;color:var(--pine-2)" :disabled="importBatchBusy" @click="importUndoId=b.id" x-text="importBatchBusy===b.id?'…':'Undo'"></button>
                   </template>
@@ -1459,6 +1459,39 @@
           <p style="color:var(--muted);font-size:13px">Please keep this screen open.</p>
         </div>
 
+        <!-- STEP: view one import's plants -->
+        <div x-show="importStep==='batchview' && importViewBatch">
+          <button class="btn-ghost" style="width:auto;margin-bottom:12px" @click="closeBatchView()">← Back to imports</button>
+          <h3 style="margin:0;font-size:16px" x-text="importViewBatch ? (importViewBatch.source_name||'Import') : ''"></h3>
+          <p class="homesub" style="margin:2px 0 12px" x-text="importViewBatch ? ((importViewBatch.plant_count||0)+' plants · '+((importViewBatch.started_at||'').slice(0,16).replace('T',' '))) : ''"></p>
+
+          <div x-show="importBusy" style="color:var(--muted);font-size:14px;padding:10px 0">Loading…</div>
+          <div x-show="!importBusy && importViewPlants.length===0" class="imp-note">These plants are no longer here — they may have been deleted already.</div>
+
+          <div x-show="importViewPlants.length" style="border:1px solid var(--line);border-radius:11px;overflow:hidden">
+            <template x-for="p in importViewPlants" :key="p.id">
+              <div class="lrow" @click="closeImport(); openDetail(p)">
+                <span style="font-family:var(--serif);font-style:italic;flex:1" x-text="displayName(p)"></span>
+                <span class="badge warn" x-show="p.lifecycle_status&&p.lifecycle_status!=='in_collection'" x-text="statusLabel(p.lifecycle_status)"></span>
+                <small style="color:var(--muted)" x-text="p.acquisition_date||''"></small>
+              </div>
+            </template>
+          </div>
+
+          <div class="btnrow" x-show="importViewPlants.length">
+            <template x-if="importUndoId!==importViewBatch.id">
+              <button class="btn-ghost" style="color:#9A3528" :disabled="importBatchBusy" @click="importUndoId=importViewBatch.id" x-text="importBatchBusy===importViewBatch.id?'Removing…':'Undo this whole import'"></button>
+            </template>
+            <template x-if="importUndoId===importViewBatch.id">
+              <div style="flex:1;display:flex;gap:8px;align-items:center;justify-content:center">
+                <small x-text="'Delete all '+(importViewBatch.plant_count||0)+' plants from this import?'"></small>
+                <button class="imp-x" style="font-size:14px;color:#9A3528" @click="undoImportBatch(importViewBatch)">Yes</button>
+                <button class="imp-x" style="font-size:14px" @click="importUndoId=''">No</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
         <!-- STEP: done -->
         <div x-show="importStep==='done' && importResult">
           <div class="imp-counts" style="margin-top:4px">
@@ -1473,7 +1506,7 @@
             <div style="margin-top:8px">
               <template x-for="b in importBatches" :key="b.id">
                 <div class="imp-batch">
-                  <div class="grow"><span x-text="b.source_name||'Import'"></span><br><small x-text="(b.plant_count||0)+' plants · '+((b.started_at||'').slice(0,16).replace('T',' '))"></small></div>
+                  <div class="grow" @click="viewImportBatch(b)" style="cursor:pointer"><span x-text="b.source_name||'Import'"></span> <span style="color:var(--pine-2);font-size:12px">View ›</span><br><small x-text="(b.plant_count||0)+' plants · '+((b.started_at||'').slice(0,16).replace('T',' '))"></small></div>
                   <template x-if="importUndoId!==b.id"><button class="imp-x" style="font-size:13px;color:var(--pine-2)" :disabled="importBatchBusy" @click="importUndoId=b.id">Undo</button></template>
                   <template x-if="importUndoId===b.id"><span style="display:flex;gap:8px;align-items:center"><small x-text="'Delete '+(b.plant_count||0)+'?'"></small><button class="imp-x" style="font-size:13px;color:#9A3528" @click="undoImportBatch(b)">Yes</button><button class="imp-x" style="font-size:13px" @click="importUndoId=''">No</button></span></template>
                 </div>
@@ -1765,6 +1798,7 @@
       importStatusRules:[], importUndoId:'',
       importPreview:null, importResult:null, importProgress:0, importProgressTotal:0,
       importBatches:[], importBatchBusy:'', _importWorker:null,
+      importViewBatch:null, importViewPlants:[], importViewFrom:'pick',
 
       init(){
         sb.auth.onAuthStateChange((event,session)=>{
@@ -2834,9 +2868,19 @@
           await sb.from('import_batch').delete().eq('id',b.id);
           await this.loadData(); await this.loadImportBatches();
           this.importNote='Removed '+(count==null?(b.plant_count||0):count)+' imported plants.';
+          if(this.importStep==='batchview'){ this.importStep=this.importViewFrom||'pick'; this.importViewBatch=null; this.importViewPlants=[]; }   // its plants are gone — leave the drill-down
         }catch(e){ this.importError='Could not undo that import: '+(e.message||e); }
         finally{ this.importBatchBusy=''; }
       },
+      async viewImportBatch(b){
+        this.importViewBatch=b; this.importViewFrom=this.importStep; this.importViewPlants=[];
+        this.importError=''; this.importUndoId=''; this.importStep='batchview'; this.importBusy=true;
+        try{ const {data,error}=await sb.from('plant').select(PLANT_SELECT).eq('import_batch_id',b.id).order('created_at',{ascending:true});
+          if(error) throw error; this.importViewPlants=data||[]; }
+        catch(e){ this.importError='Could not load that import: '+(e.message||e); }
+        finally{ this.importBusy=false; }
+      },
+      closeBatchView(){ this.importStep=this.importViewFrom||'pick'; this.importViewBatch=null; this.importViewPlants=[]; },
     }));
   });
 </script>
