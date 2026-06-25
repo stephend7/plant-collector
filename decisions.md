@@ -4,6 +4,43 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-24 — Scanner/entry UX (3 of 5): save the scanned tag photo with the plant (#2) (Lite)
+
+The last build item on the five-item backlog. Stephen asked to "ask 'Save Photo with plant?'" after a
+scan; built as an **inline pre-checked toggle**, not a popup, per the house rule *no blocking popups
+for optional data* (architecture.md) — flagged the divergence, easy to switch.
+
+- After a successful scan, the tag image is **held** (`scannedTagPhoto`, processed in the SAME pass
+  that reads the tag — `processImage` once → full for both the Edge Function and the saved photo) and
+  an inline toggle **"Keep this tag photo with the plant"** (with a thumbnail) appears under the scan
+  note, pre-checked (`keepTagPhoto`).
+- On Save (new-plant path only — scan is add-only), if kept, the tag photo is appended to the save
+  set and stored as a **`label='tag'`** photo. **Cover prefers a non-tag (clean) shot** — a tag photo
+  is for reading, not display, so it's only the cover if it's the only photo.
+- Held OUTSIDE `pendingPhotos` so it doesn't clutter the photo grid or skew the "cover" badge; object
+  URLs revoked on every reset/re-scan/save (`_clearScannedTagPhoto`, wired into `clearPendingPhotos`).
+- **Lite security:** reuses the already-reviewed `uploadPhoto` + RLS/owner-path storage pipeline; no
+  new egress (the image was already sent to scan), no new untrusted surface. PASS.
+
+Build `u → v`, committed + pushed (687d729).
+
+**Verified live END-TO-END** (Chrome, `test@test.com`, build `v`). file_upload can't take repo paths,
+so the real `scanTag` path was driven by constructing an actual image File in-page (a canvas with
+"Pinguicula gigantea" drawn on it) and passing it to `scanTag` — the **live Edge Function read it**
+(filled genus+species), and the tag photo was held with full+thumb+url blobs and the toggle rendered
+**pre-checked with its thumbnail** (DOM-confirmed: visible 595×42 row). Then: (a) **keep ON + a clean
+photo → 2 photos saved**, the clean one `label='plant'`, the scanned one **`label='tag'`**, and the
+**cover = the clean photo, not the tag**; held photo cleared after save. (b) **keep OFF → 0 photos
+saved**, no cover. Asserted against live Alpine `$data`. Both test plants (incl. one with 2 stored
+photos) deleted via the app's `deletePlant` (removes storage files); account back to baseline (1 plant).
+Inline JS parse-checked in JavaScriptCore before push.
+
+**Backlog status:** original five all addressed — #1 #2 #3 verified live; **#5a** verified live; **#4**
+built + pushed but **pending Stephen's `scan-tag` redeploy + a real laueana-tag rescan** to verify.
+Later species follow-ons remain optional: **#5b** delete-unused, **#5c** merge.
+
+---
+
 ## 2026-06-24 — Scanner/entry UX (2 of 5): rename a species (#5a) + keep hybrid #N in the name (#4) (Lite)
 
 The data-quality pair off the five-item backlog. Both Lite — #5a is CRUD on the user's own
