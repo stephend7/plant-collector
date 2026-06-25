@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-23u">
+<meta name="app-build" content="2026-06-23v">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -357,6 +357,11 @@
           <span x-text="detectedNote"></span>
           <a @click="detectedNote=''" style="color:var(--pine-2);cursor:pointer;margin-left:6px">dismiss</a>
         </div>
+        <label x-show="scannedTagPhoto" x-transition style="display:flex;align-items:center;gap:9px;margin-top:9px;font-size:14px;cursor:pointer">
+          <input type="checkbox" x-model="keepTagPhoto" style="width:auto;margin:0;flex:0 0 auto">
+          <img x-show="scannedTagPhoto" :src="scannedTagPhoto&&scannedTagPhoto.url" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--line)">
+          <span>Keep this tag photo with the plant</span>
+        </label>
         <div class="thumbs" x-show="pendingPhotos.length">
           <template x-for="(ph,idx) in pendingPhotos" :key="ph.id">
             <div class="thumb">
@@ -1778,7 +1783,7 @@
       genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[], products:[],
       addingProduct:false, newProductName:'',
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'', lastAcquisitionType: localStorage.getItem('lastAcquisitionType')||'',
-      screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], detectedNote:'',
+      screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], scannedTagPhoto:null, keepTagPhoto:true, detectedNote:'',
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
       detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
@@ -2048,7 +2053,8 @@
         if(bits.length) this.detectedNote='Auto-filled '+bits.join(', ')+' from your photo — change anything below.';
       },
       removePending(id){const i=this.pendingPhotos.findIndex(p=>p.id===id);if(i>=0){try{URL.revokeObjectURL(this.pendingPhotos[i].url);}catch(e){}this.pendingPhotos.splice(i,1);}},
-      clearPendingPhotos(){this.pendingPhotos.forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}});this.pendingPhotos=[];},
+      clearPendingPhotos(){this.pendingPhotos.forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}});this.pendingPhotos=[];this._clearScannedTagPhoto();},
+      _clearScannedTagPhoto(){if(this.scannedTagPhoto&&this.scannedTagPhoto.url){try{URL.revokeObjectURL(this.scannedTagPhoto.url);}catch(e){}}this.scannedTagPhoto=null;this.keepTagPhoto=true;},
 
       /* ---- tag scanner ---- */
       onScanFile(ev){const f=ev.target.files[0];ev.target.value='';if(f)this.scanTag(f);},
@@ -2056,12 +2062,11 @@
         if(this.scanBusy)return;
         this.scanBusy=true; this.formError='';
         try{
-          // Convert to JPEG (handles HEIC on Safari/iOS)
-          let blob;
-          try{ blob=await resizeImage(file,1600,.9); }
-          catch(e){ if(isHeic(file)){ const j=await heicToJpeg(file); blob=await resizeImage(j,1600,.9); } else throw e; }
-          // base64-encode
-          const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(blob);});
+          // Process ONCE (handles HEIC on Safari/iOS): a full JPEG used both to read the
+          // tag AND to keep as the plant's tag photo, plus a thumb for that photo.
+          const {full,thumb}=await processImage(file);
+          // base64-encode the full JPEG for the Edge Function
+          const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(full);});
           // auth token
           const {data:{session}}=await sb.auth.getSession();
           if(!session)throw new Error('Not signed in');
@@ -2074,6 +2079,11 @@
           if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error||'Scan failed ('+resp.status+')');}
           const result=await resp.json();
           await this.applyTagScan(result);
+          // Offer to keep the tag photo with the plant (inline toggle, pre-checked) — held
+          // separately from manually-added photos and saved as a label='tag' NON-cover photo.
+          this._clearScannedTagPhoto();
+          this.scannedTagPhoto={id:uid(),full,thumb,url:URL.createObjectURL(thumb)};
+          this.keepTagPhoto=true;
         }catch(e){
           this.formError='Tag scan failed — '+(e.message||'try again');
         }finally{
@@ -2188,15 +2198,19 @@
             const {data:planted,error}=await sb.from('plant').insert(this.formRow()).select('id').single();
             if(error)throw error;
             const plantId=planted.id;
-            let coverId=null;
-            for(let i=0;i<this.pendingPhotos.length;i++){
-              const ph=this.pendingPhotos[i];
+            // Photos to save = manually-added, then (optionally) the scanned tag photo last.
+            const photos=[...this.pendingPhotos];
+            if(this.keepTagPhoto && this.scannedTagPhoto) photos.push({...this.scannedTagPhoto,label:'tag'});
+            for(let i=0;i<photos.length;i++){
+              const ph=photos[i];
               const path=await uploadPhoto(this.userId,ph.id,ph.full,ph.thumb);
               const {error:perr}=await sb.from('photo').insert({id:ph.id,plant_id:plantId,storage_path:path,label:ph.label,sort_order:i});
               if(perr)throw perr;
-              if(i===0)coverId=ph.id;
             }
-            if(coverId){const {error:cerr}=await sb.from('plant').update({cover_photo_id:coverId}).eq('id',plantId);if(cerr)throw cerr;}
+            // Cover = the first clean (non-tag) photo; a tag photo is for reading, not display,
+            // so it's only the cover if it's the only photo.
+            const cover=photos.find(p=>p.label!=='tag')||photos[0];
+            if(cover){const {error:cerr}=await sb.from('plant').update({cover_photo_id:cover.id}).eq('id',plantId);if(cerr)throw cerr;}
             const after=[ this.logEvent(plantId,'acquired',{date:this.form.acquisitionDate||todayLocal()}).catch(()=>{}) ];
             if(this.form.categoryIds.length)after.push(this.syncCategories(plantId,this.form.categoryIds));
             await Promise.all(after);
