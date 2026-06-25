@@ -4,6 +4,21 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-24 — Import: "view a specific import's plants" drill-down (Lite)
+
+Closed the one UX gap Stephen flagged: you could see the LIST of past imports and undo a
+specific one, but not review WHAT a given import added before undoing. Now each row in
+"Previous imports" is tappable → a **batch view** listing exactly that import's plants
+(`viewImportBatch` loads `plant` where `import_batch_id = b.id`, RLS-scoped), with the
+per-import Undo right there; tapping a plant opens its detail. Lite tier — read-only filter on
+data the user already owns, no new untrusted-input or write surface; reuses
+`displayName`/`openDetail`/`undoImportBatch`. Build `2026-06-23s`, committed + pushed (3dda856).
+**Verified live** (Chrome, `test@test.com`): import 2 → view shows the 2 → undo-from-view returns
+to the prior screen, plants 1→3→1, reference rows untouched, account left clean; screenshot
+confirmed the render (status badge, dates, Back/Undo). Inline JS parse-checked in JavaScriptCore.
+
+---
+
 ## 2026-06-23 — Spreadsheet import BUILT (full tier) + separated Security pass
 
 Builder implemented v1 file-upload import: a SheetJS-in-a-Worker parse sandbox

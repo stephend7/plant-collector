@@ -299,6 +299,10 @@ unique. **Fixes applied + re-verified in JavaScriptCore:**
 - ✅ **Real `.xlsx` zip path + multi-tab picker VERIFIED LIVE:** a generated 2-sheet xlsx binary
   read by the worker → tab picker listed both tabs w/ dims → combined-name parse on a genuine
   **in-cell** comma peeled `BE-3390`→accession (the real friend scenario, no CSV artifact).
+- ✅ **"View a specific import's plants" drill-down added + verified live (2026-06-24, build `s`):**
+  tap an import in "Previous imports" → batch view lists exactly that import's plants
+  (`import_batch_id` filter), with per-import Undo; tap a plant to open it. Closes the "see what
+  was imported before undoing" gap. Lite tier (read-only). Verified: import 2 → view 2 → undo 1.
 - ⬜ Remaining (low): a pass on Stephen's iPhone (Safari/WebKit) — Chrome is Blink; and running his
   three actual files when he's ready to load his real collection.
 
