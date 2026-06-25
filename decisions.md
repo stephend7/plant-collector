@@ -4,6 +4,47 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-24 — Scanner/entry UX (2 of 5): rename a species (#5a) + keep hybrid #N in the name (#4) (Lite)
+
+The data-quality pair off the five-item backlog. Both Lite — #5a is CRUD on the user's own
+RLS-scoped rows; #4 is a prompt-only change to an already-shipped function.
+
+**#5a — Rename a species (the cleanup capability).** Stephen: "I can't edit the species once it's
+in the list" → a wrong/auto-created name was permanent and piled up "bad lines", and the scanner
+*auto-creates* species so misreads pollute the reference list. Because species is a real related
+table (care fields + `care_guide_entry` + `plant.species_id` FK) and everything references it by
+**id**, a rename fixes the name **everywhere at once** with no orphan. Added a **✎ Rename** button
+next to ＋ New (shows when a species is selected) → inline box prefilled with the current name →
+Save updates the one row. Generic `startRename`/`confirmRename` (species/genus/vendor/location);
+only the species button is wired now. Already-loaded plant/detail rows hold joined copies, so they're
+patched in memory to update immediately. Per-genus duplicate names caught with a friendly message
+(the `unique(user_id, genus_id, name)` constraint). Build `t → u`, committed + pushed (a34a8c2).
+
+**#4 — Hybrid trailing #N stays in the species name.** Real tag "P. laueana × Unknown #3" had the
+`#3` routed into careNotes; it identifies the cross and is part of the written name. `scan-tag`
+prompt now captures the full name remainder verbatim **including** a trailing cross/clone `#N`
+(worked example in-prompt), and states such a number is NOT a care note or accession; accession/
+careNotes tightened so they don't steal it. Committed + pushed (b047e09). **Prompt-only — does NOT
+take effect until the `scan-tag` Edge Function is REDEPLOYED in Supabase** (git ≠ deploy for
+functions).
+
+**Verification — split, stated honestly.** **#5a VERIFIED live END-TO-END** (Chrome, `test@test.com`,
+build `u`): selected Drosera→spatulata (the species the one existing plant uses), ✎ Rename opened a
+box prefilled "spatulata", renamed → "spatulata RENAMED" → the species row, the genus-scoped
+dropdown, the plant's joined name and `displayName` ("Drosera spatulata RENAMED") all updated, no
+error; the **Save button** fires `confirmRename` (an earlier miss was an x-transition timing fluke,
+re-tested clean); **renamed back to "spatulata" and a full page reload confirmed DB persistence +
+clean baseline** (1 plant, species "spatulata"). Asserted against live Alpine `$data`. Inline JS
+parse-checked in JavaScriptCore; `scan-tag` template literal integrity checked. **#4 NOT yet
+verified — gated on Stephen redeploying `scan-tag` and re-scanning the real laueana × Unknown #3 tag**
+(no API key on Claude's side to run the model).
+
+**Remaining backlog (1 of 5 left + #4 pending verify):** **#2** save the scanned tag photo with the
+plant (lean: inline "keep tag photo" toggle, attach as a `tag`-labelled NON-cover photo — pending
+Stephen's popup-vs-inline call). Plus **#5b** delete-unused / **#5c** merge as later species follow-ons.
+
+---
+
 ## 2026-06-24 — Scanner/entry UX (1 of 5): open the saved plant after add; "How Acquired" remembers last (Lite)
 
 Two items off a five-item scanner/entry backlog Stephen gathered while testing the tag scanner
