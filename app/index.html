@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-23s">
+<meta name="app-build" content="2026-06-23t">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1771,7 +1771,7 @@
       view:'loading', mode:'signin', email:'', password:'', message:'', ok:false, busy:false, userEmail:'', userId:'',
       genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[], products:[],
       addingProduct:false, newProductName:'',
-      lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'',
+      lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'', lastAcquisitionType: localStorage.getItem('lastAcquisitionType')||'',
       screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], detectedNote:'',
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
       detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
@@ -2088,7 +2088,7 @@
       resetForm(){
         this.formError=''; this.detectedNote=''; this.clearPendingPhotos();
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
-        this.form={genusId:this.lastGenusId||'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:todayLocal(),acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]};
+        this.form={genusId:this.lastGenusId||'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:todayLocal(),acquisitionType:this.lastAcquisitionType||'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]};
       },
       formRow(){
         return {
@@ -2107,7 +2107,7 @@
           notes:this.form.notes.trim()||null,
         };
       },
-      rememberPicks(){this.lastGenusId=this.form.genusId;localStorage.setItem('lastGenusId',this.lastGenusId);this.lastSpeciesId=this.form.speciesId;localStorage.setItem('lastSpeciesId',this.lastSpeciesId);},
+      rememberPicks(){this.lastGenusId=this.form.genusId;localStorage.setItem('lastGenusId',this.lastGenusId);this.lastSpeciesId=this.form.speciesId;localStorage.setItem('lastSpeciesId',this.lastSpeciesId);if(this.form.acquisitionType){this.lastAcquisitionType=this.form.acquisitionType;localStorage.setItem('lastAcquisitionType',this.lastAcquisitionType);}},
       async savePlant(){
         this.formError='';
         if(!this.form.genusId)return this.formError='Please choose a genus.';
@@ -2156,8 +2156,14 @@
             await Promise.all(after);
             this.rememberPicks();
             this.clearPendingPhotos();
-            await this.reloadPlant(plantId);
-            this.screen='list';
+            const fresh=await this.reloadPlant(plantId);
+            // Open the plant we just saved (mirrors the edit branch). Without this we
+            // returned to screen='list' under the stale genus drill the user came FROM —
+            // so saving a different genus than you were browsing showed a list that can't
+            // contain the new plant (looked blank). Also retarget the drill to the new
+            // plant's genus so 'back' lands on a list that actually includes it.
+            if(fresh){ this.galleryGenus=this.genusOf(fresh); await this.openDetail(fresh); }
+            else this.screen='list';
           }
         }catch(e){
           const m=(e&&e.message)||'';
