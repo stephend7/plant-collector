@@ -4,6 +4,48 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-24 — Scanner/entry UX (1 of 5): open the saved plant after add; "How Acquired" remembers last (Lite)
+
+Two items off a five-item scanner/entry backlog Stephen gathered while testing the tag scanner
+against real tag photos (the other three are listed at the bottom). Both **Lite** — no auth/RLS/
+untrusted-input/egress surface, so no separate Security agent.
+
+1. **Blank screen after a cross-genus save (the real bug).** `savePlant`'s new-plant branch ended
+   at `screen='list'` and never opened the new plant, while the genus drill (`galleryGenus`) stayed
+   pinned to whatever you were browsing. So saving a plant whose genus differed from the open drill
+   (browsing Pinguicula, scanning/adding a Utricularia) dropped you onto a list that *can't* contain
+   it → looked blank, and it never showed the plant you just made. **Fix:** after a new save, open
+   the saved plant's detail (mirrors the edit branch) and retarget `galleryGenus` to the new plant's
+   genus so 'back' lands on a list that includes it.
+
+2. **"How Acquired" defaults to the last chosen value**, exactly like Genus — new
+   `lastAcquisitionType` persisted in localStorage, applied in `resetForm`, saved in `rememberPicks`
+   **only when non-empty** (a blank pick never wipes the standing default). Edit-an-existing-plant
+   untouched (loads the plant's own type). The scanner doesn't extract acquisition type → no clobber
+   conflict; it's a pure convenience default.
+
+Build `2026-06-23s → 2026-06-23t`. Committed + pushed (35ed536).
+
+**Verified live END-TO-END** (Chrome, `test@test.com`, build `t` confirmed in-app): reproduced the
+exact bug — drilled into Drosera (`galleryGenus='Drosera'`), added **Pinguicula gigantea**, How
+Acquired = Traded, Saved → landed on the new plant's **detail page** (`screen='detail'`, not blank),
+`galleryGenus` retargeted to Pinguicula, count 1→2, no error; 'back' showed the Pinguicula drill
+containing the new plant. Then a **fresh Add form defaulted How Acquired to "Traded"**
+(`form.acquisitionType='traded'`, rendered select reads "Traded"; `lastAcquisitionType` persisted to
+state + localStorage). Asserted against live Alpine `$data`, not self-report. Test plant deleted,
+account back to baseline (1 plant). Inline JS parse-checked in JavaScriptCore before push.
+
+**Remaining backlog (3 of 5, NOT yet built):** **#2** save the scanned tag photo with the plant
+(lean: inline "keep tag photo" toggle, attach as a `tag`-labelled NON-cover photo — pending Stephen's
+popup-vs-inline call). **#4** scanner routes a hybrid's trailing `#N` (real tag "P. laueana × Unknown
+#3") into Notes instead of keeping it in the species name — narrow prompt fix + **redeploy `scan-tag`**;
+note the parser already routes locality correctly (verified on the Utricularia beaugleholei tag). **#5**
+can't edit a species once listed (rename / delete-unused / merge) — species is a real related table
+(care fields + `care_guide_entry` + `plant.species_id` FK), so **rename** fixes a bad name everywhere
+at once with no orphan line; the auto-create scanner makes this cleanup capability matter.
+
+---
+
 ## 2026-06-24 — Import: "view a specific import's plants" drill-down (Lite)
 
 Closed the one UX gap Stephen flagged: you could see the LIST of past imports and undo a
