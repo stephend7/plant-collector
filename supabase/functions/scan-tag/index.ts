@@ -63,20 +63,21 @@ Deno.serve(async (req) => {
 
 {
   "genus": "Genus name, first letter capitalized (e.g. Pinguicula). null if not visible.",
-  "species": "Everything after the genus: species epithet, hybrid × markers, cultivar 'names in quotes', sp./ssp./var./f., etc. Lowercase except cultivar names. null if not visible.",
+  "species": "The full plant name after the genus, VERBATIM: species epithet, hybrid × markers, cultivar 'names in quotes', sp./ssp./var./f. ranks, AND any cross or clone number that is part of the written name. Keep a trailing #N when it belongs to the name — e.g. for 'P. laueana × Unknown #3' return 'laueana × Unknown #3' (the #3 identifies the cross and stays here). Lowercase except cultivar names and proper nouns. null if not visible.",
   "form": "Additional clone or form designator not already in species. null if none.",
   "price": "Numeric price only, no $ sign (e.g. 15 or 3.50). null if not visible.",
   "vendor": "Seller or vendor name if printed on the tag. null if not visible.",
-  "accession": "Vendor accession or clone ID number. Ignore simple internal codes like #A3 or #B2. null if none.",
-  "locality": "Wild origin data in parentheses if present, e.g. Warby Range, Victoria, Australia. null if none.",
-  "careNotes": "Brief care instructions if written on the tag. null if none."
+  "accession": "A vendor's SEPARATE stock/accession code, printed apart from the plant name (e.g. BE-3390). Do NOT take a number that is part of the plant name (like the #3 in '× Unknown #3'). Ignore simple internal codes like #A3 or #B2. null if none.",
+  "locality": "Wild origin data in parentheses or braces if present, e.g. Warby Range, Victoria, Australia. null if none.",
+  "careNotes": "Brief care instructions if written on the tag. Do NOT put any part of the plant name here. null if none."
 }
 
 Rules:
 - Return ONLY the JSON — no text before or after.
 - genus: capitalize first letter only (Pinguicula, not PINGUICULA or pinguicula).
-- species: preserve × for hybrids and single quotes around cultivar names.
-- Ignore simple vendor-internal codes like #A3 — those go in accession only if they are meaningful clone IDs.
+- species: preserve × for hybrids and single quotes around cultivar names, and keep the WHOLE name remainder including a trailing cross/clone #N (e.g. '× Unknown #3').
+- A trailing #N that is part of a hybrid/cross name stays in "species"; it is NOT a care note or an accession code.
+- Ignore simple vendor-internal codes like #A3 (a code separate from the name) — put one in "accession" only if it is a meaningful clone ID.
 - If the image is blurry or a field is unclear, use null for that field.`,
           },
         ],
