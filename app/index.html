@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-23t">
+<meta name="app-build" content="2026-06-23u">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -395,17 +395,23 @@
           <label>Species *</label>
           <div class="pickrow">
             <div>
-              <select x-model="form.speciesId" :disabled="!form.genusId || adding.species">
+              <select x-model="form.speciesId" :disabled="!form.genusId || adding.species || renaming.species">
                 <option value="" x-text="form.genusId?'— choose species —':'pick a genus first'"></option>
                 <template x-for="s in speciesOptions()" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
               </select>
             </div>
-            <button type="button" class="mini" @click="startAdd('species')" x-show="!adding.species" :disabled="!form.genusId">＋ New</button>
+            <button type="button" class="mini" @click="startAdd('species')" x-show="!adding.species && !renaming.species" :disabled="!form.genusId">＋ New</button>
+            <button type="button" class="mini" @click="startRename('species')" x-show="form.speciesId && !adding.species && !renaming.species" title="Rename this species" aria-label="Rename this species">✎ Rename</button>
           </div>
           <div class="addbox" x-show="adding.species" x-transition>
             <input type="text" placeholder="New species (e.g. prolifera, 'Razzberry Blonde')" x-model="newName.species" @keydown.enter.prevent="confirmAdd('species')" x-ref="addspecies">
             <button type="button" class="ok" @click="confirmAdd('species')">Add</button>
             <button type="button" class="no" @click="cancelAdd('species')">✕</button>
+          </div>
+          <div class="addbox" x-show="renaming.species" x-transition>
+            <input type="text" placeholder="Rename species" x-model="renameName.species" @keydown.enter.prevent="confirmRename('species')" x-ref="renamespecies">
+            <button type="button" class="ok" @click="confirmRename('species')">Save</button>
+            <button type="button" class="no" @click="cancelRename('species')">✕</button>
           </div>
         </div>
       </div>
@@ -1787,6 +1793,8 @@
       quickLog:{plantId:'',plantName:'',q:'',type:'note',date:'',note:'',productId:'',doseNote:''},
       adding:{genus:false,species:false,vendor:false,location:false,category:false},
       newName:{genus:'',species:'',vendor:'',location:'',category:''},
+      renaming:{genus:false,species:false,vendor:false,location:false,category:false},
+      renameName:{genus:'',species:'',vendor:'',location:'',category:''},
       form:{genusId:'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:'',acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]},
 
       /* ---- spreadsheet import ---- */
@@ -1922,10 +1930,10 @@
         const i=list.findIndex(s=>s.id===this.lastSpeciesId); if(i>0){const[x]=list.splice(i,1);list.unshift(x);}
         return list;
       },
-      onGenusChange(){this.form.speciesId='';},
+      onGenusChange(){this.form.speciesId='';this.cancelRename('species');},
 
       /* ---- inline add ---- */
-      startAdd(kind){this.adding[kind]=true;this.newName[kind]='';this.$nextTick(()=>{const r=this.$refs['add'+kind];if(r)r.focus();});},
+      startAdd(kind){this.adding[kind]=true;this.renaming[kind]=false;this.newName[kind]='';this.$nextTick(()=>{const r=this.$refs['add'+kind];if(r)r.focus();});},
       cancelAdd(kind){this.adding[kind]=false;this.newName[kind]='';},
       async confirmAdd(kind){
         const name=(this.newName[kind]||'').trim(); if(!name)return;
@@ -1937,6 +1945,43 @@
           else if(kind==='category'){const{data,error}=await sb.from('category').insert({name}).select('id,name').single();if(error)throw error;this.categories.push(data);this.form.categoryIds.push(data.id);}
           this.cancelAdd(kind);
         }catch(e){this.formError=(e.message||'Could not add')+' — it may already exist.';}
+      },
+      // ---- rename an existing reference-list entry (e.g. a wrong/auto-created species) ----
+      // Renaming updates ONE row; because plants/care/journal all reference it by id, the
+      // corrected name flows everywhere automatically — no orphaned "bad line" left behind.
+      _renameTarget(kind){
+        return {
+          genus:    {table:'genus',            list:this.genera,   id:this.form.genusId},
+          species:  {table:'species',          list:this.speciesAll,id:this.form.speciesId},
+          vendor:   {table:'vendor',           list:this.vendors,  id:this.form.vendorId},
+          location: {table:'growing_location', list:this.locations,id:this.form.growingLocationId},
+        }[kind];
+      },
+      startRename(kind){
+        const t=this._renameTarget(kind); if(!t||!t.id)return;
+        const cur=t.list.find(x=>x.id===t.id); if(!cur)return;
+        this.adding[kind]=false; this.renaming[kind]=true; this.renameName[kind]=cur.name;
+        this.$nextTick(()=>{const r=this.$refs['rename'+kind];if(r){r.focus();r.select();}});
+      },
+      cancelRename(kind){this.renaming[kind]=false;this.renameName[kind]='';},
+      async confirmRename(kind){
+        const name=(this.renameName[kind]||'').trim(); const t=this._renameTarget(kind);
+        if(!name||!t||!t.id)return;
+        try{
+          const {data,error}=await sb.from(t.table).update({name}).eq('id',t.id).select('id,name').single();
+          if(error)throw error;
+          const item=t.list.find(x=>x.id===t.id); if(item)item.name=name;
+          // reflect on already-loaded plant rows (they hold joined copies of genus/species)
+          this.plants.forEach(p=>{
+            if(kind==='species' && p.species && p.species.id===t.id) p.species.name=name;
+            if(kind==='genus' && p.species && p.species.genus && p.species.genus.id===t.id) p.species.genus.name=name;
+          });
+          if(this.detailPlant && this.detailPlant.species){
+            if(kind==='species' && this.detailPlant.species.id===t.id) this.detailPlant.species.name=name;
+            if(kind==='genus' && this.detailPlant.species.genus && this.detailPlant.species.genus.id===t.id) this.detailPlant.species.genus.name=name;
+          }
+          this.cancelRename(kind);
+        }catch(e){this.formError=(e.message||'Could not rename')+' — that name may already exist in this genus.';}
       },
 
       /* ---- photos in the add form ---- */
@@ -2088,6 +2133,7 @@
       resetForm(){
         this.formError=''; this.detectedNote=''; this.clearPendingPhotos();
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
+        Object.keys(this.renaming).forEach(k=>this.renaming[k]=false);
         this.form={genusId:this.lastGenusId||'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:todayLocal(),acquisitionType:this.lastAcquisitionType||'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]};
       },
       formRow(){
@@ -2313,6 +2359,7 @@
       editPlant(){
         const p=this.detailPlant; this.editId=p.id; this.formError=''; this.clearPendingPhotos();
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
+        Object.keys(this.renaming).forEach(k=>this.renaming[k]=false);
         this.form={
           genusId:p.species&&p.species.genus?p.species.genus.id:'',
           speciesId:p.species?p.species.id:'',
