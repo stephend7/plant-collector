@@ -4,6 +4,17 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-24 — Scanner/entry backlog COMPLETE: #4 verified live on device
+
+Stephen redeployed the `scan-tag` Edge Function and re-scanned a real tag — **"#4 worked well"**: the
+hybrid's trailing `#N` now stays in the species name (no longer routed to Notes). That closes the last
+open item. **All five backlog items are now built AND verified live**: #1 How-Acquired default, #2 save
+tag photo, #3 cross-genus blank-screen fix, #4 hybrid `#N` parsing, #5a rename species. Current build
+`2026-06-23v`. Optional later follow-ons remain (not requested): **#5b** delete-unused species, **#5c**
+merge species.
+
+---
+
 ## 2026-06-24 — Scanner/entry UX (3 of 5): save the scanned tag photo with the plant (#2) (Lite)
 
 The last build item on the five-item backlog. Stephen asked to "ask 'Save Photo with plant?'" after a
