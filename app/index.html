@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-23w">
+<meta name="app-build" content="2026-06-23x">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -2005,7 +2005,7 @@
         const sid=this.form.speciesId; if(!sid)return;
         this.confirmDelSpecies=false; this.delSpeciesBlockMsg='';
         const inUse=this.plants.filter(p=>p.species_id===sid).length;
-        if(inUse>0){ this.delSpeciesBlockMsg=inUse+' plant'+(inUse===1?'':'s')+' use this species — rename it instead.'; return; }
+        if(inUse>0){ this.delSpeciesBlockMsg=inUse+' plant'+(inUse===1?' uses':'s use')+' this species — rename it instead.'; return; }
         this.confirmDelSpecies=true;
       },
       cancelDeleteSpecies(){this.confirmDelSpecies=false;this.delSpeciesBlockMsg='';},
