@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-26c">
+<meta name="app-build" content="2026-06-26d">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -714,7 +714,7 @@
             <!-- camera icon -->
             <svg class="sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3.2"/><path d="M8 7l1.5-3h5L16 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <h3>Photos</h3>
-            <button class="sec-act" x-show="detailPhotos.length" @click="openPhotos()">See all <span x-text="detailPhotos.length"></span> ›</button>
+            <button class="sec-act" x-show="galleryPhotos().length" @click="openPhotos()">See all <span x-text="galleryPhotos().length"></span> ›</button>
           </div>
           <div class="sec-body">
             <div class="pstrip">
@@ -930,6 +930,7 @@
         <span x-show="viewerReadonly&&viewerPhoto()" style="font-family:var(--serif);font-style:italic;color:#fff" x-text="viewerPhoto()&&viewerPhoto().plantName"></span>
         <span x-text="viewerPhoto()&&viewerPhoto().photo_date"></span>
         <span x-text="viewerPhoto()?('· '+photoLabel(viewerPhoto().label)):''"></span>
+        <button x-show="viewerPhoto()&&viewerPhoto().journal_entry_id" @click="toggleGalleryPhoto()" style="color:#bfe3cf;margin-left:14px" x-text="(viewerPhoto()&&viewerPhoto().in_gallery===false)?'Show in plant photos':'Hide from plant photos'"></button>
         <span style="margin-left:auto;display:flex;gap:14px" x-show="!viewerReadonly">
           <button x-show="detailPlant&&viewerPhoto()&&viewerPhoto().id!==detailPlant.cover_photo_id" @click="setCoverFromViewer()">Set cover</button>
           <button class="del" @click="deleteFromViewer()">Delete</button>
@@ -2380,7 +2381,7 @@
       async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.sheetOpen=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.tileEdit='';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
       closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;this.sheetOpen=false;this.tileEdit='';},
       async loadDetailPhotos(plantId){
-        const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date,comment,journal_entry_id').eq('plant_id',plantId).order('sort_order');
+        const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date,comment,journal_entry_id,in_gallery').eq('plant_id',plantId).order('sort_order');
         const photos=data||[];
         if(photos.length){
           const {data:signed}=await sb.storage.from('photos').createSignedUrls(photos.map(p=>thumbOf(p.storage_path)),3600);
@@ -2748,6 +2749,7 @@
       async loadAllPhotos(){
         const {data}=await sb.from('photo')
           .select('id,plant_id,storage_path,label,photo_date,created_at,plant:plant_id(form_descriptor,species:species_id(name,genus:genus_id(name)))')
+          .neq('in_gallery',false)
           .order('photo_date',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}).limit(150);
         const photos=data||[];
         if(photos.length){
@@ -2802,6 +2804,17 @@
       },
       async openPlantById(id){const p=this.plants.find(x=>x.id===id);if(p)await this.openDetail(p);},
       async viewPlantFromViewer(){const ph=this.viewerPhoto();if(!ph)return;const id=ph.plant_id;this.closeViewer();await this.openPlantById(id);},
+      // Journal photo only: flip whether it appears in the plant's main gallery. It always
+      // stays in its journal entry; this just adds/removes it from the strip + photos page.
+      async toggleGalleryPhoto(){
+        const ph=this.viewerPhoto(); if(!ph||!ph.journal_entry_id)return;
+        const next = ph.in_gallery===false; this.detailError='';
+        try{
+          const {error}=await sb.from('photo').update({in_gallery:next}).eq('id',ph.id); if(error)throw error;
+          ph.in_gallery=next;
+          const orig=this.detailPhotos.find(p=>p.id===ph.id); if(orig)orig.in_gallery=next;
+        }catch(e){ this.detailError=e.message||'Could not update this photo.'; }
+      },
 
       /* ---- focused journal-entry sheet ---- */
       // open from the per-plant timeline (detailPlant/detailEvents/detailPhotos already loaded)
@@ -3010,10 +3023,13 @@
       },
 
       /* ---- photos: strip, page, viewer ---- */
-      recentPhotos(){ return [...this.detailPhotos].sort((a,b)=>((b.photo_date||'')+'').localeCompare((a.photo_date||'')+'')).slice(0,3); },
+      // The plant's main gallery = all photos EXCEPT journal photos the user marked "journal only"
+      // (in_gallery===false). Plant-level photos and journal photos left visible still show.
+      galleryPhotos(){ return this.detailPhotos.filter(p=>!(p.journal_entry_id && p.in_gallery===false)); },
+      recentPhotos(){ return [...this.galleryPhotos()].sort((a,b)=>((b.photo_date||'')+'').localeCompare((a.photo_date||'')+'')).slice(0,3); },
       photoLabelsPresent(){ return [...new Set(this.detailPhotos.map(p=>p.label))]; },
       pagePhotos(){
-        let list=[...this.detailPhotos];
+        let list=[...this.galleryPhotos()];
         if(this.photoLabelFilter!=='all')list=list.filter(p=>p.label===this.photoLabelFilter);
         list.sort((a,b)=>{const c=((a.photo_date||'')+'').localeCompare((b.photo_date||'')+'');return this.photoSort==='old'?c:-c;});
         return list;
