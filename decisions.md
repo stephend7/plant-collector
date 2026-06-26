@@ -4,6 +4,42 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-26 — Journal improvements: tab search/filter + per-photo "keep out of gallery" toggle
+
+Two requests in one (Stephen at work, wanted low-decision work he could just approve).
+
+**(A) Journal tab search + event-type filter (Lite, no migration).** The Journal "All" feed gets a
+search box (matches plant name, note body, event-type label, and the product/pest line) and an
+event-type dropdown listing only the types actually present. `filteredEvents()` drives the list;
+"No entries match" shows when empty. Pure client-side filter over already-loaded `allEvents` — no new
+query/write surface. Build `…c`. Committed + pushed (3f63abf). **Verified live** (Chrome,
+`test@test.com`): search "weekly" → the fed note; type=fed → 1; search "drosera" → all 3 (plant-name
+match); dropdown lists acquired/fed/note only.
+
+**(B) Per-photo "journal only" toggle (migration 007).** Stephen: a journal entry may include an ugly
+documentation photo he wants visible ONLY in the journal entry, not in the plant's main gallery. New
+`photo.in_gallery boolean default true` (migration 007). `galleryPhotos()` filters out journal photos
+(`journal_entry_id` set) with `in_gallery=false` from the detail strip + "See all" page; `loadAllPhotos`
+excludes them server-side (`.neq('in_gallery',false)`) from the collection Photos grid; a journal photo
+always still shows inside its journal entry (`eventPhotos` ignores the flag). A **"Hide from plant
+photos" / "Show in plant photos"** toggle lives in the full-screen viewer, shown only for journal photos.
+Default true = current behaviour preserved. Build `c → 2026-06-26d`. **Held the push until Stephen ran
+007** (in_gallery is in the core photo select → would break photo load otherwise), pre-flighted the
+column, then pushed (aafb01c).
+
+**Verified live END-TO-END** (Chrome, `test@test.com`, build `d`, on a throwaway plant with a created
+journal photo): default → photo in BOTH gallery and journal; **Hide** (real viewer button) → leaves
+`galleryPhotos()` but stays in `eventPhotos()`, label flips to "Show…"; **Show** → back in the gallery;
+**fresh DB re-read confirmed the hidden state persists**. Throwaway plant deleted (cascade removed its
+event + photo + storage); account at baseline. **Lite security:** `in_gallery` is a plain column on the
+user's own RLS-scoped photo rows; toggle is an owner-scoped update; no new surface.
+
+**Backlog now:** Fix #1 (species-row buttons) still **tabled** for Stephen (Option A mockup'd). Plus
+species #5c merge, Settings tab, inventory mode, Care/Insights, Lists & sharing, and the standing
+import on-device pass.
+
+---
+
 ## 2026-06-26 — Fixes round (Stephen on-device). Fix #2: restore the detail-page info-tile boxes
 
 Stephen is gathering a list of UI fixes (handled one at a time). **Fix #1** (the species row's
