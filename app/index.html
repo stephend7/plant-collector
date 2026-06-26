@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-23z">
+<meta name="app-build" content="2026-06-26a">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -179,6 +179,11 @@
   .care-tile .cl{font-size:10.5px;color:var(--muted)}
   .care-tile .cv{font-size:13px;color:var(--ink);margin-top:3px;display:flex;align-items:center;gap:3px;min-height:16px}
   .care-tile .cv.empty{color:var(--muted)}
+  .itile{flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer}
+  .itile.sel{outline:2px solid var(--pine-2);outline-offset:-1px}
+  .itile .il{font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+  .itile .iv{font-size:13px;margin-top:2px}
+  .itile .iv.empty{color:var(--muted)}
   .care-drop{width:15px;height:15px;flex:0 0 auto}
   .photos-head{display:flex;align-items:center;justify-content:space-between;margin:16px 0 0}
   .photos-head h3{font-size:15px;margin:0;font-weight:500}
@@ -585,17 +590,17 @@
         <!-- ── INFO CARD: location tiles + detail fields ── -->
         <div class="info-card">
           <div style="display:flex;gap:7px;margin-bottom:10px">
-            <div @click="startTileEdit('qty')" style="flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer" :style="tileEdit==='qty'?'outline:2px solid var(--pine-2);outline-offset:-1px':''">
-              <div style="font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center">Quantity <span style="opacity:.45">✎</span></div>
-              <div style="font-size:13px;margin-top:2px" x-text="detailPlant.quantity"></div>
+            <div class="itile" :class="tileEdit==='qty'?'sel':''" @click="startTileEdit('qty')">
+              <div class="il">Quantity <span style="opacity:.45">✎</span></div>
+              <div class="iv" x-text="detailPlant.quantity"></div>
             </div>
-            <div @click="startTileEdit('status')" style="flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer" :style="tileEdit==='status'?'outline:2px solid var(--pine-2);outline-offset:-1px':''">
-              <div style="font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center">Status <span style="opacity:.45">✎</span></div>
-              <div style="font-size:13px;margin-top:2px" x-text="statusLabel(detailPlant.lifecycle_status)"></div>
+            <div class="itile" :class="tileEdit==='status'?'sel':''" @click="startTileEdit('status')">
+              <div class="il">Status <span style="opacity:.45">✎</span></div>
+              <div class="iv" x-text="statusLabel(detailPlant.lifecycle_status)"></div>
             </div>
-            <div @click="startTileEdit('spot')" style="flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer" :style="tileEdit==='spot'?'outline:2px solid var(--pine-2);outline-offset:-1px':''">
-              <div style="font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center">Growing spot <span style="opacity:.45">✎</span></div>
-              <div style="font-size:13px;margin-top:2px" :style="detailPlant.growing_location?'':'color:var(--muted)'" x-text="detailPlant.growing_location ? detailPlant.growing_location.name : 'Not set'"></div>
+            <div class="itile" :class="tileEdit==='spot'?'sel':''" @click="startTileEdit('spot')">
+              <div class="il">Growing spot <span style="opacity:.45">✎</span></div>
+              <div class="iv" :class="detailPlant.growing_location?'':'empty'" x-text="detailPlant.growing_location ? detailPlant.growing_location.name : 'Not set'"></div>
             </div>
           </div>
           <div class="evform" x-show="tileEdit" x-transition style="margin-bottom:12px">
