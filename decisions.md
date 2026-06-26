@@ -4,6 +4,40 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-24 — Pest picker on pest_treated events (migration 006) (Lite)
+
+From [[ui-polish-backlog]] #1. A per-user **pest / disease reference list** + a **single-select pest
+picker** that shows ONLY on `pest_treated` events, in all three editors (per-plant Log, focused sheet,
+Journal quick-log) — mirroring the existing fertilizer/pesticide **product** feature. Separate from the
+product field: product = *what you sprayed* (Spinosad), pest = *what you treated* (thrips). Seeded with
+8 common CP pests (Aphids, Botrytis, Fungus gnats, Mealybugs, Scale, Slugs & snails, Spider mites,
+Thrips). Timeline line now reads **"pest · product · dose"**. **Single pest per event for now** — chose
+the lean mirror-of-product over a multi-pest many-to-many to fit the session; multi is a later
+extension.
+
+- **Migration 006** (`app/migrations/006_pest_reference_and_journal_pest.sql`): new `pest` table
+  (RLS owner-only) + nullable `journal_entry.pest_id` (FK, on delete set null). `pest_id` is a plain FK
+  matching the `product_id` precedent — no app_owns guard (self-only opaque ref; reads are user_id-scoped).
+- **Build/deploy ordering mattered:** `pest_id` is referenced in the CORE event select/save (not an
+  isolated modal), so deploying before the migration would break journal load/save. **Held the push
+  until Stephen ran 006**, pre-flighted the live DB (pest table + pest_id column present, no error),
+  THEN pushed build `z`. Committed + pushed (3a76661).
+- **Lite security:** pest table RLS owner-only; pest_id no new read path (resolved against the user's own
+  `this.pests`); `＋ New` insert passes `user_id` explicitly (mirrors `confirmAddProduct`).
+
+**Verified live END-TO-END** (Chrome, `test@test.com`, build `z`): 8 pests **seeded** on first load;
+logging a `pest_treated` event with **Thrips + Spinosad + "2 ml/L"** saved `pest_id` and rendered the
+timeline as **"Thrips · Spinosad · 2 ml/L"**; **＋ New "Root mealybugs"** created + auto-selected; the
+**edit round-trip** reloads the event's pest; **reload confirmed DB persistence**. Test event + the ＋New
+test pest deleted (8 seeded pests kept; the 3 remaining Drosera events are pre-existing test data from
+2026-06-21/22, not this session's). Inline JS parse-checked in JavaScriptCore.
+
+**Backlog now:** species **#5c merge** (optional); Journal-tab search/filter/grouping; Settings tab
+(currency); lightweight inventory mode; Care/Insights analytics; the bigger Lists & sharing phase. Plus
+the standing **import on-device pass** (Stephen's 3 real `.xlsx` + iPhone/Safari). NEXT = Stephen's pick.
+
+---
+
 ## 2026-06-24 — Tap-to-edit info tiles (Quantity / Status / Growing spot) (Lite)
 
 Next item after the species trio. The three detail-page info tiles became **tappable** (faint ✎ on
