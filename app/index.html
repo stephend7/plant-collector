@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-23x">
+<meta name="app-build" content="2026-06-23y">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -585,17 +585,59 @@
         <!-- ── INFO CARD: location tiles + detail fields ── -->
         <div class="info-card">
           <div style="display:flex;gap:7px;margin-bottom:10px">
-            <div style="flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px">
-              <div style="font-size:10.5px;color:var(--muted)">Quantity</div>
+            <div @click="startTileEdit('qty')" style="flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer" :style="tileEdit==='qty'?'outline:2px solid var(--pine-2);outline-offset:-1px':''">
+              <div style="font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center">Quantity <span style="opacity:.45">✎</span></div>
               <div style="font-size:13px;margin-top:2px" x-text="detailPlant.quantity"></div>
             </div>
-            <div style="flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px">
-              <div style="font-size:10.5px;color:var(--muted)">Status</div>
+            <div @click="startTileEdit('status')" style="flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer" :style="tileEdit==='status'?'outline:2px solid var(--pine-2);outline-offset:-1px':''">
+              <div style="font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center">Status <span style="opacity:.45">✎</span></div>
               <div style="font-size:13px;margin-top:2px" x-text="statusLabel(detailPlant.lifecycle_status)"></div>
             </div>
-            <div style="flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px">
-              <div style="font-size:10.5px;color:var(--muted)">Growing spot</div>
+            <div @click="startTileEdit('spot')" style="flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer" :style="tileEdit==='spot'?'outline:2px solid var(--pine-2);outline-offset:-1px':''">
+              <div style="font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center">Growing spot <span style="opacity:.45">✎</span></div>
               <div style="font-size:13px;margin-top:2px" :style="detailPlant.growing_location?'':'color:var(--muted)'" x-text="detailPlant.growing_location ? detailPlant.growing_location.name : 'Not set'"></div>
+            </div>
+          </div>
+          <div class="evform" x-show="tileEdit" x-transition style="margin-bottom:12px">
+            <div x-show="tileEdit==='qty'">
+              <label>Quantity</label>
+              <input type="number" min="0" step="1" x-model="tileQty">
+            </div>
+            <div x-show="tileEdit==='status'">
+              <label>Status</label>
+              <select x-model="tileStatus">
+                <option value="in_collection">In collection</option>
+                <option value="dead">Dead</option>
+                <option value="sold">Sold</option>
+                <option value="traded">Traded</option>
+                <option value="given_away">Given away</option>
+              </select>
+              <div x-show="tileStatus==='dead'" style="margin-top:8px">
+                <label>Cause of death <span class="hint">(optional)</span></label>
+                <input type="text" x-model="tileCause" placeholder="optional — e.g. Crown rot">
+              </div>
+              <p class="hint" x-show="tileStatus!=='in_collection'" style="margin:6px 0 0">Saving logs a dated event in this plant's journal.</p>
+            </div>
+            <div x-show="tileEdit==='spot'">
+              <label>Growing spot</label>
+              <div class="pickrow">
+                <div>
+                  <select x-model="tileSpot" :disabled="tileAddingSpot">
+                    <option value="">Not set</option>
+                    <template x-for="l in locations" :key="l.id"><option :value="l.id" x-text="l.name"></option></template>
+                  </select>
+                </div>
+                <button type="button" class="mini" @click="tileAddingSpot=true;tileNewSpot=''" x-show="!tileAddingSpot">＋ New</button>
+              </div>
+              <div class="addbox" x-show="tileAddingSpot" x-transition>
+                <input type="text" placeholder="New growing spot" x-model="tileNewSpot" @keydown.enter.prevent="addTileSpot()">
+                <button type="button" class="ok" @click="addTileSpot()">Add</button>
+                <button type="button" class="no" @click="tileAddingSpot=false">✕</button>
+              </div>
+            </div>
+            <div class="formfoot" style="margin-top:10px">
+              <button class="primary" @click="saveTile()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save'"></button>
+              <button class="ghost" @click="cancelTileEdit()" :disabled="detailBusy">Cancel</button>
             </div>
           </div>
           <dl class="fields" style="margin:0">
@@ -1793,6 +1835,7 @@
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'', lastAcquisitionType: localStorage.getItem('lastAcquisitionType')||'',
       screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], scannedTagPhoto:null, keepTagPhoto:true, detectedNote:'',
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
+      tileEdit:'', tileQty:1, tileStatus:'in_collection', tileCause:'', tileSpot:'', tileAddingSpot:false, tileNewSpot:'',
       detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
       photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
@@ -2218,12 +2261,7 @@
             const work=[];
             if(!sameSet(origCats,this.form.categoryIds))work.push(this.syncCategories(id,this.form.categoryIds));
             if(oldStatus && newStatus!==oldStatus){
-              const t={dead:'died',sold:'sold',traded:'traded',given_away:'given_away',in_collection:'note'}[newStatus]||'note';
-              work.push(this.logEvent(id,t,{
-                date:todayLocal(),
-                body:newStatus==='in_collection'?'Returned to collection':null,
-                cause:newStatus==='dead'?((this.form.cause||'').trim()||null):null
-              }).catch(()=>{}));
+              work.push(this.logStatusChange(id,oldStatus,newStatus,this.form.cause).catch(()=>{}));
             }
             if(work.length)await Promise.all(work);
             this.rememberPicks();
@@ -2271,8 +2309,8 @@
       },
 
       /* ---- detail view ---- */
-      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.sheetOpen=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
-      closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;this.sheetOpen=false;},
+      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.sheetOpen=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.tileEdit='';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
+      closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;this.sheetOpen=false;this.tileEdit='';},
       async loadDetailPhotos(plantId){
         const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date,comment,journal_entry_id').eq('plant_id',plantId).order('sort_order');
         const photos=data||[];
@@ -2317,6 +2355,71 @@
         if(opt.cause)row.cause=opt.cause;
         const {error}=await sb.from('journal_entry').insert(row);
         if(error)throw error;
+      },
+      // Single source of truth for "status changed" → dated journal event (used by the
+      // full Edit form AND the tap-to-edit Status tile, so they can never drift apart).
+      async logStatusChange(id,oldStatus,newStatus,cause){
+        if(!newStatus||newStatus===oldStatus)return;
+        const t={dead:'died',sold:'sold',traded:'traded',given_away:'given_away',in_collection:'note'}[newStatus]||'note';
+        await this.logEvent(id,t,{
+          date:todayLocal(),
+          body:newStatus==='in_collection'?'Returned to collection':null,
+          cause:newStatus==='dead'?((cause||'').trim()||null):null
+        });
+      },
+      /* ---- tap-to-edit info tiles (Quantity / Status / Growing spot) on the detail page ---- */
+      startTileEdit(which){
+        if(!this.detailPlant)return;
+        this.detailError=''; this.tileAddingSpot=false; this.tileNewSpot='';
+        this.tileQty=this.detailPlant.quantity;
+        this.tileStatus=this.detailPlant.lifecycle_status||'in_collection';
+        this.tileCause='';
+        this.tileSpot=this.detailPlant.growing_location_id||'';
+        this.tileEdit=which;
+      },
+      cancelTileEdit(){this.tileEdit='';this.tileAddingSpot=false;this.tileNewSpot='';this.detailError='';},
+      saveTile(){ if(this.tileEdit==='qty')return this.saveTileQty(); if(this.tileEdit==='status')return this.saveTileStatus(); if(this.tileEdit==='spot')return this.saveTileSpot(); },
+      async saveTileQty(){
+        const id=this.detailPlant.id; const q=Math.max(0,Math.floor(Number(this.tileQty)||0));
+        this.detailBusy=true; this.detailError='';
+        try{
+          const {error}=await sb.from('plant').update({quantity:q}).eq('id',id); if(error)throw error;
+          this.detailPlant.quantity=q; this.cancelTileEdit();
+        }catch(e){ this.detailError=e.message||'Could not update quantity.'; }
+        finally{ this.detailBusy=false; }
+      },
+      async saveTileStatus(){
+        const id=this.detailPlant.id; const oldStatus=this.detailPlant.lifecycle_status; const newStatus=this.tileStatus;
+        if(newStatus===oldStatus){ this.cancelTileEdit(); return; }
+        this.detailBusy=true; this.detailError='';
+        try{
+          const {error}=await sb.from('plant').update({lifecycle_status:newStatus}).eq('id',id); if(error)throw error;
+          await this.logStatusChange(id,oldStatus,newStatus,this.tileCause).catch(()=>{});
+          this.detailPlant.lifecycle_status=newStatus;
+          await this.loadDetailEvents(id); // surface the new status event in the timeline
+          this.cancelTileEdit();
+        }catch(e){ this.detailError=e.message||'Could not update status.'; }
+        finally{ this.detailBusy=false; }
+      },
+      async saveTileSpot(){
+        const id=this.detailPlant.id; const locId=this.tileSpot||null;
+        this.detailBusy=true; this.detailError='';
+        try{
+          const {error}=await sb.from('plant').update({growing_location_id:locId}).eq('id',id); if(error)throw error;
+          this.detailPlant.growing_location_id=locId;
+          this.detailPlant.growing_location = locId ? (this.locations.find(l=>l.id===locId)||null) : null;
+          this.cancelTileEdit();
+        }catch(e){ this.detailError=e.message||'Could not update growing spot.'; }
+        finally{ this.detailBusy=false; }
+      },
+      async addTileSpot(){
+        const name=(this.tileNewSpot||'').trim(); if(!name)return;
+        this.detailBusy=true; this.detailError='';
+        try{
+          const {data,error}=await sb.from('growing_location').insert({name}).select('id,name').single(); if(error)throw error;
+          this.locations.push(data); this.tileSpot=data.id; this.tileAddingSpot=false; this.tileNewSpot='';
+        }catch(e){ this.detailError=(e.message||'Could not add')+' — it may already exist.'; }
+        finally{ this.detailBusy=false; }
       },
       _blankEvent(){return{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',photos:[],existingPhotos:[],removedPhotoIds:[]};},
       startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.addingProduct=false;this.newEvent=Object.assign(this._blankEvent(),{date:todayLocal()});this.loggingEvent=true;},
