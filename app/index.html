@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-23y">
+<meta name="app-build" content="2026-06-23z">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -777,6 +777,25 @@
                   </div>
                 </div>
               </template>
+              <template x-if="newEvent.type==='pest_treated'">
+                <div>
+                  <label>Pest / disease</label>
+                  <div class="pickrow">
+                    <div>
+                      <select x-model="newEvent.pestId" :disabled="addingPest">
+                        <option value="">— none —</option>
+                        <template x-for="p in pestOptions()" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+                      </select>
+                    </div>
+                    <button type="button" class="mini" @click="startAddPest()" x-show="!addingPest">＋ New</button>
+                  </div>
+                  <div class="addbox" x-show="addingPest" x-transition>
+                    <input type="text" placeholder="New pest / disease" x-model="newPestName" @keydown.enter.prevent="confirmAddPest('event')">
+                    <button type="button" class="ok" @click="confirmAddPest('event')">Add</button>
+                    <button type="button" class="no" @click="cancelAddPest()">✕</button>
+                  </div>
+                </div>
+              </template>
               <template x-if="newEvent.type==='fed' || newEvent.type==='pest_treated'">
                 <div>
                   <label x-text="newEvent.type==='fed'?'Fertilizer':'Product used'"></label>
@@ -976,6 +995,25 @@
                       </div>
                     </div>
                   </template>
+                  <template x-if="newEvent.type==='pest_treated'">
+                    <div>
+                      <label>Pest / disease</label>
+                      <div class="pickrow">
+                        <div>
+                          <select x-model="newEvent.pestId" :disabled="addingPest">
+                            <option value="">— none —</option>
+                            <template x-for="p in pestOptions()" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+                          </select>
+                        </div>
+                        <button type="button" class="mini" @click="startAddPest()" x-show="!addingPest">＋ New</button>
+                      </div>
+                      <div class="addbox" x-show="addingPest" x-transition>
+                        <input type="text" placeholder="New pest / disease" x-model="newPestName" @keydown.enter.prevent="confirmAddPest('event')">
+                        <button type="button" class="ok" @click="confirmAddPest('event')">Add</button>
+                        <button type="button" class="no" @click="cancelAddPest()">✕</button>
+                      </div>
+                    </div>
+                  </template>
                   <template x-if="newEvent.type==='fed' || newEvent.type==='pest_treated'">
                     <div>
                       <label x-text="newEvent.type==='fed'?'Fertilizer':'Product used'"></label>
@@ -1127,6 +1165,25 @@
               </div>
               <div style="order:-1"><label>Date</label><input type="date" x-model="quickLog.date"></div>
             </div>
+            <template x-if="quickLog.type==='pest_treated'">
+              <div>
+                <label>Pest / disease</label>
+                <div class="pickrow">
+                  <div>
+                    <select x-model="quickLog.pestId" :disabled="addingPest">
+                      <option value="">— none —</option>
+                      <template x-for="p in pestOptions()" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+                    </select>
+                  </div>
+                  <button type="button" class="mini" @click="startAddPest()" x-show="!addingPest">＋ New</button>
+                </div>
+                <div class="addbox" x-show="addingPest" x-transition>
+                  <input type="text" placeholder="New pest / disease" x-model="newPestName" @keydown.enter.prevent="confirmAddPest('quick')">
+                  <button type="button" class="ok" @click="confirmAddPest('quick')">Add</button>
+                  <button type="button" class="no" @click="cancelAddPest()">✕</button>
+                </div>
+              </div>
+            </template>
             <template x-if="quickLog.type==='fed' || quickLog.type==='pest_treated'">
               <div>
                 <label x-text="quickLog.type==='fed'?'Fertilizer':'Product used'"></label>
@@ -1830,8 +1887,8 @@
   document.addEventListener('alpine:init', () => {
     Alpine.data('app', () => ({
       view:'loading', mode:'signin', email:'', password:'', message:'', ok:false, busy:false, userEmail:'', userId:'',
-      genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[], products:[],
-      addingProduct:false, newProductName:'',
+      genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[], products:[], pests:[],
+      addingProduct:false, newProductName:'', addingPest:false, newPestName:'',
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'', lastAcquisitionType: localStorage.getItem('lastAcquisitionType')||'',
       screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], scannedTagPhoto:null, keepTagPhoto:true, detectedNote:'',
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
@@ -1846,7 +1903,7 @@
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatIds:[], listGenusName:'', allEvents:[],
       journalFilter:'all', allPhotos:[], allPhotosLoaded:false,
       quickLogOpen:false, quickLogBusy:false, quickLogError:'',
-      quickLog:{plantId:'',plantName:'',q:'',type:'note',date:'',note:'',productId:'',doseNote:''},
+      quickLog:{plantId:'',plantName:'',q:'',type:'note',date:'',note:'',productId:'',doseNote:'',pestId:''},
       adding:{genus:false,species:false,vendor:false,location:false,category:false},
       newName:{genus:'',species:'',vendor:'',location:'',category:''},
       renaming:{genus:false,species:false,vendor:false,location:false,category:false},
@@ -1926,6 +1983,7 @@
         ]);
         this.genera=g.data||[]; this.speciesAll=s.data||[]; this.vendors=v.data||[]; this.locations=l.data||[]; this.categories=cat.data||[];
         await this.loadProducts();
+        this.loadPests();
         await this.loadPlants();
       },
       // single-flight: init() calls loadData() from BOTH onAuthStateChange and getSession,
@@ -2322,7 +2380,7 @@
       },
       async loadDetailEvents(plantId){
         const {data}=await sb.from('journal_entry')
-          .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause,photo_id,product_id,dose_note')
+          .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause,photo_id,product_id,dose_note,pest_id')
           .eq('plant_id',plantId).order('entry_date',{ascending:false}).order('created_at',{ascending:false});
         this.detailEvents=data||[];
       },
@@ -2421,14 +2479,14 @@
         }catch(e){ this.detailError=(e.message||'Could not add')+' — it may already exist.'; }
         finally{ this.detailBusy=false; }
       },
-      _blankEvent(){return{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',photos:[],existingPhotos:[],removedPhotoIds:[]};},
-      startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.addingProduct=false;this.newEvent=Object.assign(this._blankEvent(),{date:todayLocal()});this.loggingEvent=true;},
+      _blankEvent(){return{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',pestId:'',photos:[],existingPhotos:[],removedPhotoIds:[]};},
+      startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.addingProduct=false;this.addingPest=false;this.newEvent=Object.assign(this._blankEvent(),{date:todayLocal()});this.loggingEvent=true;},
       _fillEventForm(ev){
-        this.editEventId=ev.id; this.addingProduct=false;
+        this.editEventId=ev.id; this.addingProduct=false; this.addingPest=false;
         this.newEvent=Object.assign(this._blankEvent(),{
           type:ev.event_type, date:ev.entry_date||todayLocal(), note:ev.body||'',
           measureLabel:ev.measure_label||'', measureValue:(ev.measure_value!=null?ev.measure_value:''), measureUnit:ev.measure_unit||'',
-          productId:ev.product_id||'', doseNote:ev.dose_note||'',
+          productId:ev.product_id||'', doseNote:ev.dose_note||'', pestId:ev.pest_id||'',
           existingPhotos:this.eventPhotos(ev).map(p=>({id:p.id,thumbUrl:p.thumbUrl,storage_path:p.storage_path})),
         });
       },
@@ -2463,7 +2521,7 @@
           const pid=this.detailPlant.id;
           const photoLabelFor=t=>({flowered:'flower',fruited:'flower',pest_treated:'pests'})[t]||'plant';
           const measureCols=()=>{const m={measure_label:null,measure_value:null,measure_unit:null};if(e.type==='measured'){if((e.measureLabel||'').trim())m.measure_label=e.measureLabel.trim();if(e.measureValue!==''&&e.measureValue!=null)m.measure_value=Number(e.measureValue);if((e.measureUnit||'').trim())m.measure_unit=e.measureUnit.trim();}return m;};
-          const productCols=()=>{const isProd=(e.type==='fed'||e.type==='pest_treated');return {product_id:isProd?(e.productId||null):null,dose_note:isProd?((e.doseNote||'').trim()||null):null};};
+          const productCols=()=>{const isProd=(e.type==='fed'||e.type==='pest_treated');return {product_id:isProd?(e.productId||null):null,dose_note:isProd?((e.doseNote||'').trim()||null):null,pest_id:e.type==='pest_treated'?(e.pestId||null):null};};
 
           // event id — reuse on edit, create otherwise
           let evId=this.editEventId;
@@ -2669,12 +2727,12 @@
       listCount(){return this.listGroups().reduce((t,g)=>t+g.plants.length,0);},
       async loadAllEvents(){
         const {data}=await sb.from('journal_entry')
-          .select('id,plant_id,entry_date,event_type,body,photo_id,product_id,dose_note,plant:plant_id(form_descriptor,species:species_id(name,genus:genus_id(name)))')
+          .select('id,plant_id,entry_date,event_type,body,photo_id,product_id,dose_note,pest_id,plant:plant_id(form_descriptor,species:species_id(name,genus:genus_id(name)))')
           .order('entry_date',{ascending:false}).order('created_at',{ascending:false}).limit(150);
         this.allEvents=(data||[]).map(e=>{
           const sp=e.plant&&e.plant.species,g=sp&&sp.genus?sp.genus.name:'',s=sp?sp.name:'';
           const name=[g,s,e.plant&&e.plant.form_descriptor].filter(Boolean).join(' ').trim()||'Plant';
-          return {id:e.id,plant_id:e.plant_id,entry_date:e.entry_date,event_type:e.event_type,body:e.body,product_id:e.product_id,dose_note:e.dose_note,hasPhoto:!!e.photo_id,plantName:name};
+          return {id:e.id,plant_id:e.plant_id,entry_date:e.entry_date,event_type:e.event_type,body:e.body,product_id:e.product_id,dose_note:e.dose_note,pest_id:e.pest_id,hasPhoto:!!e.photo_id,plantName:name};
         });
       },
       async loadAllPhotos(){
@@ -2826,17 +2884,56 @@
         }catch(e){/* likely a duplicate — ignore */}
         this.cancelAddProduct();
       },
-      // "Maxsea · 1/4 strength" — resolves product name from the global list + dose note
+      // "thrips · Maxsea · 1/4 strength" — pest (pest_treated only) + product name + dose
       eventProductLine(ev){
         if(!ev)return'';
+        const pest=ev.pest_id?this.pests.find(x=>x.id===ev.pest_id):null;
         const p=ev.product_id?this.products.find(x=>x.id===ev.product_id):null;
-        return [p&&p.name, ev.dose_note].filter(Boolean).join(' · ');
+        return [pest&&pest.name, p&&p.name, ev.dose_note].filter(Boolean).join(' · ');
+      },
+      /* ---- pest list (mirrors the product list; shown only on pest_treated events) ---- */
+      loadPests(){
+        if(this._pestsLoad)return this._pestsLoad;
+        this._pestsLoad=(async()=>{
+          try{
+            const {data,error}=await sb.from('pest').select('id,name').order('name');
+            if(error)throw error;
+            this.pests=data||[];
+            await this.ensureSeedPests();
+          }catch(e){ /* table may not exist yet — picker just stays empty */ this.pests=this.pests||[]; }
+        })();
+        return this._pestsLoad;
+      },
+      async ensureSeedPests(){
+        if(this.pests.length)return;
+        const key='seededPests:'+this.userId;
+        if(localStorage.getItem(key))return;
+        const defaults=['Aphids','Thrips','Mealybugs','Fungus gnats','Scale','Spider mites','Slugs & snails','Botrytis (grey mould)'];
+        try{
+          const rows=defaults.map(name=>({name,user_id:this.userId}));
+          const {data,error}=await sb.from('pest').insert(rows).select('id,name');
+          if(!error&&data)this.pests=data.sort((a,b)=>a.name.localeCompare(b.name));
+          localStorage.setItem(key,'1');
+        }catch(e){/* ignore — user can add pests manually */}
+      },
+      pestOptions(){ return [...this.pests].sort((a,b)=>a.name.localeCompare(b.name)); },
+      startAddPest(){ this.addingPest=true; this.newPestName=''; },
+      cancelAddPest(){ this.addingPest=false; this.newPestName=''; },
+      async confirmAddPest(target){
+        const name=(this.newPestName||'').trim(); if(!name){this.cancelAddPest();return;}
+        try{
+          const {data,error}=await sb.from('pest').insert({name,user_id:this.userId}).select('id,name').single();
+          if(error)throw error;
+          this.pests.push(data);
+          if(target==='quick')this.quickLog.pestId=data.id; else this.newEvent.pestId=data.id;
+        }catch(e){/* likely a duplicate — ignore */}
+        this.cancelAddPest();
       },
 
       /* ---- quick log (from Journal tab FAB) ---- */
       openQuickLog(){
-        this.quickLog={plantId:'',plantName:'',q:'',type:'note',date:todayLocal(),note:'',productId:'',doseNote:''};
-        this.quickLogError=''; this.addingProduct=false; this.quickLogOpen=true;
+        this.quickLog={plantId:'',plantName:'',q:'',type:'note',date:todayLocal(),note:'',productId:'',doseNote:'',pestId:''};
+        this.quickLogError=''; this.addingProduct=false; this.addingPest=false; this.quickLogOpen=true;
         this.$nextTick(()=>{ const el=this.$refs.quickLogSearch; if(el)el.focus(); });
       },
       closeQuickLog(){ this.quickLogOpen=false; },
@@ -2857,6 +2954,7 @@
             if(this.quickLog.productId)row.product_id=this.quickLog.productId;
             if((this.quickLog.doseNote||'').trim())row.dose_note=this.quickLog.doseNote.trim();
           }
+          if(this.quickLog.type==='pest_treated'&&this.quickLog.pestId)row.pest_id=this.quickLog.pestId;
           const {error}=await sb.from('journal_entry').insert(row);
           if(error)throw error;
           this.closeQuickLog();
