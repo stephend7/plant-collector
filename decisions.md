@@ -4,6 +4,41 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-24 — Tap-to-edit info tiles (Quantity / Status / Growing spot) (Lite)
+
+Next item after the species trio. The three detail-page info tiles became **tappable** (faint ✎ on
+each) → an inline editor drops below the tile row with Save/Cancel:
+- **Quantity** → number → `plant.quantity`.
+- **Status** → picker; **Dead** reveals a cause field; saving writes the status AND **logs the dated
+  journal event** (died/sold/traded/given_away, or a "Returned to collection" note) with the cause.
+- **Growing spot** → pick existing or **＋ New** (inline add) → `plant.growing_location_id`.
+
+**Key safety decision (addresses Stephen's "could this create a bigger problem?"):** the status →
+journal-event logic was **extracted into ONE shared helper `logStatusChange(id,old,new,cause)`** used by
+*both* `savePlant`'s Edit path and the new Status tile. The status→event-type map now exists **exactly
+once** (verified), so the quick tile edit and the full Edit form can never drift — no risk of a status
+change that silently skips its history event or cause-of-death. Considered bundling this with #5b;
+deliberately kept it a **separate change** (different surface = detail page; Status carries real logic).
+
+Build `x → y`, committed + pushed (db01aa0). **Lite security:** every tile writes via an RLS-scoped
+`plant` update on the owner's row; the status event reuses the RLS-guarded `logEvent`; `＋ New` location
+inserts a `growing_location` (RLS owner). No new surface.
+
+**Verified live END-TO-END** (Chrome, `test@test.com`, build `y`, on a throwaway plant): real tile
+clicks open the editor and the real Save fires. **(1) Quantity** 1→3, persists. **(2) Status→Dead +
+"Crown rot"** → status='dead' AND a `died` event dated today **with cause "Crown rot"** logged; list
+badge updated. **(3) Status→In collection** → "Returned to collection" note logged. **(4) Growing spot
+＋ New "TestShelf"** → location created, selected, saved to the plant. **(5) Regression:** changing
+status via the **full Edit form** still logs (a `sold` event) — proves the shared-helper refactor didn't
+break the existing path. **Reload confirmed DB persistence** (qty 3 / status sold / spot TestShelf).
+Throwaway plant (+ its 4 events) and the test location deleted → account back to baseline. Inline JS
+parse-checked in JavaScriptCore.
+
+**Backlog now:** species **#5c merge** (optional) and the various Journal-tab / inventory-mode /
+Settings items in [[ui-polish-backlog]] remain. NEXT = Stephen's pick.
+
+---
+
 ## 2026-06-24 — Species cleanup: delete an unused species (#5b) (Lite)
 
 Follow-on to #5a rename, chosen by Stephen ("finish the species story"). A red **🗑 Delete** button
