@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-26a">
+<meta name="app-build" content="2026-06-26b">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -183,7 +183,7 @@
   .itile.sel{outline:2px solid var(--pine-2);outline-offset:-1px}
   .itile .il{font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
   .itile .iv{font-size:13px;margin-top:2px}
-  .itile .iv.empty{color:var(--muted)}
+  .itile .iv.unset{color:var(--muted)}
   .care-drop{width:15px;height:15px;flex:0 0 auto}
   .photos-head{display:flex;align-items:center;justify-content:space-between;margin:16px 0 0}
   .photos-head h3{font-size:15px;margin:0;font-weight:500}
@@ -600,7 +600,7 @@
             </div>
             <div class="itile" :class="tileEdit==='spot'?'sel':''" @click="startTileEdit('spot')">
               <div class="il">Growing spot <span style="opacity:.45">✎</span></div>
-              <div class="iv" :class="detailPlant.growing_location?'':'empty'" x-text="detailPlant.growing_location ? detailPlant.growing_location.name : 'Not set'"></div>
+              <div class="iv" :class="detailPlant.growing_location?'':'unset'" x-text="detailPlant.growing_location ? detailPlant.growing_location.name : 'Not set'"></div>
             </div>
           </div>
           <div class="evform" x-show="tileEdit" x-transition style="margin-bottom:12px">
