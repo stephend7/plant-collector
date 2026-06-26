@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-23v">
+<meta name="app-build" content="2026-06-23w">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -400,13 +400,14 @@
           <label>Species *</label>
           <div class="pickrow">
             <div>
-              <select x-model="form.speciesId" :disabled="!form.genusId || adding.species || renaming.species">
+              <select x-model="form.speciesId" @change="cancelDeleteSpecies()" :disabled="!form.genusId || adding.species || renaming.species || confirmDelSpecies || !!delSpeciesBlockMsg">
                 <option value="" x-text="form.genusId?'— choose species —':'pick a genus first'"></option>
                 <template x-for="s in speciesOptions()" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
               </select>
             </div>
-            <button type="button" class="mini" @click="startAdd('species')" x-show="!adding.species && !renaming.species" :disabled="!form.genusId">＋ New</button>
-            <button type="button" class="mini" @click="startRename('species')" x-show="form.speciesId && !adding.species && !renaming.species" title="Rename this species" aria-label="Rename this species">✎ Rename</button>
+            <button type="button" class="mini" @click="startAdd('species')" x-show="!adding.species && !renaming.species && !confirmDelSpecies && !delSpeciesBlockMsg" :disabled="!form.genusId">＋ New</button>
+            <button type="button" class="mini" @click="startRename('species')" x-show="form.speciesId && !adding.species && !renaming.species && !confirmDelSpecies && !delSpeciesBlockMsg" title="Rename this species" aria-label="Rename this species">✎ Rename</button>
+            <button type="button" class="mini" @click="askDeleteSpecies()" x-show="form.speciesId && !adding.species && !renaming.species && !confirmDelSpecies && !delSpeciesBlockMsg" style="color:var(--danger);border-color:#E2B8B4" title="Delete this species" aria-label="Delete this species">🗑 Delete</button>
           </div>
           <div class="addbox" x-show="adding.species" x-transition>
             <input type="text" placeholder="New species (e.g. prolifera, 'Razzberry Blonde')" x-model="newName.species" @keydown.enter.prevent="confirmAdd('species')" x-ref="addspecies">
@@ -417,6 +418,13 @@
             <input type="text" placeholder="Rename species" x-model="renameName.species" @keydown.enter.prevent="confirmRename('species')" x-ref="renamespecies">
             <button type="button" class="ok" @click="confirmRename('species')">Save</button>
             <button type="button" class="no" @click="cancelRename('species')">✕</button>
+          </div>
+          <div class="addbox" x-show="confirmDelSpecies || delSpeciesBlockMsg" x-transition style="flex-wrap:wrap;align-items:center">
+            <span x-show="confirmDelSpecies" style="font-size:14px">Delete this species? Can’t be undone.</span>
+            <button type="button" class="ok" style="background:var(--danger)" x-show="confirmDelSpecies" @click="confirmDeleteSpecies()">Delete</button>
+            <button type="button" class="no" x-show="confirmDelSpecies" @click="cancelDeleteSpecies()">Cancel</button>
+            <span x-show="delSpeciesBlockMsg" style="font-size:14px;color:var(--danger)" x-text="delSpeciesBlockMsg"></span>
+            <button type="button" class="no" x-show="delSpeciesBlockMsg" @click="cancelDeleteSpecies()">OK</button>
           </div>
         </div>
       </div>
@@ -1800,6 +1808,7 @@
       newName:{genus:'',species:'',vendor:'',location:'',category:''},
       renaming:{genus:false,species:false,vendor:false,location:false,category:false},
       renameName:{genus:'',species:'',vendor:'',location:'',category:''},
+      confirmDelSpecies:false, delSpeciesBlockMsg:'',
       form:{genusId:'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:'',acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]},
 
       /* ---- spreadsheet import ---- */
@@ -1935,7 +1944,7 @@
         const i=list.findIndex(s=>s.id===this.lastSpeciesId); if(i>0){const[x]=list.splice(i,1);list.unshift(x);}
         return list;
       },
-      onGenusChange(){this.form.speciesId='';this.cancelRename('species');},
+      onGenusChange(){this.form.speciesId='';this.cancelRename('species');this.cancelDeleteSpecies();},
 
       /* ---- inline add ---- */
       startAdd(kind){this.adding[kind]=true;this.renaming[kind]=false;this.newName[kind]='';this.$nextTick(()=>{const r=this.$refs['add'+kind];if(r)r.focus();});},
@@ -1987,6 +1996,33 @@
           }
           this.cancelRename(kind);
         }catch(e){this.formError=(e.message||'Could not rename')+' — that name may already exist in this genus.';}
+      },
+      // ---- delete a species, but ONLY when no plant uses it ----
+      // The DB enforces this too (plant.species_id ... on delete restrict); the client
+      // count just lets us block with a helpful message before attempting, and the catch
+      // is a backstop if a plant we didn't have loaded references it.
+      askDeleteSpecies(){
+        const sid=this.form.speciesId; if(!sid)return;
+        this.confirmDelSpecies=false; this.delSpeciesBlockMsg='';
+        const inUse=this.plants.filter(p=>p.species_id===sid).length;
+        if(inUse>0){ this.delSpeciesBlockMsg=inUse+' plant'+(inUse===1?'':'s')+' use this species — rename it instead.'; return; }
+        this.confirmDelSpecies=true;
+      },
+      cancelDeleteSpecies(){this.confirmDelSpecies=false;this.delSpeciesBlockMsg='';},
+      async confirmDeleteSpecies(){
+        const sid=this.form.speciesId; if(!sid)return;
+        try{
+          const {error}=await sb.from('species').delete().eq('id',sid);
+          if(error)throw error;
+          const i=this.speciesAll.findIndex(s=>s.id===sid); if(i>=0)this.speciesAll.splice(i,1);
+          if(this.lastSpeciesId===sid){this.lastSpeciesId='';try{localStorage.removeItem('lastSpeciesId');}catch(e){}}
+          this.form.speciesId=''; this.confirmDelSpecies=false; this.delSpeciesBlockMsg='';
+        }catch(e){
+          this.confirmDelSpecies=false;
+          this.delSpeciesBlockMsg=/foreign key|violat|referenced/i.test(e.message||'')
+            ? 'A plant uses this species — rename it instead.'
+            : (e.message||'Could not delete this species.');
+        }
       },
 
       /* ---- photos in the add form ---- */
@@ -2144,6 +2180,7 @@
         this.formError=''; this.detectedNote=''; this.clearPendingPhotos();
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
         Object.keys(this.renaming).forEach(k=>this.renaming[k]=false);
+        this.confirmDelSpecies=false; this.delSpeciesBlockMsg='';
         this.form={genusId:this.lastGenusId||'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:todayLocal(),acquisitionType:this.lastAcquisitionType||'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]};
       },
       formRow(){
@@ -2374,6 +2411,7 @@
         const p=this.detailPlant; this.editId=p.id; this.formError=''; this.clearPendingPhotos();
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
         Object.keys(this.renaming).forEach(k=>this.renaming[k]=false);
+        this.confirmDelSpecies=false; this.delSpeciesBlockMsg='';
         this.form={
           genusId:p.species&&p.species.genus?p.species.genus.id:'',
           speciesId:p.species?p.species.id:'',
