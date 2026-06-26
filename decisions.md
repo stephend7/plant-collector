@@ -4,6 +4,39 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-24 — Species cleanup: delete an unused species (#5b) (Lite)
+
+Follow-on to #5a rename, chosen by Stephen ("finish the species story"). A red **🗑 Delete** button
+next to ✎ Rename (shown when a species is selected). Deliberately **safe-by-construction**:
+- **In use → refused**, with a count: "N plants use this species — rename it instead" (singular/plural
+  agreement). No delete.
+- **Unused → inline confirm** ("Delete this species? Can't be undone. [Delete] [Cancel]") → removes the
+  one species row (its care fields + cascaded `care_guide_entry` go with it) and clears the selection.
+- **Two backstops:** the client in-use count (over `plant.species_id`) AND the DB's
+  `plant.species_id … on delete restrict` — the latter caught and shown gently if a plant wasn't
+  loaded. RLS scopes the delete to the owner's species. Lite — no new surface.
+
+Considered bundling the **tap-to-edit info tiles** in; deliberately kept separate (different surface =
+detail page; the Status tile carries real event-log + cause-of-death logic that deserves its own pass).
+
+Build `v → w`; then `w → x` for a grammar fix caught in verification ("1 plant **uses**", not "use").
+Committed + pushed (4b3cacc, e96878d).
+
+**Verified live END-TO-END** (Chrome, `test@test.com`, build `w`): **(A) in-use blocked** — selecting
+*Drosera spatulata* (used by the one plant) → Delete → "1 plant uses this species — rename it instead",
+not deleted; **(B) unused deleted** — created a throwaway species, Delete → confirm → removed from the
+list + selection cleared, and a **full reload confirmed it's gone from the DB** while *spatulata*
+survived and plant count stayed 1 (net-zero, account clean). The Delete button's `@click` binding fires
+its handler (confirmed via a real DOM click; synthetic-mouse misses were an automation coordinate quirk).
+Inline JS parse-checked in JavaScriptCore.
+
+**Species trio status:** **#5a rename** ✅ + **#5b delete-unused** ✅ done & verified; **#5c merge**
+remains the optional later follow-on. NEXT (Stephen's pick): **tap-to-edit info tiles** (Quantity /
+Status / Growing spot) — its own change; the Status tile needs care (must log the status event +
+capture cause-of-death like `savePlant` does).
+
+---
+
 ## 2026-06-24 — Scanner/entry backlog COMPLETE: #4 verified live on device
 
 Stephen redeployed the `scan-tag` Edge Function and re-scanned a real tag — **"#4 worked well"**: the
