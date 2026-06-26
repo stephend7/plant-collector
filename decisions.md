@@ -4,6 +4,34 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-26 — Fixes round (Stephen on-device). Fix #2: restore the detail-page info-tile boxes
+
+Stephen is gathering a list of UI fixes (handled one at a time). **Fix #1** (the species row's
+＋New/Rename/Delete buttons crowd out the name — long hybrids truncate to "martin…") was **tabled**
+for him to think about; I mocked up the recommended "Option A" (full-width dropdown + ＋New, with
+Rename/Delete behind a small "Edit this species" link; Delete inside that panel, in red). Decision
+pending.
+
+**Fix #2 (DONE + verified):** the Quantity/Status/Growing-spot boxes had flattened to plain text — a
+**regression from the tap-to-edit tiles change**. Root cause: each tile carried a static `style`
+(box bg/border/radius) AND a dynamic `:style` for the tap highlight, and Alpine's `:style` clobbered
+the static box style. Fix: moved the box look into a **`.itile` CSS class** and switched the highlight
+to a class toggle (**`.itile.sel`**), removing the inline `style`/`:style` conflict (build `…z →
+2026-06-26a`). **Second bug caught in live verification:** the muted "Not set" value used class
+`empty`, which collided with the global `.empty` empty-state rule (dashed box + 30px padding + 34px
+margin) → tall, boxed text, and `align-items:stretch` stretched all three tiles. Renamed the class to
+`.unset` (build `a → 2026-06-26b`). Committed + pushed (e0137ee, 7675e13).
+
+**Verified live** (Chrome, `test@test.com`, build `2026-06-26b`): tiles render as 3 uniform 55px boxes
+with bg/border/10px radius, "Not set" muted with no dashed border; tap-to-edit still opens the editor,
+the `.sel` highlight applies on the active tile and clears on cancel. No data touched. Lesson: **don't
+mix a static `style` with a dynamic `:style` on the same element** (Alpine clobbers it — use a class),
+and **avoid bare utility class names** like `empty` that collide with global rules.
+
+**Build-marker note:** the `2026-06-23x/y/z` run hit the end of the alphabet; rolled to `2026-06-26a/b`.
+
+---
+
 ## 2026-06-24 — Pest picker on pest_treated events (migration 006) (Lite)
 
 From [[ui-polish-backlog]] #1. A per-user **pest / disease reference list** + a **single-select pest
