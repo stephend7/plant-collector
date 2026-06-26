@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-26b">
+<meta name="app-build" content="2026-06-26c">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1358,8 +1358,12 @@
               <p style="margin:0 0 6px;font-size:15px;color:var(--ink)">Your journal is empty.</p>
               <p style="margin:0">Tap <strong>＋</strong> to log your first entry, or open any plant and tap <strong>＋ Log event</strong>.</p>
             </div>
+            <div x-show="allEvents.length>0" style="display:flex;gap:8px;margin-top:12px">
+              <input type="search" x-model="journalSearch" placeholder="Search notes & plant names" style="flex:1">
+              <span class="fsel" style="flex:0 0 auto"><select x-model="journalTypeFilter"><option value="">All types</option><template x-for="t in journalEventTypes()" :key="t"><option :value="t" x-text="eventTypeLabel(t)"></option></template></select></span>
+            </div>
             <div style="margin-top:6px">
-              <template x-for="e in allEvents" :key="e.id">
+              <template x-for="e in filteredEvents()" :key="e.id">
                 <div class="jrow" @click="openJournalEntry('event', e.id, e.plant_id)">
                   <div class="jicon" x-html="eventIconSvg(e.event_type)"></div>
                   <div class="jmid">
@@ -1375,6 +1379,7 @@
                   </div>
                 </div>
               </template>
+              <p class="hint" x-show="allEvents.length>0 && filteredEvents().length===0" style="margin-top:16px;text-align:center">No entries match.</p>
             </div>
           </div>
         </template>
@@ -1906,7 +1911,7 @@
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',photos:[],existingPhotos:[],removedPhotoIds:[]},
       filterCategoryIds:[],
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatIds:[], listGenusName:'', allEvents:[],
-      journalFilter:'all', allPhotos:[], allPhotosLoaded:false,
+      journalFilter:'all', journalSearch:'', journalTypeFilter:'', allPhotos:[], allPhotosLoaded:false,
       quickLogOpen:false, quickLogBusy:false, quickLogError:'',
       quickLog:{plantId:'',plantName:'',q:'',type:'note',date:'',note:'',productId:'',doseNote:'',pestId:''},
       adding:{genus:false,species:false,vendor:false,location:false,category:false},
@@ -2757,6 +2762,19 @@
         this.allPhotosLoaded=true;
       },
       async setJournalFilter(f){this.journalFilter=f;if(f==='photos'&&!this.allPhotosLoaded)await this.loadAllPhotos();},
+      // Journal tab: search (plant name + note + type + product/pest line) and an event-type filter.
+      journalEventTypes(){ return [...new Set(this.allEvents.map(e=>e.event_type))].sort((a,b)=>this.eventTypeLabel(a).localeCompare(this.eventTypeLabel(b))); },
+      filteredEvents(){
+        const q=(this.journalSearch||'').trim().toLowerCase(); const t=this.journalTypeFilter;
+        return this.allEvents.filter(e=>{
+          if(t && e.event_type!==t) return false;
+          if(q){
+            const hay=((e.plantName||'')+' '+(e.body||'')+' '+this.eventTypeLabel(e.event_type)+' '+this.eventProductLine(e)).toLowerCase();
+            if(!hay.includes(q)) return false;
+          }
+          return true;
+        });
+      },
       fmtDate(d){
         if(!d)return ''; const m=(''+d).split('-'); if(m.length<3)return d;
         const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][(+m[1])-1]||'';
