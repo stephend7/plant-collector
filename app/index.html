@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-27c">
+<meta name="app-build" content="2026-06-27d">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -2105,20 +2105,33 @@
         this.spSearch=''; this.spPanel=true;
         await new Promise(r=>setTimeout(r));
         if(this.$refs.spSearchInput)this.$refs.spSearchInput.focus();
-        // iOS: cap panel height to the visual viewport (shrinks when keyboard appears)
+        // iOS: position sheet above keyboard by adding padding-bottom = keyboard height.
+        // sheet-back uses position:fixed;inset:0 (anchored to layout viewport, extends
+        // behind keyboard). padding-bottom shrinks the flex content area so the sheet
+        // (align-items:flex-end) floats just above the keyboard instead of behind it.
         if(window.visualViewport){
-          const resize=()=>{
+          const update=()=>{
+            const kb=Math.max(0,window.innerHeight-window.visualViewport.height);
+            const back=this.$refs.spSheet?.closest('.sheet-back');
+            if(back) back.style.paddingBottom=kb+'px';
             if(this.$refs.spSheet)
-              this.$refs.spSheet.style.maxHeight=Math.round(window.visualViewport.height*0.88)+'px';
+              this.$refs.spSheet.style.maxHeight=Math.round(window.visualViewport.height*.90)+'px';
           };
-          resize();
-          window.visualViewport.addEventListener('resize',resize);
-          this._spVpCleanup=()=>window.visualViewport.removeEventListener('resize',resize);
+          window.visualViewport.addEventListener('resize',update);
+          window.visualViewport.addEventListener('scroll',update);
+          update();
+          this._spVpCleanup=()=>{
+            window.visualViewport.removeEventListener('resize',update);
+            window.visualViewport.removeEventListener('scroll',update);
+            const back=this.$refs.spSheet?.closest('.sheet-back');
+            if(back) back.style.paddingBottom='';
+            if(this.$refs.spSheet) this.$refs.spSheet.style.maxHeight='';
+          };
         }
       },
       closeSpPanel(){
-        this.spPanel=false;this.spSearch='';
         if(this._spVpCleanup){this._spVpCleanup();this._spVpCleanup=null;}
+        this.spPanel=false;this.spSearch='';
       },
       spFilteredSpecies(){
         const q=(this.spSearch||'').trim().toLowerCase();
