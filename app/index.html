@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-26d">
+<meta name="app-build" content="2026-06-27a">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -184,6 +184,12 @@
   .itile .il{font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
   .itile .iv{font-size:13px;margin-top:2px}
   .itile .iv.unset{color:var(--muted)}
+  .sp-field{width:100%;display:flex;align-items:center;gap:8px;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--field);color:var(--ink);font-size:16px;cursor:pointer;text-align:left;font-family:inherit}
+  .sp-field[disabled]{opacity:.55;cursor:default}
+  .sp-field .sp-val{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:italic}
+  .sp-field .sp-val.unset{font-style:normal;color:var(--muted)}
+  .sp-field .sp-arr{color:var(--muted);flex:0 0 auto;font-size:18px;line-height:1}
+  .sp-edit-link{background:none;border:0;color:var(--pine-2);font-size:12px;cursor:pointer;padding:2px 0;font-family:inherit}
   .care-drop{width:15px;height:15px;flex:0 0 auto}
   .photos-head{display:flex;align-items:center;justify-content:space-between;margin:16px 0 0}
   .photos-head h3{font-size:15px;margin:0;font-weight:500}
@@ -347,7 +353,7 @@
     <!-- entry / edit form -->
     <div class="formwrap" x-show="screen==='form'" x-transition>
       <h2 x-text="editId?'Edit plant':'Add a plant'"></h2>
-      <p class="hint">Pick the genus first, then its species. Use ＋ to add anything that isn't in the list yet.</p>
+      <p class="hint">Pick the genus first, then tap the species field to search or create.</p>
 
       <!-- PHOTOS (only when adding; managed in the detail view when editing) -->
       <div x-show="!editId">
@@ -403,33 +409,63 @@
         </div>
         <div>
           <label>Species *</label>
-          <div class="pickrow">
-            <div>
-              <select x-model="form.speciesId" @change="cancelDeleteSpecies()" :disabled="!form.genusId || adding.species || renaming.species || confirmDelSpecies || !!delSpeciesBlockMsg">
-                <option value="" x-text="form.genusId?'— choose species —':'pick a genus first'"></option>
-                <template x-for="s in speciesOptions()" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
-              </select>
+          <button type="button" class="sp-field" @click="openSpPanel()" :disabled="!form.genusId">
+            <span class="sp-val" :class="form.speciesId?’’:’unset’" x-text="form.speciesId?speciesName(form.speciesId):(form.genusId?’— choose species —‘:’pick a genus first’)"></span>
+            <span class="sp-arr">›</span>
+          </button>
+          <div x-show="form.speciesId && !spEditMode" style="margin-top:5px;text-align:right">
+            <button type="button" class="sp-edit-link" @click="spEditMode=true">✎ Edit this species</button>
+          </div>
+          <div x-show="spEditMode" x-transition>
+            <div class="addbox" x-show="!renaming.species && !confirmDelSpecies && !delSpeciesBlockMsg" style="margin-top:6px">
+              <button type="button" class="mini" @click="startRename(‘species’)">✎ Rename</button>
+              <button type="button" class="mini" @click="askDeleteSpecies()" style="color:var(--danger);border-color:#E2B8B4">🗑 Delete</button>
+              <button type="button" class="no" @click="spEditMode=false" style="margin-left:auto">Done</button>
             </div>
-            <button type="button" class="mini" @click="startAdd('species')" x-show="!adding.species && !renaming.species && !confirmDelSpecies && !delSpeciesBlockMsg" :disabled="!form.genusId">＋ New</button>
-            <button type="button" class="mini" @click="startRename('species')" x-show="form.speciesId && !adding.species && !renaming.species && !confirmDelSpecies && !delSpeciesBlockMsg" title="Rename this species" aria-label="Rename this species">✎ Rename</button>
-            <button type="button" class="mini" @click="askDeleteSpecies()" x-show="form.speciesId && !adding.species && !renaming.species && !confirmDelSpecies && !delSpeciesBlockMsg" style="color:var(--danger);border-color:#E2B8B4" title="Delete this species" aria-label="Delete this species">🗑 Delete</button>
+            <div class="addbox" x-show="renaming.species" x-transition>
+              <input type="text" placeholder="Rename species" x-model="renameName.species" @keydown.enter.prevent="confirmRename(‘species’)" x-ref="renamespecies">
+              <button type="button" class="ok" @click="confirmRename(‘species’)">Save</button>
+              <button type="button" class="no" @click="cancelRename(‘species’)">✕</button>
+            </div>
+            <div class="addbox" x-show="confirmDelSpecies || delSpeciesBlockMsg" x-transition style="flex-wrap:wrap;align-items:center">
+              <span x-show="confirmDelSpecies" style="font-size:14px">Delete this species? Can’t be undone.</span>
+              <button type="button" class="ok" style="background:var(--danger)" x-show="confirmDelSpecies" @click="confirmDeleteSpecies()">Delete</button>
+              <button type="button" class="no" x-show="confirmDelSpecies" @click="cancelDeleteSpecies()">Cancel</button>
+              <span x-show="delSpeciesBlockMsg" style="font-size:14px;color:var(--danger)" x-text="delSpeciesBlockMsg"></span>
+              <button type="button" class="no" x-show="delSpeciesBlockMsg" @click="cancelDeleteSpecies()">OK</button>
+            </div>
           </div>
-          <div class="addbox" x-show="adding.species" x-transition>
-            <input type="text" placeholder="New species (e.g. prolifera, 'Razzberry Blonde')" x-model="newName.species" @keydown.enter.prevent="confirmAdd('species')" x-ref="addspecies">
-            <button type="button" class="ok" @click="confirmAdd('species')">Add</button>
-            <button type="button" class="no" @click="cancelAdd('species')">✕</button>
-          </div>
-          <div class="addbox" x-show="renaming.species" x-transition>
-            <input type="text" placeholder="Rename species" x-model="renameName.species" @keydown.enter.prevent="confirmRename('species')" x-ref="renamespecies">
-            <button type="button" class="ok" @click="confirmRename('species')">Save</button>
-            <button type="button" class="no" @click="cancelRename('species')">✕</button>
-          </div>
-          <div class="addbox" x-show="confirmDelSpecies || delSpeciesBlockMsg" x-transition style="flex-wrap:wrap;align-items:center">
-            <span x-show="confirmDelSpecies" style="font-size:14px">Delete this species? Can’t be undone.</span>
-            <button type="button" class="ok" style="background:var(--danger)" x-show="confirmDelSpecies" @click="confirmDeleteSpecies()">Delete</button>
-            <button type="button" class="no" x-show="confirmDelSpecies" @click="cancelDeleteSpecies()">Cancel</button>
-            <span x-show="delSpeciesBlockMsg" style="font-size:14px;color:var(--danger)" x-text="delSpeciesBlockMsg"></span>
-            <button type="button" class="no" x-show="delSpeciesBlockMsg" @click="cancelDeleteSpecies()">OK</button>
+          <!-- species search panel -->
+          <div class="sheet-back" x-show="spPanel" x-cloak @click.self="closeSpPanel()" style="z-index:65">
+            <div class="sheet" style="max-height:82vh">
+              <div class="sheet-hd" style="border-bottom:1px solid var(--line)">
+                <span class="nm" x-text="genusName(form.genusId)||’Species’"></span>
+                <span style="margin-left:4px;color:var(--muted);font-size:13px;font-style:normal">— species</span>
+                <button class="sheet-x" @click="closeSpPanel()" style="margin-left:auto">✕</button>
+              </div>
+              <div style="padding:10px 16px 6px;flex:0 0 auto">
+                <div class="searchbar" style="margin:0">
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style="flex:0 0 auto;color:var(--muted)"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  <input type="search" x-model="spSearch" placeholder="Search or type a new name…"
+                    x-ref="spSearchInput"
+                    @keydown.enter.prevent="!spHasExactMatch()&&spSearch.trim()&&spCreate()">
+                </div>
+              </div>
+              <div class="sheet-body">
+                <template x-for="s in spFilteredSpecies()" :key="s.id">
+                  <div class="lrow" @click="pickSpecies(s.id)" style="gap:10px">
+                    <span style="font-style:italic;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" x-text="s.name"></span>
+                    <span x-show="s.id===form.speciesId" style="color:var(--pine);flex:0 0 auto">✓</span>
+                  </div>
+                </template>
+                <div class="lrow" x-show="spSearch.trim()&&!spHasExactMatch()" @click="spCreate()" style="color:var(--pine-2);font-weight:600;gap:6px">
+                  ＋ Create "<span style="font-style:italic" x-text="spSearch.trim()"></span>"
+                </div>
+                <div class="hint" x-show="!spSearch.trim()&&spFilteredSpecies().length===0" style="padding:24px 0;text-align:center">
+                  No species for this genus yet.<br>Type a name above to create one.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1920,6 +1956,7 @@
       renaming:{genus:false,species:false,vendor:false,location:false,category:false},
       renameName:{genus:'',species:'',vendor:'',location:'',category:''},
       confirmDelSpecies:false, delSpeciesBlockMsg:'',
+      spPanel:false, spSearch:'', spEditMode:false,
       form:{genusId:'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:'',acquisitionType:'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]},
 
       /* ---- spreadsheet import ---- */
@@ -2056,7 +2093,38 @@
         const i=list.findIndex(s=>s.id===this.lastSpeciesId); if(i>0){const[x]=list.splice(i,1);list.unshift(x);}
         return list;
       },
-      onGenusChange(){this.form.speciesId='';this.cancelRename('species');this.cancelDeleteSpecies();},
+      onGenusChange(){this.form.speciesId='';this.cancelRename('species');this.cancelDeleteSpecies();this.spPanel=false;this.spSearch='';this.spEditMode=false;},
+
+      speciesName(id){const s=this.speciesAll.find(s=>s.id===id);return s?s.name:'';},
+      genusName(id){const g=this.genera.find(g=>g.id===id);return g?g.name:'';},
+      async openSpPanel(){
+        if(!this.form.genusId)return;
+        this.spSearch=''; this.spPanel=true;
+        await new Promise(r=>setTimeout(r));
+        if(this.$refs.spSearchInput)this.$refs.spSearchInput.focus();
+      },
+      closeSpPanel(){this.spPanel=false;this.spSearch='';},
+      spFilteredSpecies(){
+        const q=(this.spSearch||'').trim().toLowerCase();
+        const list=this.speciesOptions();
+        return q?list.filter(s=>s.name.toLowerCase().includes(q)):list;
+      },
+      spHasExactMatch(){
+        const q=(this.spSearch||'').trim().toLowerCase();
+        return !!q&&this.speciesOptions().some(s=>s.name.toLowerCase()===q);
+      },
+      pickSpecies(id){this.form.speciesId=id;this.closeSpPanel();this.spEditMode=false;},
+      async spCreate(){
+        const name=(this.spSearch||'').trim();
+        if(!name||!this.form.genusId)return;
+        try{
+          const{data,error}=await sb.from('species').insert({name,genus_id:this.form.genusId}).select('id,name,genus_id').single();
+          if(error)throw error;
+          this.speciesAll.push(data);
+          this.form.speciesId=data.id;
+          this.closeSpPanel();
+        }catch(e){this.closeSpPanel();this.formError=(e.message||'Could not add species')+' — it may already exist.';}
+      },
 
       /* ---- inline add ---- */
       startAdd(kind){this.adding[kind]=true;this.renaming[kind]=false;this.newName[kind]='';this.$nextTick(()=>{const r=this.$refs['add'+kind];if(r)r.focus();});},
@@ -2293,6 +2361,7 @@
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
         Object.keys(this.renaming).forEach(k=>this.renaming[k]=false);
         this.confirmDelSpecies=false; this.delSpeciesBlockMsg='';
+        this.spPanel=false; this.spSearch=''; this.spEditMode=false;
         this.form={genusId:this.lastGenusId||'',speciesId:'',formDescriptor:'',vendorId:'',growingLocationId:'',acquisitionDate:todayLocal(),acquisitionType:this.lastAcquisitionType||'',quantity:1,price:'',accessionId:'',sourceUrl:'',locationData:'',lifecycleStatus:'in_collection',notes:'',cause:'',categoryIds:[]};
       },
       formRow(){
@@ -2584,6 +2653,7 @@
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
         Object.keys(this.renaming).forEach(k=>this.renaming[k]=false);
         this.confirmDelSpecies=false; this.delSpeciesBlockMsg='';
+        this.spPanel=false; this.spSearch=''; this.spEditMode=false;
         this.form={
           genusId:p.species&&p.species.genus?p.species.genus.id:'',
           speciesId:p.species?p.species.id:'',
