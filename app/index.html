@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-27a">
+<meta name="app-build" content="2026-06-27b">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -2196,7 +2196,7 @@
           if(error)throw error;
           const i=this.speciesAll.findIndex(s=>s.id===sid); if(i>=0)this.speciesAll.splice(i,1);
           if(this.lastSpeciesId===sid){this.lastSpeciesId='';try{localStorage.removeItem('lastSpeciesId');}catch(e){}}
-          this.form.speciesId=''; this.confirmDelSpecies=false; this.delSpeciesBlockMsg='';
+          this.form.speciesId=''; this.confirmDelSpecies=false; this.delSpeciesBlockMsg=''; this.spEditMode=false;
         }catch(e){
           this.confirmDelSpecies=false;
           this.delSpeciesBlockMsg=/foreign key|violat|referenced/i.test(e.message||'')
