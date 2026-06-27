@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-27b">
+<meta name="app-build" content="2026-06-27c">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -433,38 +433,6 @@
               <button type="button" class="no" x-show="confirmDelSpecies" @click="cancelDeleteSpecies()">Cancel</button>
               <span x-show="delSpeciesBlockMsg" style="font-size:14px;color:var(--danger)" x-text="delSpeciesBlockMsg"></span>
               <button type="button" class="no" x-show="delSpeciesBlockMsg" @click="cancelDeleteSpecies()">OK</button>
-            </div>
-          </div>
-          <!-- species search panel -->
-          <div class="sheet-back" x-show="spPanel" x-cloak @click.self="closeSpPanel()" style="z-index:65">
-            <div class="sheet" style="max-height:82vh">
-              <div class="sheet-hd" style="border-bottom:1px solid var(--line)">
-                <span class="nm" x-text="genusName(form.genusId)||’Species’"></span>
-                <span style="margin-left:4px;color:var(--muted);font-size:13px;font-style:normal">— species</span>
-                <button class="sheet-x" @click="closeSpPanel()" style="margin-left:auto">✕</button>
-              </div>
-              <div style="padding:10px 16px 6px;flex:0 0 auto">
-                <div class="searchbar" style="margin:0">
-                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style="flex:0 0 auto;color:var(--muted)"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                  <input type="search" x-model="spSearch" placeholder="Search or type a new name…"
-                    x-ref="spSearchInput"
-                    @keydown.enter.prevent="!spHasExactMatch()&&spSearch.trim()&&spCreate()">
-                </div>
-              </div>
-              <div class="sheet-body">
-                <template x-for="s in spFilteredSpecies()" :key="s.id">
-                  <div class="lrow" @click="pickSpecies(s.id)" style="gap:10px">
-                    <span style="font-style:italic;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" x-text="s.name"></span>
-                    <span x-show="s.id===form.speciesId" style="color:var(--pine);flex:0 0 auto">✓</span>
-                  </div>
-                </template>
-                <div class="lrow" x-show="spSearch.trim()&&!spHasExactMatch()" @click="spCreate()" style="color:var(--pine-2);font-weight:600;gap:6px">
-                  ＋ Create "<span style="font-style:italic" x-text="spSearch.trim()"></span>"
-                </div>
-                <div class="hint" x-show="!spSearch.trim()&&spFilteredSpecies().length===0" style="padding:24px 0;text-align:center">
-                  No species for this genus yet.<br>Type a name above to create one.
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -1255,6 +1223,41 @@
         <div class="sheet-acts" x-show="quickLog.plantId">
           <button class="go" @click="saveQuickLog()" :disabled="quickLogBusy" x-text="quickLogBusy?'Saving…':'Save entry'"></button>
           <button @click="closeQuickLog()" :disabled="quickLogBusy">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SPECIES SEARCH PANEL ===== -->
+    <!-- Lives at app root (outside the form) so iOS does NOT show the form ^ v ✓ nav bar -->
+    <div class="sheet-back" x-show="spPanel" x-cloak @click.self="closeSpPanel()" style="z-index:65">
+      <div class="sheet" x-ref="spSheet" style="max-height:82vh">
+        <div class="sheet-hd" style="border-bottom:1px solid var(--line)">
+          <span class="nm" x-text="genusName(form.genusId)||'Species'"></span>
+          <span style="margin-left:4px;color:var(--muted);font-size:13px;font-style:normal">— species</span>
+          <button class="sheet-x" @click="closeSpPanel()" style="margin-left:auto">✕</button>
+        </div>
+        <div style="padding:10px 16px 6px;flex:0 0 auto">
+          <div class="searchbar" style="margin:0">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style="flex:0 0 auto;color:var(--muted)"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input type="search" x-model="spSearch" placeholder="Search or type a new name…"
+              x-ref="spSearchInput"
+              autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+              @keydown.enter.prevent="!spHasExactMatch()&&spSearch.trim()&&spCreate()">
+          </div>
+        </div>
+        <div class="sheet-body">
+          <template x-for="s in spFilteredSpecies()" :key="s.id">
+            <div class="lrow" @click="pickSpecies(s.id)" style="gap:10px">
+              <span style="font-style:italic;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" x-text="s.name"></span>
+              <span x-show="s.id===form.speciesId" style="color:var(--pine);flex:0 0 auto">✓</span>
+            </div>
+          </template>
+          <div class="lrow" x-show="spSearch.trim()&&!spHasExactMatch()" @click="spCreate()" style="color:var(--pine-2);font-weight:600;gap:6px">
+            ＋ Create "<span style="font-style:italic" x-text="spSearch.trim()"></span>"
+          </div>
+          <div class="hint" x-show="!spSearch.trim()&&spFilteredSpecies().length===0" style="padding:24px 0;text-align:center">
+            No species for this genus yet.<br>Type a name above to create one.
+          </div>
         </div>
       </div>
     </div>
@@ -2102,8 +2105,21 @@
         this.spSearch=''; this.spPanel=true;
         await new Promise(r=>setTimeout(r));
         if(this.$refs.spSearchInput)this.$refs.spSearchInput.focus();
+        // iOS: cap panel height to the visual viewport (shrinks when keyboard appears)
+        if(window.visualViewport){
+          const resize=()=>{
+            if(this.$refs.spSheet)
+              this.$refs.spSheet.style.maxHeight=Math.round(window.visualViewport.height*0.88)+'px';
+          };
+          resize();
+          window.visualViewport.addEventListener('resize',resize);
+          this._spVpCleanup=()=>window.visualViewport.removeEventListener('resize',resize);
+        }
       },
-      closeSpPanel(){this.spPanel=false;this.spSearch='';},
+      closeSpPanel(){
+        this.spPanel=false;this.spSearch='';
+        if(this._spVpCleanup){this._spVpCleanup();this._spVpCleanup=null;}
+      },
       spFilteredSpecies(){
         const q=(this.spSearch||'').trim().toLowerCase();
         const list=this.speciesOptions();
