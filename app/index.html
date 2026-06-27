@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-27d">
+<meta name="app-build" content="2026-06-27e">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1243,6 +1243,10 @@
               x-ref="spSearchInput"
               autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
               @keydown.enter.prevent="!spHasExactMatch()&&spSearch.trim()&&spCreate()">
+            <button type="button" x-show="spSearch.trim()&&!spHasExactMatch()" @click="spCreate()"
+              style="flex:0 0 auto;background:var(--pine);color:#fff;border:0;border-radius:8px;padding:5px 11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">
+              ＋ New
+            </button>
           </div>
         </div>
         <div class="sheet-body">
@@ -1252,9 +1256,6 @@
               <span x-show="s.id===form.speciesId" style="color:var(--pine);flex:0 0 auto">✓</span>
             </div>
           </template>
-          <div class="lrow" x-show="spSearch.trim()&&!spHasExactMatch()" @click="spCreate()" style="color:var(--pine-2);font-weight:600;gap:6px">
-            ＋ Create "<span style="font-style:italic" x-text="spSearch.trim()"></span>"
-          </div>
           <div class="hint" x-show="!spSearch.trim()&&spFilteredSpecies().length===0" style="padding:24px 0;text-align:center">
             No species for this genus yet.<br>Type a name above to create one.
           </div>
