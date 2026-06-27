@@ -4,6 +4,53 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-27 — Species search-panel picker BUILT (builds a + b)
+
+Replaces the native species `<select>` and the crowded ＋New / ✎Rename / 🗑Delete button row with a
+**tappable field** + **search-panel overlay**. Solves Fix #1 (button crowding) and the hand-entry
+UX problem in one change. Lite tier — no migration, no new RLS surface; `spCreate()` is a direct
+mirror of the original `confirmAdd('species')` insert path (owner-scoped, same FK + constraint
+coverage). Build **2026-06-27a** (feature) + **2026-06-27b** (spEditMode reset on delete).
+Commits: `cc1238c`, `b1b7c8f`.
+
+**What was built:**
+- Species field → full-width `<button class="sp-field">` showing selected name (italic) or a prompt
+  ("— choose species —" / "pick a genus first") — both driven by `speciesName()` + Alpine `:class`.
+- Tapping opens a `sheet-back` overlay (same CSS + z-index pattern as all other sheets, z-index:65
+  to clear the quick-log sheet at 60). Genus name shown as panel title scope context.
+- **Autofocused search input** (`$refs.spSearchInput`, `setTimeout` yield per playbook rule).
+- **`spFilteredSpecies()`** — substring filter over `speciesOptions()` (genus-scoped + last-picked-
+  first ordering preserved); empty query = full ordered list.
+- **`＋ Create "..."` row** appears when `spSearch.trim()` is non-empty and `!spHasExactMatch()`.
+  Tapping calls `spCreate()` → owner-scoped insert → pushes to `speciesAll`, sets `form.speciesId`,
+  closes panel. Exact-match guard prevents accidental duplicates.
+- **"✎ Edit this species" link** (visible only when species selected + `!spEditMode`) → toggles
+  `spEditMode` to reveal Rename + Delete buttons in an inline box. "Done" button collapses it.
+  Rename/Delete reuse **existing `startRename` / `confirmRename` / `askDeleteSpecies` /
+  `confirmDeleteSpecies`** functions unchanged — no new CRUD logic.
+- `onGenusChange`, `resetForm`, `editPlant` all reset `spPanel / spSearch / spEditMode`.
+- `confirmDeleteSpecies` now also resets `spEditMode` (build b fix: edit section was lingering
+  with no species selected after delete).
+- **`applyDetection` and `applyTagScan` unaffected** — they set `form.speciesId` directly after
+  pushing the new species to `speciesAll`; the tappable field reads `speciesName(form.speciesId)`
+  reactively, so the scan pre-fill just appears in the field without opening the panel (the panel
+  is the manual/correction path). The `await new Promise(r=>setTimeout(r))` yield kept as-is.
+
+**Verified Chrome END-TO-END** (`test@test.com`, build `b`):
+- Field renders as button (no old `<select>` in DOM) ✓
+- Panel opens on tap, shows 4 Pinguicula species ✓
+- Filter "spat" → 0 matches + ＋ Create "spat" row (no false Pinguicula match) ✓
+- Tap "gigantea" → panel closes, `speciesId` set, field shows "gigantea", Edit link appears ✓
+- Open panel → type "test-picker-sp" (no match) → Create → species in DB + `speciesAll`, field
+  shows name, panel closed ✓
+- Edit → Delete → Confirm → species removed from DB + `speciesAll`, field resets to "— choose
+  species —", `spEditMode` resets to false ✓
+
+**Still needs Stephen's iPhone pass (WebKit gate per Conditions for Builder):** keyboard raise +
+panel scroll, focus behavior, tap-target comfort, iOS-specific rendering. Chrome = Blink only.
+
+---
+
 ## 2026-06-26 — PLAN: searchable species picker (replaces the species dropdown + button row)
 
 > Architecture locked on **Opus 4.8**; **build on Sonnet 4.6**. Stephen approved the direction
