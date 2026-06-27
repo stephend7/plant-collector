@@ -4,6 +4,64 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-26 — PLAN: searchable species picker (replaces the species dropdown + button row)
+
+> Architecture locked on **Opus 4.8**; **build on Sonnet 4.6**. Stephen approved the direction
+> 2026-06-26. **Not built yet.**
+
+**Decision.** Replace the native species `<select>` and its crowded ＋New / ✎Rename / 🗑Delete button
+row with a **search-panel picker**. Solves two issues at once: (a) the tabled Fix #1 — three buttons
+crowd out the (often long, hybrid) species name, truncating it to "martin…"; (b) the on-device finding —
+a native dropdown is unusable for a long, growing species list with no type-to-filter, especially for
+**hand entry or when the tag-reader misses the species**. Chose a **focused search panel/sheet** over an
+inline dropdown for **iOS reliability** + finger-friendliness on big lists. Genus stays as-is for now
+(shorter list); the same picker can follow if Stephen likes it.
+
+**Design.**
+- The species field on the add/edit form becomes a **tappable field** showing the selected species (or
+  "— choose species —" / "pick a genus first"). Full-width. The ＋New / Rename / Delete buttons leave the
+  row.
+- Tapping opens a **search panel** (reuse the app's existing focused-sheet/overlay pattern — already
+  iOS-tested):
+  - Shows the current genus as scope context.
+  - Autofocused search input; **case-insensitive SUBSTRING** match over the species name (matches
+    anywhere → "lau" finds "martinezii × laueana").
+  - Scrollable filtered list; empty-query order = existing `speciesOptions()` (last-picked
+    `lastSpeciesId` pinned, then alphabetical).
+  - No exact (case-insensitive) match for the typed text → a **"＋ Create species '<typed>'"** row →
+    creates under the current genus + selects. **This replaces the ＋New button.**
+  - Tap a row → sets `form.speciesId`, closes the panel.
+- Below the field: a small **"✎ Edit this species"** link (only when a species is selected) → reveals the
+  EXISTING inline Rename + Delete UI (Delete red, inside), incl. the in-use guard ("N plants use this
+  species — rename it instead").
+
+**Conditions for Builder (Sonnet 4.6):**
+1. **iPhone is the gate.** Custom picker → verify on Stephen's iPhone (keyboard, panel scroll, focus, tap
+   targets), not just Chrome. Reuse the existing `.sheet`/quick-log overlay markup; avoid fragile absolute
+   positioning. Heed prior iOS bugs: stacking context from `-webkit-overflow-scrolling`, and native-select
+   render races → use the macrotask yield `await new Promise(r=>setTimeout(r))`, not `$nextTick`.
+2. **Reuse existing CRUD — do not reinvent:** Create → existing species-insert path (`confirmAdd('species')`
+   ~L2068: insert `species` {name, genus_id}, push `speciesAll`, set `form.speciesId`); preserve naming
+   rules (× hybrids, 'cultivars', sp.) + genus scope + in-memory sync. Rename/Delete → existing
+   `startRename('species')` / `confirmRename` / `askDeleteSpecies` / `confirmDeleteSpecies` /
+   `cancelDeleteSpecies` + inline boxes + in-use block; just re-home behind the Edit link. Selection sets
+   `form.speciesId` (same binding the `<select>` used).
+3. **Ordering** = reuse `speciesOptions()` (last-picked pinned, then alphabetical) for the empty-query list.
+4. **Genus scope** = list only species for `form.genusId`; keep the "pick a genus first" guard; field not
+   usable until a genus is chosen.
+5. **Don't break tag-scan pre-fill** (`applyDetection`): a scanned species must show in the field without
+   forcing the panel — the panel is the manual/correction path.
+6. **onGenusChange** already clears species + cancels rename/delete — keep it.
+7. **Tier: Lite.** No new DB/RLS/import/egress surface (UI re-shell over existing owner-scoped species
+   CRUD). **No migration.** Security review = confirm create/rename/delete still use the same owner-scoped
+   paths. One build, bump `<meta app-build>`, verify (Chrome + iPhone), one commit.
+
+**Edge cases:** empty genus (field prompts for genus, not tappable); long hybrid names (ellipsis in field,
+graceful wrap/truncate in rows); duplicate-name create (existing guard / DB unique); a confirmed rename must
+update the field's displayed name (rename already patches `speciesAll` + loaded rows).
+
+---
+
 ## 2026-06-26 — Journal improvements: tab search/filter + per-photo "keep out of gallery" toggle
 
 Two requests in one (Stephen at work, wanted low-decision work he could just approve).
