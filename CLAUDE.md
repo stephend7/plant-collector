@@ -23,6 +23,11 @@
   auth/RLS, public-guest access, **untrusted-file import**, new upload/egress paths, crypto, or any
   capability with no analog already shipped. *(Next up: spreadsheet import = full tier.)*
 
+## Model rotation (friend's playbook)
+- **Opus 4.8** → Architecture phase only (design, plan, trade-offs)
+- **Sonnet 4.6** → Security review, Build, Test
+Switch models in the model picker after the architecture plan is agreed and before building starts.
+
 ## House rules
 - **Source control:** stage specific files (never `git add -A`); one logical change per commit;
   co-author tag; commit/push only when Stephen asks. **Deploy = `git push`** (GitHub Pages rebuilds;
