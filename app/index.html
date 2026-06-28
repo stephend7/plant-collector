@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-27f">
+<meta name="app-build" content="2026-06-27g">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1249,7 +1249,7 @@
               @keydown.enter.prevent="!spHasExactMatch()&&spSearch.trim()&&spCreate()">
           </div>
         </div>
-        <div class="sheet-body">
+        <div class="sheet-body" style="padding-bottom:60px">
           <template x-for="s in spFilteredSpecies()" :key="s.id">
             <div class="lrow" @click="pickSpecies(s.id)" style="gap:10px">
               <span style="font-style:italic;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" x-text="s.name"></span>
@@ -2105,7 +2105,8 @@
         if(!this.form.genusId)return;
         this.spSearch=''; this.spPanel=true;
         await new Promise(r=>setTimeout(r));
-        if(this.$refs.spSearchInput)this.$refs.spSearchInput.focus();
+        // No auto-focus: panel opens without keyboard so no iOS origin badge covers the list.
+        // User taps the search bar themselves if they want to type or create.
         // iOS: position sheet above keyboard by adding padding-bottom = keyboard height.
         // sheet-back uses position:fixed;inset:0 (anchored to layout viewport, extends
         // behind keyboard). padding-bottom shrinks the flex content area so the sheet
