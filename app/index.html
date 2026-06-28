@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-27e">
+<meta name="app-build" content="2026-06-27f">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1232,9 +1232,13 @@
     <div class="sheet-back" x-show="spPanel" x-cloak @click.self="closeSpPanel()" style="z-index:65">
       <div class="sheet" x-ref="spSheet" style="max-height:82vh">
         <div class="sheet-hd" style="border-bottom:1px solid var(--line)">
-          <span class="nm" x-text="genusName(form.genusId)||'Species'"></span>
-          <span style="margin-left:4px;color:var(--muted);font-size:13px;font-style:normal">— species</span>
-          <button class="sheet-x" @click="closeSpPanel()" style="margin-left:auto">✕</button>
+          <span class="nm" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0" x-text="genusName(form.genusId)||'Species'"></span>
+          <span style="margin-left:4px;color:var(--muted);font-size:13px;font-style:normal;white-space:nowrap">— species</span>
+          <button type="button" x-show="spSearch.trim()&&!spHasExactMatch()" @click="spCreate()"
+            style="margin-left:12px;flex:0 0 auto;background:var(--pine);color:#fff;border:0;border-radius:8px;padding:5px 11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">
+            ＋ New
+          </button>
+          <button class="sheet-x" @click="closeSpPanel()" style="margin-left:auto;flex:0 0 auto">✕</button>
         </div>
         <div style="padding:10px 16px 6px;flex:0 0 auto">
           <div class="searchbar" style="margin:0">
@@ -1243,10 +1247,6 @@
               x-ref="spSearchInput"
               autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
               @keydown.enter.prevent="!spHasExactMatch()&&spSearch.trim()&&spCreate()">
-            <button type="button" x-show="spSearch.trim()&&!spHasExactMatch()" @click="spCreate()"
-              style="flex:0 0 auto;background:var(--pine);color:#fff;border:0;border-radius:8px;padding:5px 11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">
-              ＋ New
-            </button>
           </div>
         </div>
         <div class="sheet-body">
