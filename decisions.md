@@ -4,6 +4,34 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-27 — iOS keyboard layout bug fixed (builds c–g)
+
+After Chrome verified (build b), Stephen tested on iPhone (Safari/WebKit). Found: the iOS origin
+badge (`stephend7.github.io`) and keyboard layout caused the panel to be unusable. Fixed across
+five builds:
+
+- **c**: Moved species panel from inside the form to app root (alongside other sheets), so iOS
+  stops treating the search input as a form field. Added `autocorrect/autocomplete/autocapitalize=off`.
+- **d**: Added `visualViewport.resize` listener + `padding-bottom` on `.sheet-back` equal to keyboard
+  height. This is the key iOS layout fix: `position:fixed;inset:0` anchors to the LAYOUT viewport
+  (behind keyboard); `padding-bottom` shrinks the flex content area so the sheet floats above the
+  keyboard instead.
+- **e/f**: Moved the `＋ New` (create species) button to the PANEL HEADER — well above where the iOS
+  system origin badge floats. Badge appears at the top edge of the keyboard stack and overlaid the
+  old in-list Create row regardless of position within the search bar.
+- **g**: Removed auto-focus on panel open. Without keyboard focus, no keyboard, no badge — user sees
+  the full species list (including long hybrid names) immediately. Badge only appears if user
+  deliberately taps the search bar to type/search. Added `padding-bottom:60px` on the list body as
+  a secondary buffer so the lowest row stays clear of the badge zone when keyboard is visible.
+
+**Final verified state (Stephen's iPhone, build g):**
+- Panel opens badge-free, full list visible, long hybrid names readable ✓
+- Tap a species → picks immediately, no keyboard needed ✓
+- Tap search bar → keyboard + badge appears; ＋ New in header stays visible above badge ✓
+- Tap ＋ New with search text → creates species ✓
+
+---
+
 ## 2026-06-27 — Species search-panel picker BUILT (builds a + b)
 
 Replaces the native species `<select>` and the crowded ＋New / ✎Rename / 🗑Delete button row with a
