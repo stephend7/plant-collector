@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-30a">
+<meta name="app-build" content="2026-06-30b">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -788,16 +788,13 @@
               </template>
               <template x-if="newEvent.type==='pest_treated'">
                 <div>
-                  <label>Pest / disease</label>
-                  <div class="pickrow">
-                    <div>
-                      <select x-model="newEvent.pestId" :disabled="addingPest">
-                        <option value="">— none —</option>
-                        <template x-for="p in pestOptions()" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
-                      </select>
-                    </div>
-                    <button type="button" class="mini" @click="startAddPest()" x-show="!addingPest">＋ New</button>
+                  <label>Pest / disease <span class="hint">(pick one or more)</span></label>
+                  <div class="cat-chips">
+                    <template x-for="p in pestOptions()" :key="p.id">
+                      <button type="button" class="cat-chip" :class="newEvent.pestIds.includes(p.id)?'selected':''" @click="togglePest(p.id,'event')" x-text="p.name"></button>
+                    </template>
                   </div>
+                  <button type="button" class="mini" style="margin-top:6px" @click="startAddPest()" x-show="!addingPest">＋ New pest</button>
                   <div class="addbox" x-show="addingPest" x-transition>
                     <input type="text" placeholder="New pest / disease" x-model="newPestName" @keydown.enter.prevent="confirmAddPest('event')">
                     <button type="button" class="ok" @click="confirmAddPest('event')">Add</button>
@@ -1007,16 +1004,13 @@
                   </template>
                   <template x-if="newEvent.type==='pest_treated'">
                     <div>
-                      <label>Pest / disease</label>
-                      <div class="pickrow">
-                        <div>
-                          <select x-model="newEvent.pestId" :disabled="addingPest">
-                            <option value="">— none —</option>
-                            <template x-for="p in pestOptions()" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
-                          </select>
-                        </div>
-                        <button type="button" class="mini" @click="startAddPest()" x-show="!addingPest">＋ New</button>
+                      <label>Pest / disease <span class="hint">(pick one or more)</span></label>
+                      <div class="cat-chips">
+                        <template x-for="p in pestOptions()" :key="p.id">
+                          <button type="button" class="cat-chip" :class="newEvent.pestIds.includes(p.id)?'selected':''" @click="togglePest(p.id,'event')" x-text="p.name"></button>
+                        </template>
                       </div>
+                      <button type="button" class="mini" style="margin-top:6px" @click="startAddPest()" x-show="!addingPest">＋ New pest</button>
                       <div class="addbox" x-show="addingPest" x-transition>
                         <input type="text" placeholder="New pest / disease" x-model="newPestName" @keydown.enter.prevent="confirmAddPest('event')">
                         <button type="button" class="ok" @click="confirmAddPest('event')">Add</button>
@@ -1177,16 +1171,13 @@
             </div>
             <template x-if="quickLog.type==='pest_treated'">
               <div>
-                <label>Pest / disease</label>
-                <div class="pickrow">
-                  <div>
-                    <select x-model="quickLog.pestId" :disabled="addingPest">
-                      <option value="">— none —</option>
-                      <template x-for="p in pestOptions()" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
-                    </select>
-                  </div>
-                  <button type="button" class="mini" @click="startAddPest()" x-show="!addingPest">＋ New</button>
+                <label>Pest / disease <span class="hint">(pick one or more)</span></label>
+                <div class="cat-chips">
+                  <template x-for="p in pestOptions()" :key="p.id">
+                    <button type="button" class="cat-chip" :class="quickLog.pestIds.includes(p.id)?'selected':''" @click="togglePest(p.id,'quick')" x-text="p.name"></button>
+                  </template>
                 </div>
+                <button type="button" class="mini" style="margin-top:6px" @click="startAddPest()" x-show="!addingPest">＋ New pest</button>
                 <div class="addbox" x-show="addingPest" x-transition>
                   <input type="text" placeholder="New pest / disease" x-model="newPestName" @keydown.enter.prevent="confirmAddPest('quick')">
                   <button type="button" class="ok" @click="confirmAddPest('quick')">Add</button>
@@ -1954,7 +1945,7 @@
       tab:'plants', galleryGenus:null, galleryCatId:'', searchQ:'', listCatIds:[], listGenusName:'', allEvents:[],
       journalFilter:'all', journalSearch:'', journalTypeFilter:'', allPhotos:[], allPhotosLoaded:false,
       quickLogOpen:false, quickLogBusy:false, quickLogError:'',
-      quickLog:{plantId:'',plantName:'',q:'',type:'note',date:'',note:'',productId:'',doseNote:'',pestId:''},
+      quickLog:{plantId:'',plantName:'',q:'',type:'note',date:'',note:'',productId:'',doseNote:'',pestIds:[]},
       adding:{genus:false,species:false,vendor:false,location:false,category:false},
       newName:{genus:'',species:'',vendor:'',location:'',category:''},
       renaming:{genus:false,species:false,vendor:false,location:false,category:false},
@@ -2491,9 +2482,17 @@
       },
       async loadDetailEvents(plantId){
         const {data}=await sb.from('journal_entry')
-          .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause,photo_id,product_id,dose_note,pest_id')
+          .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause,photo_id,product_id,dose_note')
           .eq('plant_id',plantId).order('entry_date',{ascending:false}).order('created_at',{ascending:false});
-        this.detailEvents=data||[];
+        const events=(data||[]).map(e=>({...e,pestIds:[]}));
+        try{
+          const ids=events.map(e=>e.id);
+          if(ids.length){
+            const {data:jeps}=await sb.from('journal_entry_pest').select('journal_entry_id,pest_id').in('journal_entry_id',ids);
+            if(jeps){const m={};for(const j of jeps)(m[j.journal_entry_id]=m[j.journal_entry_id]||[]).push(j.pest_id);for(const ev of events)ev.pestIds=m[ev.id]||[];}
+          }
+        }catch(_){}
+        this.detailEvents=events;
       },
       eventPhotos(ev){ return this.detailPhotos.filter(p=>p.journal_entry_id===ev.id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||((a.photo_date||'')<(b.photo_date||'')?-1:1)); },
       eventPhotoUrl(ev){ const ps=this.eventPhotos(ev); if(ps.length)return ps[0].thumbUrl||null; if(ev.photo_id){const p=this.detailPhotos.find(x=>x.id===ev.photo_id);return p?p.thumbUrl:null;} return null; },
@@ -2590,14 +2589,14 @@
         }catch(e){ this.detailError=(e.message||'Could not add')+' — it may already exist.'; }
         finally{ this.detailBusy=false; }
       },
-      _blankEvent(){return{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',pestId:'',photos:[],existingPhotos:[],removedPhotoIds:[]};},
+      _blankEvent(){return{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',pestIds:[],photos:[],existingPhotos:[],removedPhotoIds:[]};},
       startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.addingProduct=false;this.addingPest=false;this.newEvent=Object.assign(this._blankEvent(),{date:todayLocal()});this.loggingEvent=true;},
       _fillEventForm(ev){
         this.editEventId=ev.id; this.addingProduct=false; this.addingPest=false;
         this.newEvent=Object.assign(this._blankEvent(),{
           type:ev.event_type, date:ev.entry_date||todayLocal(), note:ev.body||'',
           measureLabel:ev.measure_label||'', measureValue:(ev.measure_value!=null?ev.measure_value:''), measureUnit:ev.measure_unit||'',
-          productId:ev.product_id||'', doseNote:ev.dose_note||'', pestId:ev.pest_id||'',
+          productId:ev.product_id||'', doseNote:ev.dose_note||'', pestIds:ev.pestIds||[],
           existingPhotos:this.eventPhotos(ev).map(p=>({id:p.id,thumbUrl:p.thumbUrl,storage_path:p.storage_path})),
         });
       },
@@ -2632,7 +2631,7 @@
           const pid=this.detailPlant.id;
           const photoLabelFor=t=>({flowered:'flower',fruited:'flower',pest_treated:'pests'})[t]||'plant';
           const measureCols=()=>{const m={measure_label:null,measure_value:null,measure_unit:null};if(e.type==='measured'){if((e.measureLabel||'').trim())m.measure_label=e.measureLabel.trim();if(e.measureValue!==''&&e.measureValue!=null)m.measure_value=Number(e.measureValue);if((e.measureUnit||'').trim())m.measure_unit=e.measureUnit.trim();}return m;};
-          const productCols=()=>{const isProd=(e.type==='fed'||e.type==='pest_treated');return {product_id:isProd?(e.productId||null):null,dose_note:isProd?((e.doseNote||'').trim()||null):null,pest_id:e.type==='pest_treated'?(e.pestId||null):null};};
+          const productCols=()=>{const isProd=(e.type==='fed'||e.type==='pest_treated');return {product_id:isProd?(e.productId||null):null,dose_note:isProd?((e.doseNote||'').trim()||null):null};};
 
           // event id — reuse on edit, create otherwise
           let evId=this.editEventId;
@@ -2662,6 +2661,7 @@
           const upd=Object.assign({event_type:e.type,entry_date:date,body:(e.note||'').trim()||null,photo_id:primaryId},measureCols(),productCols());
           const {error:uerr}=await sb.from('journal_entry').update(upd).eq('id',evId);
           if(uerr)throw uerr;
+          await this.syncPests(evId, e.type==='pest_treated'?e.pestIds:[]);
 
           await this.loadDetailEvents(pid); await this.loadDetailPhotos(pid);
           if(this.tab==='journal'){ this.allPhotosLoaded=false; await this.loadAllEvents(); if(this.journalFilter==='photos')await this.loadAllPhotos(); }
@@ -2839,13 +2839,21 @@
       listCount(){return this.listGroups().reduce((t,g)=>t+g.plants.length,0);},
       async loadAllEvents(){
         const {data}=await sb.from('journal_entry')
-          .select('id,plant_id,entry_date,event_type,body,photo_id,product_id,dose_note,pest_id,plant:plant_id(form_descriptor,species:species_id(name,genus:genus_id(name)))')
+          .select('id,plant_id,entry_date,event_type,body,photo_id,product_id,dose_note,plant:plant_id(form_descriptor,species:species_id(name,genus:genus_id(name)))')
           .order('entry_date',{ascending:false}).order('created_at',{ascending:false}).limit(150);
-        this.allEvents=(data||[]).map(e=>{
+        const events=(data||[]).map(e=>{
           const sp=e.plant&&e.plant.species,g=sp&&sp.genus?sp.genus.name:'',s=sp?sp.name:'';
           const name=[g,s,e.plant&&e.plant.form_descriptor].filter(Boolean).join(' ').trim()||'Plant';
-          return {id:e.id,plant_id:e.plant_id,entry_date:e.entry_date,event_type:e.event_type,body:e.body,product_id:e.product_id,dose_note:e.dose_note,pest_id:e.pest_id,hasPhoto:!!e.photo_id,plantName:name};
+          return {id:e.id,plant_id:e.plant_id,entry_date:e.entry_date,event_type:e.event_type,body:e.body,product_id:e.product_id,dose_note:e.dose_note,hasPhoto:!!e.photo_id,plantName:name,pestIds:[]};
         });
+        try{
+          const ids=events.map(e=>e.id);
+          if(ids.length){
+            const {data:jeps}=await sb.from('journal_entry_pest').select('journal_entry_id,pest_id').in('journal_entry_id',ids);
+            if(jeps){const m={};for(const j of jeps)(m[j.journal_entry_id]=m[j.journal_entry_id]||[]).push(j.pest_id);for(const ev of events)ev.pestIds=m[ev.id]||[];}
+          }
+        }catch(_){}
+        this.allEvents=events;
       },
       async loadAllPhotos(){
         const {data}=await sb.from('photo')
@@ -3021,12 +3029,12 @@
         }catch(e){/* likely a duplicate — ignore */}
         this.cancelAddProduct();
       },
-      // "thrips · Maxsea · 1/4 strength" — pest (pest_treated only) + product name + dose
+      // "thrips, mealybugs · Maxsea · 1/4 strength" — pests (comma-joined) + product + dose
       eventProductLine(ev){
         if(!ev)return'';
-        const pest=ev.pest_id?this.pests.find(x=>x.id===ev.pest_id):null;
-        const p=ev.product_id?this.products.find(x=>x.id===ev.product_id):null;
-        return [pest&&pest.name, p&&p.name, ev.dose_note].filter(Boolean).join(' · ');
+        const pestNames=(ev.pestIds||[]).map(pid=>{const p=this.pests.find(x=>x.id===pid);return p?p.name:null;}).filter(Boolean);
+        const prod=ev.product_id?this.products.find(x=>x.id===ev.product_id):null;
+        return [pestNames.join(', '), prod&&prod.name, ev.dose_note].filter(Boolean).join(' · ');
       },
       /* ---- pest list (mirrors the product list; shown only on pest_treated events) ---- */
       loadPests(){
@@ -3062,14 +3070,28 @@
           const {data,error}=await sb.from('pest').insert({name,user_id:this.userId}).select('id,name').single();
           if(error)throw error;
           this.pests.push(data);
-          if(target==='quick')this.quickLog.pestId=data.id; else this.newEvent.pestId=data.id;
+          if(target==='quick') this.quickLog.pestIds.push(data.id);
+          else this.newEvent.pestIds.push(data.id);
         }catch(e){/* likely a duplicate — ignore */}
         this.cancelAddPest();
       },
 
+      togglePest(pestId,target){
+        const arr=target==='quick'?this.quickLog.pestIds:this.newEvent.pestIds;
+        const i=arr.indexOf(pestId); if(i>=0)arr.splice(i,1); else arr.push(pestId);
+      },
+      async syncPests(evId,pestIds){
+        await sb.from('journal_entry_pest').delete().eq('journal_entry_id',evId);
+        if(pestIds.length){
+          const rows=pestIds.map(pid=>({journal_entry_id:evId,pest_id:pid,user_id:this.userId}));
+          const {error}=await sb.from('journal_entry_pest').insert(rows);
+          if(error)throw error;
+        }
+      },
+
       /* ---- quick log (from Journal tab FAB) ---- */
       openQuickLog(){
-        this.quickLog={plantId:'',plantName:'',q:'',type:'note',date:todayLocal(),note:'',productId:'',doseNote:'',pestId:''};
+        this.quickLog={plantId:'',plantName:'',q:'',type:'note',date:todayLocal(),note:'',productId:'',doseNote:'',pestIds:[]};
         this.quickLogError=''; this.addingProduct=false; this.addingPest=false; this.quickLogOpen=true;
         this.$nextTick(()=>{ const el=this.$refs.quickLogSearch; if(el)el.focus(); });
       },
@@ -3091,9 +3113,9 @@
             if(this.quickLog.productId)row.product_id=this.quickLog.productId;
             if((this.quickLog.doseNote||'').trim())row.dose_note=this.quickLog.doseNote.trim();
           }
-          if(this.quickLog.type==='pest_treated'&&this.quickLog.pestId)row.pest_id=this.quickLog.pestId;
-          const {error}=await sb.from('journal_entry').insert(row);
+          const {data:evRow,error}=await sb.from('journal_entry').insert(row).select('id').single();
           if(error)throw error;
+          if(this.quickLog.type==='pest_treated')await this.syncPests(evRow.id,this.quickLog.pestIds);
           this.closeQuickLog();
           await this.loadAllEvents();
           if(this.detailPlant&&this.detailPlant.id===pid)await this.loadDetailEvents(pid);
