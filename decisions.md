@@ -4,6 +4,26 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-30 — Multi-pest picker on pest_treated events (migration 008) (Full tier)
+
+Upgraded pest selection from a single dropdown to **tappable chips** (pick Thrips AND Mealybugs in one event). Migration 008 replaces `journal_entry.pest_id` FK with a `journal_entry_pest` junction table, mirroring the proven `plant_category` pattern. Build `2026-06-30b`.
+
+**Architecture (Opus 4.8):** junction table chosen over `pest_ids[]` array specifically to avoid deletion rot — cascading FK on both ends, no orphaned IDs. Old `pest_id` column dropped in the same migration (no leftover schema). Security tier: Full — cross-tenant FK guards on both ends of the junction (`app_owns_journal_entry` + new `app_owns_pest`). Backfill carries `user_id` from source row (runs as postgres where `auth.uid()=null`).
+
+**Build (Sonnet 4.6):** chips in all three editors (per-plant Log, focused sheet, quick-log). Side-query pest load (never nested in the core event SELECT — journal survives a missing table). `syncPests` delete-then-insert mirrors `syncCategories`. Timeline displays pests comma-joined ("Thrips, Mealybugs · Spinosad · 2 ml/L"). `syncPests` errors propagate to outer handlers (Security finding: don't swallow errors silently).
+
+**Separated Security agent verdict: PASS.** One LOW finding applied: removed `catch(_){}` from `syncPests` so a partial failure surfaces to the user rather than silently wiping pest links.
+
+**Verified END-TO-END:** Chrome (`test@test.com`, build `b`) — two-pest event saved to `journal_entry_pest`, loaded back via side query, timeline showed "Thrips, Mealybugs". Account cleaned. **Stephen's iPhone (WebKit) — PASS** ("Looks good").
+
+---
+
+## 2026-06-30 — Import blank-status fix (build 2026-06-30a)
+
+Blank status cells in a mapped Status column were silently shown as "In collection" in the import preview. Now shown as **— blank —** in amber; blank rows counted in the "to review" total. DB still stores `in_collection` (schema requires NOT NULL); making `lifecycle_status` nullable is a future migration. Verified live in Chrome via Alpine `$data` simulation.
+
+---
+
 ## 2026-06-29 — Import test on `CP DB2.xlsx`: SHIPPED feature confirmed live; two new findings deferred
 
 Ran the spreadsheet importer (built 2026-06-23) against Stephen's real, messiest legacy file for the
