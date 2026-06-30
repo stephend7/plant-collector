@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-27g">
+<meta name="app-build" content="2026-06-30a">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1606,7 +1606,7 @@
                     <td x-text="p.vendorName"></td>
                     <td><span x-text="p.acquisitionDate||'—'"></span><span x-show="p.acquisitionDatePrecision&&p.acquisitionDatePrecision!=='day'" class="imp-warn" x-text="' ('+p.acquisitionDatePrecision+')'"></span></td>
                     <td x-text="p.price==null?'':('$'+p.price)"></td>
-                    <td x-text="statusLabel(p.status)"></td>
+                    <td><span x-show="p.statusBlank" class="imp-warn">— blank —</span><span x-show="!p.statusBlank" x-text="statusLabel(p.status)"></span></td>
                     <td class="imp-warn" x-text="p.warnings.join(', ')"></td>
                   </tr>
                 </template>
@@ -3258,10 +3258,11 @@
           let price=null;
           if(this.importMap.price!=='') price=cleanPrice(this._imp(row,'price'));
           if(price==null){ const src=this._imp(row,this.importNameMode==='combined'?'combinedName':'species'); const sp=scrapePrice(src); if(sp!=null){ price=sp; warnings.push('price $'+sp+' from name'); } }
-          let status=this.importDefaultStatus;
+          let status=this.importDefaultStatus, statusBlank=false;
           if(this.importMap.status!==''){ const raw=this._imp(row,'status'); const tgt=this.statusTargetFor(raw);
             if(tgt==='__skip'){ skipped.push({row:rowNo,reason:'status: '+raw}); return; }
-            else if(tgt&&tgt!=='__notes'){ status=tgt; } else if(raw){ extraNotes='Status: '+raw; } }
+            else if(tgt&&tgt!=='__notes'){ status=tgt; } else if(raw){ extraNotes='Status: '+raw; }
+            else { statusBlank=true; status=null; } }
           let acqType=null;
           if(this.importMap.acquisitionType!==''){ const t=normKey(this._imp(row,'acquisitionType'));
             if(/seed/.test(t))acqType='seed'; else if(/trade/.test(t))acqType='traded'; else if(/gift/.test(t))acqType='gift'; else if(/divi/.test(t))acqType='division'; else if(/buy|bought|purchas/.test(t))acqType='bought'; }
@@ -3269,7 +3270,7 @@
           if(vendorToNotes) notes=(notes?notes+' · ':'')+'Source: '+vendorToNotes;
           if(extraNotes) notes=(notes?notes+' · ':'')+extraNotes;
           if(warnings.length) warnCount++;
-          plants.push({ row:rowNo, genus, species, gKey:gk, formDescriptor:formDesc, accession, vendorName, vendorKey:vendorName?normKey(vendorName):'', sourceUrl:this._imp(row,'sourceUrl'), locationData:this._imp(row,'locationData'), acquisitionDate:dateIso, acquisitionDatePrecision:datePrec, price, status, acquisitionType:acqType, notes, warnings });
+          plants.push({ row:rowNo, genus, species, gKey:gk, formDescriptor:formDesc, accession, vendorName, vendorKey:vendorName?normKey(vendorName):'', sourceUrl:this._imp(row,'sourceUrl'), locationData:this._imp(row,'locationData'), acquisitionDate:dateIso, acquisitionDatePrecision:datePrec, price, status, statusBlank, acquisitionType:acqType, notes, warnings });
         });
         this.importPreview={ plants, newGenera:[...newGenera.values()], newSpeciesCount:newSpecies.size, newVendors:[...newVendors.values()], skipped, warnCount };
         this.importStep='preview';
@@ -3296,7 +3297,7 @@
           const rows=[];
           for(const pl of P.plants){ const g=genusByKey.get(pl.gKey); if(!g) continue; const s=speciesByKey.get(g.id+'|'+normKey(pl.species)); if(!s) continue;
             const v=pl.vendorKey?vendorByKey.get(pl.vendorKey):null;
-            rows.push({ species_id:s.id, form_descriptor:pl.formDescriptor||null, vendor_id:v?v.id:null, acquisition_date:pl.acquisitionDate||null, acquisition_date_precision:pl.acquisitionDatePrecision||null, acquisition_type:pl.acquisitionType||null, acquisition_price:pl.price, accession_id:pl.accession||null, source_url:pl.sourceUrl||null, location_data:pl.locationData||null, lifecycle_status:pl.status||'in_collection', notes:pl.notes||null, import_batch_id:batchId }); }
+            rows.push({ species_id:s.id, form_descriptor:pl.formDescriptor||null, vendor_id:v?v.id:null, acquisition_date:pl.acquisitionDate||null, acquisition_date_precision:pl.acquisitionDatePrecision||null, acquisition_type:pl.acquisitionType||null, acquisition_price:pl.price, accession_id:pl.accession||null, source_url:pl.sourceUrl||null, location_data:pl.locationData||null, lifecycle_status:pl.status!=null?pl.status:'in_collection', notes:pl.notes||null, import_batch_id:batchId }); }
           let created=0;
           for(let i=0;i<rows.length;i+=200){ const {error}=await sb.from('plant').insert(rows.slice(i,i+200)); if(error) throw error; created+=Math.min(200,rows.length-i); this.importProgress=created;
             await sb.from('import_batch').update({plant_count:created}).eq('id',batchId); }   // keep count honest even on partial failure (so undo's confirm is accurate)

@@ -4,6 +4,36 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-29 — Import test on `CP DB2.xlsx`: SHIPPED feature confirmed live; two new findings deferred
+
+Ran the spreadsheet importer (built 2026-06-23) against Stephen's real, messiest legacy file for the
+first time, on the `test@test.com` account (Chrome, Claude-in-Chrome driving). **Result: the shipped
+feature works correctly end-to-end on real data.** Mapped Plants tab (214 rows) → 151 plants created,
+5 genera, 133 species, 53 vendors, 4 rows flagged for review (messy Status values). Spot-checked one
+imported plant (Byblis gigantea) against the source row — vendor, date (Excel-serial converted
+correctly), price, accession ID (Key column), and notes all matched exactly.
+
+**Bug confirmed for the backlog:** blank Status cells (174/213 rows in this file) silently default to
+`in_collection` instead of staying blank or showing a "was blank" marker. Stephen's ask, logged in the
+`ui-polish-backlog` memory (#5) — fix in both the import preview and the default-status logic.
+
+**Two new findings from reading the file's other tabs (Images, Journal) — not part of this session's
+build, captured for later:**
+1. **5 real Journal entries** exist in the file (dated notes + event types like Repot/Observation),
+   small enough to recover by hand or a future targeted import.
+2. **20 real photos** exist, but only as Google-Drive filename references (AppSheet stored the actual
+   files in a Drive folder `Images_Images/...`) — recoverable, not yet pulled in. Prompted a sync
+   question (could app-added photos push BACK to Drive, two-way?) — answered and logged as a future,
+   not-yet-scoped full-tier item in the `import-sync-design` memory (new "Photo round-trip to Google
+   Drive" subsection): technically possible, but it's the heaviest piece of the sync roadmap (write
+   OAuth + dual-upload + new conflict edges), not something to build before the app is in daily use.
+
+Full tab-by-tab read (Plants/Species/Images/Journal/Genus/per-genus tabs/Sheet11) captured in the
+`legacy-data-findings` memory. Account left with the 151 imported test plants in place (not undone)
+pending Stephen's further review — **import undo is available** (one click in the app) if needed.
+
+---
+
 ## 2026-06-27 — iOS keyboard layout bug fixed (builds c–g)
 
 After Chrome verified (build b), Stephen tested on iPhone (Safari/WebKit). Found: the iOS origin
