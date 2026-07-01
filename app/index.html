@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-30c">
+<meta name="app-build" content="2026-06-30d">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1563,7 +1563,9 @@
             <select x-model="importMap.country"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
           <div class="imp-maprow"><label>Notes</label>
             <select x-model="importMap.notes"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
-          <div class="imp-maprow"><label>Acquisition type <small>plant / seed / trade…</small></label>
+          <div class="imp-maprow"><label>Type → Category <small>Plant / Seed / Cutting… added as a category tag</small></label>
+            <select x-model="importMap.typeCategory"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          <div class="imp-maprow"><label>How acquired <small>bought / traded / gift…</small></label>
             <select x-model="importMap.acquisitionType"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
           <div class="imp-maprow"><label>Wishlist flag <small>these rows are skipped</small></label>
             <select x-model="importMap.wishlist"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
@@ -1601,6 +1603,7 @@
             <div class="imp-pill"><b x-text="importPreview && importPreview.newGenera.length"></b>new genera</div>
             <div class="imp-pill"><b x-text="importPreview && importPreview.newSpeciesCount"></b>new species</div>
             <div class="imp-pill"><b x-text="importPreview && importPreview.newVendors.length"></b>new vendors</div>
+            <div class="imp-pill" x-show="importPreview && importPreview.newCategories.length"><b x-text="importPreview && importPreview.newCategories.length"></b>new categories</div>
             <div class="imp-pill" x-show="importPreview && importPreview.warnCount"><b x-text="importPreview && importPreview.warnCount"></b>to review</div>
             <div class="imp-pill" x-show="importPreview && importPreview.skipped.length"><b x-text="importPreview && importPreview.skipped.length"></b>skipped</div>
           </div>
@@ -1677,6 +1680,7 @@
             <div class="imp-pill"><b x-text="importResult && importResult.genera"></b>genera</div>
             <div class="imp-pill"><b x-text="importResult && importResult.species"></b>species</div>
             <div class="imp-pill"><b x-text="importResult && importResult.vendors"></b>vendors</div>
+            <div class="imp-pill" x-show="importResult && importResult.categories"><b x-text="importResult && importResult.categories"></b>new categories</div>
             <div class="imp-pill" x-show="importResult && importResult.skipped"><b x-text="importResult && importResult.skipped"></b>skipped</div>
           </div>
           <p style="color:var(--muted);font-size:13px">Your collection is updated. Changed your mind? Undo this import below.</p>
@@ -1911,7 +1915,7 @@
   function cleanPrice(raw){ const s=String(raw==null?'':raw).replace(/[^0-9.]/g,''); return s===''?null:(isNaN(Number(s))?null:Number(s)); }
   // Best-effort header→field guesses (user confirms on the mapping screen).
   function guessImportMap(headers){
-    const map={genus:'',species:'',combinedName:'',formDescriptor:'',vendor:'',acquisitionDate:'',price:'',accessionId:'',sourceUrl:'',locationData:'',country:'',notes:'',status:'',wishlist:'',acquisitionType:''};
+    const map={genus:'',species:'',combinedName:'',formDescriptor:'',vendor:'',acquisitionDate:'',price:'',accessionId:'',sourceUrl:'',locationData:'',country:'',notes:'',status:'',wishlist:'',acquisitionType:'',typeCategory:''};
     headers.forEach((h,i)=>{
       const t=normKey(h); if(!t) return; const set=(k)=>{ if(map[k]==='') map[k]=String(i); };
       if(/genus/.test(t)) set('genus');
@@ -1927,7 +1931,8 @@
       if(/note|descr|comment|growing/.test(t)) set('notes');
       if(/status/.test(t)) set('status');
       if(/^want$|wish|interested/.test(t)) set('wishlist');
-      if(/^type$|how.*acqui|acqui.*type/.test(t)) set('acquisitionType');
+      if(/how.*acqui|acqui.*type/.test(t)) set('acquisitionType');
+      if(/^type$|^plant\s*type$/.test(t)) set('typeCategory');
       if(/descriptor|form\b|variety|cultivar/.test(t)) set('formDescriptor');
     });
     return map;
@@ -1977,7 +1982,7 @@
       importOpen:false, importStep:'pick', importBusy:false, importError:'', importNote:'',
       importFileName:'', importSheets:[], importSheetName:'', importRows:[], importHeaders:[],
       importNameMode:'split',
-      importMap:{genus:'',species:'',combinedName:'',formDescriptor:'',vendor:'',acquisitionDate:'',price:'',accessionId:'',sourceUrl:'',locationData:'',country:'',notes:'',status:'',wishlist:'',acquisitionType:''},
+      importMap:{genus:'',species:'',combinedName:'',formDescriptor:'',vendor:'',acquisitionDate:'',price:'',accessionId:'',sourceUrl:'',locationData:'',country:'',notes:'',status:'',wishlist:'',acquisitionType:'',typeCategory:''},
       importSourceAsNotes:false, importDefaultStatus:'in_collection',
       importStatusRules:[], importUndoId:'',
       importPreview:null, importResult:null, importProgress:0, importProgressTotal:0,
@@ -3313,15 +3318,21 @@
             else if(tgt&&tgt!=='__notes'){ status=tgt; } else if(raw){ extraNotes='Status: '+raw; }
             else { statusBlank=true; status=null; } }
           let acqType=null;
-          if(this.importMap.acquisitionType!==''){ const t=normKey(this._imp(row,'acquisitionType'));
-            if(/seed/.test(t))acqType='seed'; else if(/trade/.test(t))acqType='traded'; else if(/gift/.test(t))acqType='gift'; else if(/divi/.test(t))acqType='division'; else if(/buy|bought|purchas/.test(t))acqType='bought'; }
+          if(this.importMap.acquisitionType!==''){ const raw=this._imp(row,'acquisitionType'); const t=normKey(raw);
+            if(/seed/.test(t))acqType='seed'; else if(/trade/.test(t))acqType='traded'; else if(/gift/.test(t))acqType='gift'; else if(/divi/.test(t))acqType='division'; else if(/buy|bought|purchas/.test(t))acqType='bought';
+            else if(raw) warnings.push('how acquired "'+raw+'" not recognised'); }
+          let typeCategory='';
+          if(this.importMap.typeCategory!==''){ typeCategory=normWS(this._imp(row,'typeCategory')); }
           let notes=this._imp(row,'notes');
           if(vendorToNotes) notes=(notes?notes+' · ':'')+'Source: '+vendorToNotes;
           if(extraNotes) notes=(notes?notes+' · ':'')+extraNotes;
           if(warnings.length) warnCount++;
-          plants.push({ row:rowNo, genus, species, gKey:gk, formDescriptor:formDesc, accession, vendorName, vendorKey:vendorName?normKey(vendorName):'', sourceUrl:this._imp(row,'sourceUrl'), locationData:this._imp(row,'locationData'), country:normWS(this._imp(row,'country')), acquisitionDate:dateIso, acquisitionDatePrecision:datePrec, price, status, statusBlank, acquisitionType:acqType, notes, warnings });
+          plants.push({ row:rowNo, genus, species, gKey:gk, formDescriptor:formDesc, accession, vendorName, vendorKey:vendorName?normKey(vendorName):'', sourceUrl:this._imp(row,'sourceUrl'), locationData:this._imp(row,'locationData'), country:normWS(this._imp(row,'country')), acquisitionDate:dateIso, acquisitionDatePrecision:datePrec, price, status, statusBlank, acquisitionType:acqType, typeCategory, notes, warnings });
         });
-        this.importPreview={ plants, newGenera:[...newGenera.values()], newSpeciesCount:newSpecies.size, newVendors:[...newVendors.values()], skipped, warnCount };
+        const existingCatKeys=new Set(this.categories.map(c=>normKey(c.name)));
+        const newCatNames=new Map();
+        plants.forEach(pl=>{ if(pl.typeCategory){ const k=normKey(pl.typeCategory); if(k&&!existingCatKeys.has(k)&&!newCatNames.has(k)) newCatNames.set(k,pl.typeCategory); } });
+        this.importPreview={ plants, newGenera:[...newGenera.values()], newSpeciesCount:newSpecies.size, newVendors:[...newVendors.values()], newCategories:[...newCatNames.values()], skipped, warnCount };
         this.importStep='preview';
       },
       importPreviewSample(){ return this.importPreview?this.importPreview.plants.slice(0,12):[]; },
@@ -3343,14 +3354,23 @@
           const vendorByKey=new Map(this.vendors.map(v=>[normKey(v.name),v]));
           const toAddV=P.newVendors.filter(n=>!vendorByKey.has(normKey(n)));
           if(toAddV.length){ const {data,error}=await sb.from('vendor').insert(toAddV.map(name=>({name}))).select('id,name'); if(error) throw error; data.forEach(v=>{ this.vendors.push(v); vendorByKey.set(normKey(v.name),v); }); }
-          const rows=[];
+          // Upsert categories referenced by the typeCategory column
+          const catByKey=new Map(this.categories.map(c=>[normKey(c.name),c]));
+          for(const name of P.newCategories){ const k=normKey(name); if(!catByKey.has(k)){ const {data,error}=await sb.from('category').insert({name}).select('id,name').single(); if(error) throw error; this.categories.push(data); catByKey.set(k,data); } }
+          const rows=[]; const plantTypeCats=[];
           for(const pl of P.plants){ const g=genusByKey.get(pl.gKey); if(!g) continue; const s=speciesByKey.get(g.id+'|'+normKey(pl.species)); if(!s) continue;
             const v=pl.vendorKey?vendorByKey.get(pl.vendorKey):null;
-            rows.push({ species_id:s.id, form_descriptor:pl.formDescriptor||null, vendor_id:v?v.id:null, acquisition_date:pl.acquisitionDate||null, acquisition_date_precision:pl.acquisitionDatePrecision||null, acquisition_type:pl.acquisitionType||null, acquisition_price:pl.price, accession_id:pl.accession||null, source_url:pl.sourceUrl||null, location_data:pl.locationData||null, country:pl.country||null, lifecycle_status:pl.status!=null?pl.status:'in_collection', notes:pl.notes||null, import_batch_id:batchId }); }
-          let created=0;
-          for(let i=0;i<rows.length;i+=200){ const {error}=await sb.from('plant').insert(rows.slice(i,i+200)); if(error) throw error; created+=Math.min(200,rows.length-i); this.importProgress=created;
+            rows.push({ species_id:s.id, form_descriptor:pl.formDescriptor||null, vendor_id:v?v.id:null, acquisition_date:pl.acquisitionDate||null, acquisition_date_precision:pl.acquisitionDatePrecision||null, acquisition_type:pl.acquisitionType||null, acquisition_price:pl.price, accession_id:pl.accession||null, source_url:pl.sourceUrl||null, location_data:pl.locationData||null, country:pl.country||null, lifecycle_status:pl.status!=null?pl.status:'in_collection', notes:pl.notes||null, import_batch_id:batchId });
+            const cat=pl.typeCategory?catByKey.get(normKey(pl.typeCategory)):null;
+            plantTypeCats.push(cat?cat.id:null); }
+          let created=0; const allPlantIds=[];
+          for(let i=0;i<rows.length;i+=200){ const {data,error}=await sb.from('plant').insert(rows.slice(i,i+200)).select('id'); if(error) throw error; allPlantIds.push(...data.map(r=>r.id)); created+=data.length; this.importProgress=created;
             await sb.from('import_batch').update({plant_count:created}).eq('id',batchId); }   // keep count honest even on partial failure (so undo's confirm is accurate)
-          this.importResult={ created, genera:toAddG.length, species:spArr.length, vendors:toAddV.length, skipped:P.skipped.length, warnings:P.warnCount };
+          // Attach type categories to their plants
+          const catRows=[];
+          for(let i=0;i<allPlantIds.length;i++){ if(plantTypeCats[i]&&allPlantIds[i]) catRows.push({plant_id:allPlantIds[i],category_id:plantTypeCats[i]}); }
+          for(let i=0;i<catRows.length;i+=200){ const {error}=await sb.from('plant_category').insert(catRows.slice(i,i+200)); if(error) throw error; }
+          this.importResult={ created, genera:toAddG.length, species:spArr.length, vendors:toAddV.length, categories:P.newCategories.length, skipped:P.skipped.length, warnings:P.warnCount };
           this.importStep='done';
           await this.loadData(); await this.loadImportBatches();
         }catch(e){ this.importError='Import failed: '+(e.message||e)+'. Anything already added is in the batch list below — you can undo it.'; this.importStep='preview'; await this.loadImportBatches(); }

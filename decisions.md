@@ -4,6 +4,16 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-06-30 — Country field (migration 009) + Type → Categories import (build 2026-06-30d)
+
+**Country field:** `plant.country` text column (nullable, no FK, no RLS change — lite tier). Added to add/edit form with datalist autocomplete from existing values, detail hero with globe SVG icon, gallery filter pills (drives `generaGallery()` and `genusPlants()`), import mapper (auto-detect: `^country$|^nation$|^country of origin$`), CSV export. Import auto-detect fixed: `country` regex now separate from and checked before `locationData` (prior collision silently dropped whichever column won the race).
+
+**Type → Categories import (no migration):** A mapped "Type" column (e.g. Plant / Seed / Cutting / TC) is now imported as a category tag on each plant — free-form, not an enum. Auto-detect maps `^type$|^plant type$` to the new `typeCategory` import slot; the old `acquisitionType` auto-detect no longer claims bare `^type$`. During `runImport`: new category names are upserted first, then the bulk plant insert uses `.select('id')` to collect IDs, and `plant_category` rows are bulk-inserted afterwards. Summary pills show "N new categories" in preview and result screens. Previously unrecognised "how acquired" values now generate a warning row instead of silently dropping.
+
+**Verified:** Country field end-to-end in Chrome — added *Pinguicula gigantea* with country "Mexico", confirmed globe icon in detail hero, "Mexico" filter pill appeared in gallery, click filtered to 1 genus. Type axis: static structure verified via grep; live import test pending with Stephen's real file.
+
+---
+
 ## 2026-06-30 — Multi-pest picker on pest_treated events (migration 008) (Full tier)
 
 Upgraded pest selection from a single dropdown to **tappable chips** (pick Thrips AND Mealybugs in one event). Migration 008 replaces `journal_entry.pest_id` FK with a `journal_entry_pest` junction table, mirroring the proven `plant_category` pattern. Build `2026-06-30b`.
