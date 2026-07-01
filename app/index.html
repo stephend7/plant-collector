@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-07-01b">
+<meta name="app-build" content="2026-07-01c">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -420,7 +420,7 @@
         <div>
           <label>Species *</label>
           <button type="button" class="sp-field" @click="openSpPanel()" :disabled="!form.genusId">
-            <span class="sp-val" :class="form.speciesId?’’:’unset’" x-text="form.speciesId?speciesName(form.speciesId):(form.genusId?’— choose species —‘:’pick a genus first’)"></span>
+            <span class="sp-val" :class="form.speciesId?'':'unset'" x-text="form.speciesId?speciesName(form.speciesId):(form.genusId?'— choose species —':'pick a genus first')"></span>
             <span class="sp-arr">›</span>
           </button>
           <div x-show="form.speciesId && !spEditMode" style="margin-top:5px;text-align:right">
@@ -428,14 +428,14 @@
           </div>
           <div x-show="spEditMode" x-transition>
             <div class="addbox" x-show="!renaming.species && !confirmDelSpecies && !delSpeciesBlockMsg" style="margin-top:6px">
-              <button type="button" class="mini" @click="startRename(‘species’)">✎ Rename</button>
+              <button type="button" class="mini" @click="startRename('species')">✎ Rename</button>
               <button type="button" class="mini" @click="askDeleteSpecies()" style="color:var(--danger);border-color:#E2B8B4">🗑 Delete</button>
               <button type="button" class="no" @click="spEditMode=false" style="margin-left:auto">Done</button>
             </div>
             <div class="addbox" x-show="renaming.species" x-transition>
-              <input type="text" placeholder="Rename species" x-model="renameName.species" @keydown.enter.prevent="confirmRename(‘species’)" x-ref="renamespecies">
-              <button type="button" class="ok" @click="confirmRename(‘species’)">Save</button>
-              <button type="button" class="no" @click="cancelRename(‘species’)">✕</button>
+              <input type="text" placeholder="Rename species" x-model="renameName.species" @keydown.enter.prevent="confirmRename('species')" x-ref="renamespecies">
+              <button type="button" class="ok" @click="confirmRename('species')">Save</button>
+              <button type="button" class="no" @click="cancelRename('species')">✕</button>
             </div>
             <div class="addbox" x-show="confirmDelSpecies || delSpeciesBlockMsg" x-transition style="flex-wrap:wrap;align-items:center">
               <span x-show="confirmDelSpecies" style="font-size:14px">Delete this species? Can’t be undone.</span>
