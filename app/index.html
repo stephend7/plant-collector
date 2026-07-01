@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-06-30d">
+<meta name="app-build" content="2026-07-01a">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -291,6 +291,16 @@
   .imp-maprow{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
   .imp-maprow label{font-size:13px;color:var(--ink);font-weight:600}
   .imp-maprow small{display:block;color:var(--muted);font-weight:400;font-size:11px}
+  /* ---- main menu ---- */
+  .menu-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px 12px;border:1px solid var(--line);border-radius:11px;background:var(--card);margin-bottom:8px;cursor:pointer;font-size:15px;color:var(--ink);text-align:left;font-family:inherit}
+  .menu-row:hover{border-color:var(--pine)}
+  .menu-row:disabled{opacity:.5;cursor:default}
+  .menu-row:disabled:hover{border-color:var(--line)}
+  .menu-row svg{width:21px;height:21px;flex:0 0 auto;color:var(--pine)}
+  .menu-row .grow{flex:1;min-width:0}
+  .menu-row-t{font-weight:600}
+  .menu-soon{margin-left:8px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:var(--field);padding:2px 7px;border-radius:20px}
+  .menu-row small{display:block;color:var(--muted);font-weight:400;font-size:12px;margin-top:1px}
   .imp-counts{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
   .imp-pill{background:var(--chip);border-radius:10px;padding:9px 13px;font-size:13px;color:var(--ink)}
   .imp-pill b{font-size:18px;display:block;font-family:var(--serif)}
@@ -1275,6 +1285,9 @@
             <p class="homesub" x-show="!galleryGenus" x-text="plants.length+' plant'+(plants.length===1?'':'s')+' · '+generaGallery().length+' gen'+(generaGallery().length===1?'us':'era')"></p>
             <p class="homesub" x-show="galleryGenus" x-text="genusPlants(galleryGenus).length+' plant'+(genusPlants(galleryGenus).length===1?'':'s')"></p>
           </div>
+          <button class="iconbtn" @click="mainMenuOpen=true" title="Menu" aria-label="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+          </button>
         </div>
 
         <div class="searchbar">
@@ -1355,10 +1368,10 @@
           <div><h1>All plants</h1><p class="homesub" x-text="listCount()+' shown'"></p></div>
           <div style="display:flex;gap:8px">
             <button class="iconbtn" @click="openImport()" title="Import from a spreadsheet" aria-label="Import from a spreadsheet">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21V9M8 13l4-4 4 4M5 4h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17 8 12 3 7 8" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="3" x2="12" y2="15" stroke-linecap="round"/></svg>
             </button>
-            <button class="iconbtn" @click="exportCsv()" :disabled="!plants.length" title="Export to CSV" aria-label="Export to CSV">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12M8 11l4 4 4-4M5 20h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <button class="iconbtn" @click="exportCsv()" :disabled="!plants.length" title="Export / download" aria-label="Export / download">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="7 10 12 15 17 10" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="15" x2="12" y2="3" stroke-linecap="round"/></svg>
             </button>
           </div>
         </div>
@@ -1464,10 +1477,64 @@
         </div>
       </div>
 
-      <p class="who" style="margin-top:26px;text-align:center">Signed in as <span x-text="userEmail"></span> · <a style="color:var(--pine-2);cursor:pointer" @click="signOut()">sign out</a> · <span x-text="_myBuild"></span></p>
     </div>
 
    </div><!-- /appscroll -->
+
+    <!-- ===== MAIN MENU ===== -->
+    <div class="sheet-back" x-show="mainMenuOpen" x-cloak @click.self="mainMenuOpen=false" style="z-index:62">
+      <div class="sheet" style="max-height:74vh">
+        <div class="sheet-grab"></div>
+        <div class="sheet-hd">
+          <span class="nm" style="font-style:normal;font-weight:600;font-size:16px">Menu</span>
+          <button class="sheet-x" @click="mainMenuOpen=false" aria-label="Close">✕</button>
+        </div>
+        <div class="sheet-body" style="padding-bottom:8px">
+          <button type="button" class="menu-row" @click="mainMenuOpen=false; openImport()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17 8 12 3 7 8" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="3" x2="12" y2="15" stroke-linecap="round"/></svg>
+            <span class="grow"><span class="menu-row-t">Import from spreadsheet</span><small>Bring in plants from Excel or Google Sheets</small></span>
+          </button>
+          <button type="button" class="menu-row" :disabled="!plants.length" @click="if(plants.length){mainMenuOpen=false; exportCsv();}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="7 10 12 15 17 10" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="15" x2="12" y2="3" stroke-linecap="round"/></svg>
+            <span class="grow"><span class="menu-row-t">Export / download</span><small>Save your whole collection as a CSV file</small></span>
+          </button>
+          <button type="button" class="menu-row" disabled title="Two-way sync is planned but not built yet">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="23 4 23 10 17 10" stroke-linecap="round" stroke-linejoin="round"/><polyline points="1 20 1 14 7 14" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="grow"><span class="menu-row-t">Sync<span class="menu-soon">coming soon</span></span><small>Two-way sync with Google Sheets</small></span>
+          </button>
+        </div>
+        <div class="sheet-acts" style="flex-direction:column;align-items:stretch;gap:6px;padding-top:10px">
+          <p class="who" style="margin:0">Signed in as <span x-text="userEmail"></span></p>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <a style="color:var(--pine-2);cursor:pointer;font-size:14px" @click="mainMenuOpen=false; signOut()">Sign out</a>
+            <span style="color:var(--muted);font-size:12px" x-text="_myBuild"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== EXPORT (rename + download) fallback for browsers with no native Save-As ===== -->
+    <div class="sheet-back" x-show="exportDialogOpen" x-cloak @click.self="exportDialogOpen=false" style="z-index:63">
+      <div class="sheet" style="max-height:60vh">
+        <div class="sheet-grab"></div>
+        <div class="sheet-hd">
+          <span class="nm" style="font-style:normal;font-weight:600;font-size:16px">Export collection</span>
+          <button class="sheet-x" @click="exportDialogOpen=false" aria-label="Close">✕</button>
+        </div>
+        <div class="sheet-body">
+          <label style="font-size:13px;font-weight:600;color:var(--ink);display:block;margin-bottom:6px">File name</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="text" x-model="exportFileName" @keydown.enter="confirmExportDownload()" style="flex:1">
+            <span style="color:var(--muted);font-size:14px">.csv</span>
+          </div>
+          <p class="hint" style="margin-top:10px">Saves all <span x-text="plants.length"></span> plants as a CSV file — opens in Excel, Numbers, or Google Sheets.</p>
+        </div>
+        <div class="sheet-acts">
+          <button @click="exportDialogOpen=false">Cancel</button>
+          <button class="go" @click="confirmExportDownload()">Download</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ===================== SPREADSHEET IMPORT ===================== -->
     <div class="imp-back" x-show="importOpen" x-cloak style="display:none">
@@ -1962,6 +2029,7 @@
       detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
       photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
+      mainMenuOpen:false, exportDialogOpen:false, exportFileName:'',
       sheetOpen:false, sheet:null, sheetConfirmDelete:false, sheetEditing:false, sheetForm:{comment:'',label:'plant',date:''},
       prevTab:'plants', updateReady:false,
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',photos:[],existingPhotos:[],removedPhotoIds:[]},
@@ -3201,7 +3269,7 @@
       async deleteFromViewer(){const ph=this.viewerPhoto();if(!ph)return;this.viewerOpen=false;await this.removeDetailPhoto(ph);},
 
       /* ---- CSV export ---- */
-      exportCsv(){
+      _buildCsv(){
         const head=['Genus','Species','Form/Descriptor','Vendor','Growing location','Quantity','Price','Accession ID','Purchase link','Location data','Country','Acquisition date','How acquired','Status','Notes','Categories'];
         // Neutralize spreadsheet formula injection: a cell starting with = + - @ (or tab/CR)
         // is prefixed with ' so Excel/Sheets treats it as text, not a live formula. Matters
@@ -3213,11 +3281,35 @@
           p.quantity, p.price==null?'':p.price, p.accession_id||'', p.source_url||'', p.location_data||'', p.country||'', p.acquisition_date||'', this.acqTypeLabel(p.acquisition_type), this.statusLabel(p.lifecycle_status), p.notes||'',
           (p.plant_category||[]).map(pc=>pc.category&&pc.category.name).filter(Boolean).join('; ')
         ].map(esc).join(','));
-        const csv=[head.join(','),...rows].join('\n');
-        const blob=new Blob([csv],{type:'text/csv'});
+        return [head.join(','),...rows].join('\n');
+      },
+      // Native OS "Save As" where the browser supports it (Chrome/Edge on a computer);
+      // everywhere else (Safari, iPhone — no folder-picker API at all) falls back to an
+      // in-app rename dialog so the download is never a silent surprise.
+      async exportCsv(){
+        if(!this.plants.length) return;
+        if(window.showSaveFilePicker){
+          try{
+            const handle=await window.showSaveFilePicker({
+              suggestedName:'plant-collection-'+todayLocal()+'.csv',
+              types:[{description:'CSV file',accept:{'text/csv':['.csv']}}]
+            });
+            const writable=await handle.createWritable();
+            await writable.write(this._buildCsv());
+            await writable.close();
+            return;
+          }catch(e){ if(e && e.name==='AbortError') return; /* user cancelled Save As — do nothing */ }
+        }
+        this.exportFileName='plant-collection-'+todayLocal();
+        this.exportDialogOpen=true;
+      },
+      confirmExportDownload(){
+        const name=(this.exportFileName||'plant-collection').trim().replace(/\.csv$/i,'')||'plant-collection';
+        const blob=new Blob([this._buildCsv()],{type:'text/csv'});
         const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-        a.download='plant-collection-'+todayLocal()+'.csv';
+        a.download=name+'.csv';
         a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+        this.exportDialogOpen=false;
       },
 
       /* ---- spreadsheet import (FULL TIER; parsing is sandboxed in lib/import-worker.js) ---- */
