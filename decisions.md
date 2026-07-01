@@ -4,6 +4,26 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-01 — Main menu + native-Save-As export dialog (build 2026-07-01a), Undo-Import bug fix (build 2026-07-01b)
+
+**Main menu:** Stephen found the List-tab-only up/down-arrow import/export icons unrecognizable, and was surprised export silently fired a download with no confirm/rename/cancel. Fix, both his calls via AskUserQuestion: (1) standard Feather-style tray-arrow icons (upload/download/refresh) used consistently in the List tab AND a new ⋯ menu on the main Plants screen (Import / Export / Sync-disabled-"coming soon" / Sign out / build version — sign-out+version moved out of the old always-visible page-bottom footer into this one home); (2) native OS "Save As" (`showSaveFilePicker`) where the browser supports it (Chrome/Edge desktop), in-app rename dialog (Cancel/Download) everywhere else since Safari/iPhone have no folder-picker API at all — a cancelled native picker does nothing (no silent fallback download).
+
+**Verified (test@test.com initially, then Stephen's real account after an account-mismatch safety check — see below):** menu opens/closes (tap-outside works), Import row opens the importer, List-tab icons updated. Export fallback dialog tested by temporarily disabling `showSaveFilePicker` in-page: Cancel does nothing, renamed Download fires cleanly. Native Save-As itself not driven live (outside what the Chrome extension can screenshot/cancel safely) — Stephen to click it once himself to see the real OS picker.
+
+**Safety check that surfaced a real fact:** mid-verification, the signed-in account showed `stephend7@gmail.com` (real account) with 166 plants matching the CP DB2.xlsx import profile, not the expected `test@test.com` throwaway. Flagged to Stephen before proceeding — he confirmed **he ran that import himself, directly into his real account**, and has not yet tested "Undo this whole import" on it. No data-integrity incident; just real usage, and a reminder that this account now holds real import data pending an undo test.
+
+**"Undo this whole import" button — three separate real bugs, found and fixed in sequence, only the third was the actual blocker:**
+
+1. **(build 2026-07-01b)** Several import-screen Alpine bindings (`importPreview.plants.length`, `importPreview.skipped`, `importViewBatch.id` ×2) were read without a null guard in `x-text`/`x-if` expressions, throwing `TypeError`s on every page load before the importer was ever opened. Fixed with `importPreview &&` / `importViewBatch &&` guards. Confirmed those specific errors gone after fix — **but the button still didn't respond to clicks.**
+
+2. **(build 2026-07-01c)** Scanned every `x-text`/`x-show`/`:disabled`/`x-model`/`:class`/`@click` attribute on the live page by running each through `new Function(...)`. Found 5 directives (the species Rename/Delete buttons' `@click`/`x-model`, and the species-field `:class`/`x-text`) using **typographic curly quotes (‘ ’) as JS string delimiters** instead of straight quotes — e.g. `startRename(‘species’)`. Not valid JavaScript at all; threw a `SyntaxError` on every DOM walk (page load, and every time an `x-if` template got freshly inserted). Fixed by swapping to straight quotes. Confirmed zero broken directives afterward — **button still stuck disabled.**
+
+3. **(build 2026-07-01d, the actual root cause)** Isolated the button's `:disabled` binding directly and discovered a real quirk in this app's bundled Alpine build: `:disabled` bound to an **empty string `""`** is treated as `disabled=true` — only a literal boolean `false` counts as enabled. Confirmed with a scratch Alpine component: `:disabled="false"` → enabled, `:disabled="''"` → disabled, every time. `importBatchBusy` is a string sentinel (empty when idle, holds the busy batch's id while an undo runs) — not a boolean — so the three `:disabled="importBatchBusy"` bindings (batch-list row, single-batch drill-down, duplicate pick-step list) were stuck disabled from first render, regardless of the actual (falsy) value. Fixed with `:disabled="!!importBatchBusy"` on all three. **Durable lesson for this codebase: any future `:disabled` binding must use a real boolean, never a string/id sentinel directly** — every other `:disabled` target in the app already does (detailBusy, saving, photoBusy, etc.), which is why only these three were affected.
+
+**VERIFIED LIVE (build 2026-07-01d):** on Stephen's real account, clicked "Undo this whole import" on the actual CP DB2.xlsx batch (151 plants) — correctly flipped to "Delete all 151 plants from this import? Yes/No". Clicked **No** to back out; data untouched. Stephen has not yet run the actual undo (Yes) — his call, whenever he wants to.
+
+---
+
 ## 2026-06-30 — Country field (migration 009) + Type → Categories import (build 2026-06-30d)
 
 **Country field:** `plant.country` text column (nullable, no FK, no RLS change — lite tier). Added to add/edit form with datalist autocomplete from existing values, detail hero with globe SVG icon, gallery filter pills (drives `generaGallery()` and `genusPlants()`), import mapper (auto-detect: `^country$|^nation$|^country of origin$`), CSV export. Import auto-detect fixed: `country` regex now separate from and checked before `locationData` (prior collision silently dropped whichever column won the race).
