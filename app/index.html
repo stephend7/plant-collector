@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-07-01c">
+<meta name="app-build" content="2026-07-01d">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1565,7 +1565,7 @@
                 <div class="imp-batch">
                   <div class="grow" @click="viewImportBatch(b)" style="cursor:pointer"><span x-text="b.source_name||'Import'"></span> <span style="color:var(--pine-2);font-size:12px">View ›</span><br><small x-text="(b.plant_count||0)+' plants · '+((b.started_at||'').slice(0,16).replace('T',' '))"></small></div>
                   <template x-if="importUndoId!==b.id">
-                    <button class="imp-x" style="font-size:13px;color:var(--pine-2)" :disabled="importBatchBusy" @click="importUndoId=b.id" x-text="importBatchBusy===b.id?'…':'Undo'"></button>
+                    <button class="imp-x" style="font-size:13px;color:var(--pine-2)" :disabled="!!importBatchBusy" @click="importUndoId=b.id" x-text="importBatchBusy===b.id?'…':'Undo'"></button>
                   </template>
                   <template x-if="importUndoId===b.id">
                     <span style="display:flex;gap:8px;align-items:center"><small x-text="'Delete '+(b.plant_count||0)+' plants?'"></small>
@@ -1728,7 +1728,7 @@
 
           <div class="btnrow" x-show="importViewPlants.length">
             <template x-if="importViewBatch && importUndoId!==importViewBatch.id">
-              <button class="btn-ghost" style="color:#9A3528" :disabled="importBatchBusy" @click="importUndoId=importViewBatch.id" x-text="importBatchBusy===importViewBatch.id?'Removing…':'Undo this whole import'"></button>
+              <button class="btn-ghost" style="color:#9A3528" :disabled="!!importBatchBusy" @click="importUndoId=importViewBatch.id" x-text="importBatchBusy===importViewBatch.id?'Removing…':'Undo this whole import'"></button>
             </template>
             <template x-if="importViewBatch && importUndoId===importViewBatch.id">
               <div style="flex:1;display:flex;gap:8px;align-items:center;justify-content:center">
@@ -1756,7 +1756,7 @@
               <template x-for="b in importBatches" :key="b.id">
                 <div class="imp-batch">
                   <div class="grow" @click="viewImportBatch(b)" style="cursor:pointer"><span x-text="b.source_name||'Import'"></span> <span style="color:var(--pine-2);font-size:12px">View ›</span><br><small x-text="(b.plant_count||0)+' plants · '+((b.started_at||'').slice(0,16).replace('T',' '))"></small></div>
-                  <template x-if="importUndoId!==b.id"><button class="imp-x" style="font-size:13px;color:var(--pine-2)" :disabled="importBatchBusy" @click="importUndoId=b.id">Undo</button></template>
+                  <template x-if="importUndoId!==b.id"><button class="imp-x" style="font-size:13px;color:var(--pine-2)" :disabled="!!importBatchBusy" @click="importUndoId=b.id">Undo</button></template>
                   <template x-if="importUndoId===b.id"><span style="display:flex;gap:8px;align-items:center"><small x-text="'Delete '+(b.plant_count||0)+'?'"></small><button class="imp-x" style="font-size:13px;color:#9A3528" @click="undoImportBatch(b)">Yes</button><button class="imp-x" style="font-size:13px" @click="importUndoId=''">No</button></span></template>
                 </div>
               </template>
