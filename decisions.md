@@ -4,6 +4,14 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-01 — Grid/List view toggle + "All categories" label fix (build 2026-07-01f)
+
+**Grid/List toggle (Lite tier; Architecture pass, Build pass — real feature from `ui-polish-backlog` #6):** Right after an import nobody has photos yet, so the genus gallery was a wall of blank leaf-placeholder tiles. Added a Grid/List toggle to the Plants tab, reusing the existing `.seg` segmented-control styling (same component as the Journal tab's All/Photos switch). List mode keeps the genus drill-down (genus rows → tap → plant rows as text), staying distinct from the separate flat List tab. **Smart default:** opens in List when under 40% of plants have a cover photo, Grid otherwise; the first manual tap overrides this permanently (saved to `localStorage['plantsViewMode']`, same pattern as `lastGenusId`). **Grid density:** `.gallery-grid` now gets a `cols-3`/`cols-4` class (via `gridDensityClass()`) so tiles shrink as a genus/collection grows past 6/24 items — thresholds are a judgment call, not measured. Both view modes keep the existing Category/Country filter pills. No new Supabase calls (List mode is strictly cheaper — no photos needed), no auth/RLS/import surface touched.
+
+**"All categories" label fix:** the genus-gallery's category-filter clear button read "All genera" — copy-paste mislabel from before Categories existed there, confusing since the alternatives are categories (Carnivorous, Orchid, Plant, Seed…), not other genera. Renamed to "All categories" to match the identical button already correctly labeled on the List tab.
+
+---
+
 ## 2026-07-01 — Category filter not applied on genus drill-down (build 2026-07-01e)
 
 Found by Stephen during the build-2026-07-01d verification walkthrough: tapping a category chip (e.g. "Seed") on the genera-gallery screen correctly filtered the per-genus counts, but tapping into a genus from there showed ALL plants in that genus, ignoring the category filter.
