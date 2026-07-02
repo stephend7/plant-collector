@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-07-01f">
+<meta name="app-build" content="2026-07-01g">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1321,11 +1321,12 @@
         <template x-if="searchQ.trim().length===0 && !galleryGenus">
           <div>
             <div class="pills2" x-show="categories.length">
-              <button type="button" class="cat-chip" :class="galleryCatId===''?'selected':''" @click="galleryCatId=''">All categories</button>
+              <button type="button" class="cat-chip" :class="galleryCatIds.length===0?'selected':''" @click="galleryCatIds=[]">All categories</button>
               <template x-for="c in categories" :key="c.id">
-                <button type="button" class="cat-chip" :class="galleryCatId===c.id?'selected':''" @click="galleryCatId=c.id" x-text="c.name"></button>
+                <button type="button" class="cat-chip" :class="galleryCatIds.includes(c.id)?'selected':''" @click="toggleGalleryCat(c.id)" x-text="c.name"></button>
               </template>
             </div>
+            <span class="hint" x-show="galleryCatIds.length>1">matching all <span x-text="galleryCatIds.length"></span> categories</span>
             <div class="pills2" x-show="distinctCountries().length">
               <button type="button" class="cat-chip" :class="galleryCountry===''?'selected':''" @click="galleryCountry=''">All countries</button>
               <template x-for="c in distinctCountries()" :key="c">
@@ -2067,7 +2068,7 @@
       prevTab:'plants', updateReady:false,
       newEvent:{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',photos:[],existingPhotos:[],removedPhotoIds:[]},
       filterCategoryIds:[],
-      tab:'plants', galleryGenus:null, galleryCatId:'', galleryCountry:'', searchQ:'', listCatIds:[], listGenusName:'', allEvents:[],
+      tab:'plants', galleryGenus:null, galleryCatIds:[], galleryCountry:'', searchQ:'', listCatIds:[], listGenusName:'', allEvents:[],
       plantsViewMode: localStorage.getItem('plantsViewMode')||'',
       journalFilter:'all', journalSearch:'', journalTypeFilter:'', allPhotos:[], allPhotosLoaded:false,
       quickLogOpen:false, quickLogBusy:false, quickLogError:'',
@@ -2952,13 +2953,14 @@
         return result.sort();
       },
       generaGallery(){
-        let list=this.galleryCatId?this.plants.filter(p=>(p.plant_category||[]).some(pc=>pc.category_id===this.galleryCatId)):this.plants;
+        let list=this.galleryCatIds.length?this.plants.filter(p=>{const ids=(p.plant_category||[]).map(pc=>pc.category_id);return this.galleryCatIds.every(id=>ids.includes(id));}):this.plants;
         if(this.galleryCountry)list=list.filter(p=>p.country===this.galleryCountry);
         const by={};
         for(const p of list){const g=this.genusOf(p);if(!by[g])by[g]={genus:g,count:0,thumbUrl:null};by[g].count++;if(!by[g].thumbUrl&&p.thumbUrl)by[g].thumbUrl=p.thumbUrl;}
         return Object.values(by).sort((a,b)=>a.genus.localeCompare(b.genus));
       },
-      genusPlants(genusName){let list=this.plants.filter(p=>this.genusOf(p)===genusName);if(this.galleryCatId)list=list.filter(p=>(p.plant_category||[]).some(pc=>pc.category_id===this.galleryCatId));if(this.galleryCountry)list=list.filter(p=>p.country===this.galleryCountry);return list.sort((a,b)=>this.speciesLine(a).localeCompare(this.speciesLine(b)));},
+      genusPlants(genusName){let list=this.plants.filter(p=>this.genusOf(p)===genusName);if(this.galleryCatIds.length)list=list.filter(p=>{const ids=(p.plant_category||[]).map(pc=>pc.category_id);return this.galleryCatIds.every(id=>ids.includes(id));});if(this.galleryCountry)list=list.filter(p=>p.country===this.galleryCountry);return list.sort((a,b)=>this.speciesLine(a).localeCompare(this.speciesLine(b)));},
+      toggleGalleryCat(id){const i=this.galleryCatIds.indexOf(id);if(i>=0)this.galleryCatIds.splice(i,1);else this.galleryCatIds.push(id);},
       effectivePlantsView(){
         if(this.plantsViewMode)return this.plantsViewMode;
         if(!this.plants.length)return 'grid';
