@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-07-01d">
+<meta name="app-build" content="2026-07-01e">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -2924,7 +2924,7 @@
         for(const p of list){const g=this.genusOf(p);if(!by[g])by[g]={genus:g,count:0,thumbUrl:null};by[g].count++;if(!by[g].thumbUrl&&p.thumbUrl)by[g].thumbUrl=p.thumbUrl;}
         return Object.values(by).sort((a,b)=>a.genus.localeCompare(b.genus));
       },
-      genusPlants(genusName){let list=this.plants.filter(p=>this.genusOf(p)===genusName);if(this.galleryCountry)list=list.filter(p=>p.country===this.galleryCountry);return list.sort((a,b)=>this.speciesLine(a).localeCompare(this.speciesLine(b)));},
+      genusPlants(genusName){let list=this.plants.filter(p=>this.genusOf(p)===genusName);if(this.galleryCatId)list=list.filter(p=>(p.plant_category||[]).some(pc=>pc.category_id===this.galleryCatId));if(this.galleryCountry)list=list.filter(p=>p.country===this.galleryCountry);return list.sort((a,b)=>this.speciesLine(a).localeCompare(this.speciesLine(b)));},
       openGenus(name){this.galleryGenus=name;},
       searchResults(){const q=this.searchQ.trim().toLowerCase();if(!q)return[];return this.plants.filter(p=>this.displayName(p).toLowerCase().includes(q)).slice(0,60);},
       genusNames(){const s=new Set();for(const p of this.plants){const g=p.species&&p.species.genus&&p.species.genus.name;if(g)s.add(g);}return[...s].sort((a,b)=>a.localeCompare(b));},
