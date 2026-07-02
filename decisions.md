@@ -10,6 +10,8 @@ Stephen noticed the genera-page (Plants tab) category filter only let him pick o
 
 **Fix:** renamed `galleryCatId` → `galleryCatIds` (array), added `toggleGalleryCat(id)` (same toggle pattern as the List tab's `toggleListCat`), and switched `generaGallery()`/`genusPlants()` to the same AND-logic filter already used by `listGroups()` (a plant must carry ALL selected categories). Chips now show selected state via `.includes()` instead of `===`; added a "matching all N categories" hint when 2+ are picked, mirroring the List tab.
 
+**Verified:** Chrome (`test@test.com`) — multiple chips select together, "matching all 2 categories" hint appears, "All categories" clears correctly, drill-down still narrows correctly (no regression of the `2026-07-01e` fix below), no console errors. **CONFIRMED by Stephen on his iPhone** (same pass as the Grid/List toggle below — both were live together when he tested).
+
 ---
 
 ## 2026-07-01 — Grid/List view toggle + "All categories" label fix (build 2026-07-01f)
@@ -17,6 +19,10 @@ Stephen noticed the genera-page (Plants tab) category filter only let him pick o
 **Grid/List toggle (Lite tier; Architecture pass, Build pass — real feature from `ui-polish-backlog` #6):** Right after an import nobody has photos yet, so the genus gallery was a wall of blank leaf-placeholder tiles. Added a Grid/List toggle to the Plants tab, reusing the existing `.seg` segmented-control styling (same component as the Journal tab's All/Photos switch). List mode keeps the genus drill-down (genus rows → tap → plant rows as text), staying distinct from the separate flat List tab. **Smart default:** opens in List when under 40% of plants have a cover photo, Grid otherwise; the first manual tap overrides this permanently (saved to `localStorage['plantsViewMode']`, same pattern as `lastGenusId`). **Grid density:** `.gallery-grid` now gets a `cols-3`/`cols-4` class (via `gridDensityClass()`) so tiles shrink as a genus/collection grows past 6/24 items — thresholds are a judgment call, not measured. Both view modes keep the existing Category/Country filter pills. No new Supabase calls (List mode is strictly cheaper — no photos needed), no auth/RLS/import surface touched.
 
 **"All categories" label fix:** the genus-gallery's category-filter clear button read "All genera" — copy-paste mislabel from before Categories existed there, confusing since the alternatives are categories (Carnivorous, Orchid, Plant, Seed…), not other genera. Renamed to "All categories" to match the identical button already correctly labeled on the List tab.
+
+**Verified:** Chrome (`test@test.com`) — toggle switches cleanly, List mode shows genus/plant rows with no blank tiles, category filter still narrows the List-mode drill-down correctly, manual choice persists via `localStorage` and overrides the smart default on reload, no console errors. **CONFIRMED by Stephen on his iPhone** against his real ~166-plant collection (a much better real-world test of the smart-default threshold than the small Chrome test account).
+
+**Tooling note (this session):** GitHub Pages + Chrome served a stale cached copy of the app on a repeat visit to the identical `?u=1` URL after a push — the query string must be a fresh/unique value each time to force a real reload, not just present. Also confirmed (again) that the local static-preview sandbox (`preview_start` tool) cannot open files at all, even with an explicit, correct, hardcoded path passed via `directory=` — a `PermissionError` inside `open()` gets silently converted to a plain 404 by `http.server`, so it looks like a missing file rather than a permissions error. Chrome-against-the-live-site remains the only working verification route in this environment.
 
 ---
 
@@ -28,7 +34,7 @@ Found by Stephen during the build-2026-07-01d verification walkthrough: tapping 
 
 **Fix:** `genusPlants()` now also filters by `galleryCatId`, mirroring the existing country-filter line right above it. One-line change, no new pattern — same shape as the already-shipped country filter.
 
-**Verification:** Could not drive Chrome/Supabase live in this session (fix is local/uncommitted, so nothing deployed for Chrome to hit; the local static-preview sandbox couldn't open files at all, confirmed via reproducible test — an environment limitation, not a code issue). Stephen to confirm on his phone after push, using the same "Seed" category test that surfaced the bug.
+**Verification:** Could not drive Chrome/Supabase live in the same pass as the fix (fix was local/uncommitted at write time, so nothing deployed for Chrome to hit; the local static-preview sandbox couldn't open files at all, confirmed via reproducible test — an environment limitation, not a code issue). **CONFIRMED by Stephen on his iPhone** after push, using the same "Seed" category test that surfaced the bug.
 
 ---
 
@@ -49,6 +55,8 @@ Found by Stephen during the build-2026-07-01d verification walkthrough: tapping 
 3. **(build 2026-07-01d, the actual root cause)** Isolated the button's `:disabled` binding directly and discovered a real quirk in this app's bundled Alpine build: `:disabled` bound to an **empty string `""`** is treated as `disabled=true` — only a literal boolean `false` counts as enabled. Confirmed with a scratch Alpine component: `:disabled="false"` → enabled, `:disabled="''"` → disabled, every time. `importBatchBusy` is a string sentinel (empty when idle, holds the busy batch's id while an undo runs) — not a boolean — so the three `:disabled="importBatchBusy"` bindings (batch-list row, single-batch drill-down, duplicate pick-step list) were stuck disabled from first render, regardless of the actual (falsy) value. Fixed with `:disabled="!!importBatchBusy"` on all three. **Durable lesson for this codebase: any future `:disabled` binding must use a real boolean, never a string/id sentinel directly** — every other `:disabled` target in the app already does (detailBusy, saving, photoBusy, etc.), which is why only these three were affected.
 
 **VERIFIED LIVE (build 2026-07-01d):** on Stephen's real account, clicked "Undo this whole import" on the actual CP DB2.xlsx batch (151 plants) — correctly flipped to "Delete all 151 plants from this import? Yes/No". Clicked **No** to back out; data untouched. Stephen has not yet run the actual undo (Yes) — his call, whenever he wants to.
+
+**FOLLOW-UP — real undo run for real (2026-07-01, later same day):** Stephen reports he had imported CP DB2.xlsx **twice** (a second real run created a second, separate import batch — expected behavior, since imports never merge/dedupe by design) and used "Undo this whole import" (the actual Yes, not a dry-run) to delete **both** batches. Confirmed working correctly at real scale, on real data, across two independent batches. **Account-state correction:** the 166-plants/"CP DB2 fully intact" figure recorded above is now stale — his real account is back down to whatever it held before either CP DB2 import (Stephen's own base collection, roughly ~15 plants). Don't cite the 166 figure as current state going forward.
 
 ---
 
