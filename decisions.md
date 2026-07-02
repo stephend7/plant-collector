@@ -4,12 +4,6 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
-## 2026-07-01 — Model rotation: Sonnet 5 replaces Sonnet 4.6, Fable 5 held to a bar
-
-Stephen's rule (his call, 2026-07-01): Fable 5 is expensive, so it's not a default swap for the Build/Test slots in the playbook's model rotation — **Sonnet 5 covers those** and is the new default there. Fable 5 is only worth using **if it beats Opus 4.8**, i.e. it would need to earn the Architecture slot, not just replace Sonnet. Until proven otherwise: Architecture = Opus 4.8, Build/Security/Test = Sonnet 5.
-
----
-
 ## 2026-07-01 — Category filter not applied on genus drill-down (build 2026-07-01e)
 
 Found by Stephen during the build-2026-07-01d verification walkthrough: tapping a category chip (e.g. "Seed") on the genera-gallery screen correctly filtered the per-genus counts, but tapping into a genus from there showed ALL plants in that genus, ignoring the category filter.
