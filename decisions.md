@@ -4,6 +4,27 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-05 — Inventory mode, lite/rolling version (build 2026-07-05a)
+
+Built the lightweight, rolling Inventory feature from `ui-polish-backlog` #4 (Lite tier; Architecture + Build + inline Security, no separate agent — non-risky owned-row-write UI). Deliberately the SIMPLE half: mark-seen + gap-finder only. The harder reconciliation half (duplicate-guard when a physical plant may already be in the DB, "＋ found one here" add shortcut, moved-shelf handling) is **deferred by Stephen's own call** — ship lite, let real use on his phone make the harder answers clearer before designing them.
+
+**What shipped:**
+- New screen `screen==='inventory'`, reached from the ⋯ main menu (disabled until the collection has plants, same pattern as Export).
+- **By shelf:** groups in-collection plants by `growing_location` (no finer "tray" level, per Stephen). Tap a shelf → its plants → **Mark seen**.
+- **Mark seen** stamps `plant.last_seen_at`; a ± stepper (defaults to current `quantity`) lets him adjust the count in the same tap. Only writes `quantity` if it actually changed. **No journal event is written** — marking seen must not spam the timeline (Stephen's explicit "no sessions, no nagging" rule); only a real count change touches the row, and even that logs nothing (consistent with the tap-to-edit tiles' quantity path).
+- **Due for a look:** all in-collection plants sorted least-recently-seen first, never-seen at the very top (`last_seen_at` null → sorts before any date). This is the on-demand gap-finder — the app NEVER auto-flags "missing"; Stephen consults it when HE feels he's done his rounds.
+- `seenLabel()` gives friendly relative text (Never seen / Seen today / Seen N days ago / weeks / months).
+
+**Data model:** migration `010_inventory_last_seen.sql` adds two nullable columns to `plant` — `last_seen_at timestamptz`, `last_seen_count integer`. No FK, no check, **no RLS change** (existing owner-only policies on `plant` already cover every column). Followed the migration-009 precedent (migration file is canonical; `schema.sql` not re-edited). `PLANT_SELECT` extended to load the two columns.
+
+**Security (inline, PASS — no new surface):** write path is the same RLS-protected `sb.from('plant').update(...).eq('id',p.id)` — owner-only RLS means a user can only ever update their own rows whatever id is passed. Quantity sanitized `Math.max(0,Math.floor(Number()||0))` (no negative/NaN/float). `last_seen_at` is a client ISO timestamp but it's the user's own convenience field, not an auth/trust input. No egress, no upload, no injection surface.
+
+**Verified live END-TO-END** (Chrome, `test2@test.com` — the old `test@test.com` password was lost and can't be email-reset on a fake address, so a fresh throwaway was made; build `2026-07-05a`): created 2 throwaway *Drosera* on Shelf A / Shelf B → By shelf grouped them correctly (1 + 1) → Mark seen flipped "Never seen"→"Seen today" and **the write survived a full page reload** (real Supabase round-trip, not local state) → Due for a look sorted never-seen above seen → the ± stepper bumped one plant 1→3 and that landed on the actual `plant.quantity` (checked on the detail page) → the plant's journal still showed ONLY its original Acquired event (no seen-spam). **NOT yet confirmed on Stephen's iPhone (WebKit)** — pending his real-device pass.
+
+**Process note (surfaced, not buried):** partway through I mis-pointed the local test server at the MAIN working tree instead of this task's worktree, so edits briefly landed on `main` instead of the `claude/wizardly-meitner-0f7aa1` branch. Caught it with `git status`, moved the changes to the worktree branch, confirmed `main` clean. No data lost, nothing pushed in a bad state.
+
+---
+
 ## 2026-07-01 — Multi-select category filter on the genera page (build 2026-07-01g)
 
 Stephen noticed the genera-page (Plants tab) category filter only let him pick one category at a time and read it as a regression. Checked git history: it was actually single-select from day one (`galleryCatId`, a single string) — only the separate List tab ever had multi-select (`listCatIds`, an array with AND logic, added earlier). Asked Stephen directly; he wants multi-select here too, to match the List tab.

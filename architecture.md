@@ -89,6 +89,12 @@ whitespace (no `"Pinguicula"` vs `"Pinguicula "` rot), and allow one-tap add.
 - **Pot / container + a photo of it** — finer-grained location, to help find a tagless plant later
 - **Lifecycle status** — in collection / dead / sold / traded / given away (always set manually)
 - optional **plant-level notes**
+- **Last seen** (`last_seen_at` + optional `last_seen_count`) — for the lightweight **Inventory
+  mode** (walk a shelf, tap each plant "seen"; a least-recently-seen sort surfaces loss
+  candidates on demand). Rolling, no sessions, no auto-flagging. Marking seen writes NO journal
+  event (would spam it); only an actual count change touches the row. Migration `010`. The harder
+  reconciliation half (duplicate-guard, add-from-shelf, moved-shelf) is deferred — see `decisions.md`
+  2026-07-05.
 
 **Photo (a visual timeline)** — multiple per plant, capturing **progression over time**
 (vital for bonsai growers; valued by Nepenthes and most others). Each photo carries:
