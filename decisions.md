@@ -4,6 +4,58 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-07 — Google Sheets sync DESIGNED & approved (no code yet; build later on Sonnet)
+
+The two-way-sync design session paused 2026-07-05 resumed and finished on **Fable 5** (the
+"design on the strong model, build later" plan). Full-tier process: Architect contract written
+(`docs/sheets-sync-plan.md`) → **real separated Security agent reviewed the PLAN** (Sonnet,
+reviewer ≠ author) → verdict **CONDITIONAL PASS**, all 10 findings folded back into the doc →
+summary presented → **Stephen approved the design 2026-07-07**. No feature code exists yet.
+
+**Decisions locked today (Stephen):**
+- **Write-consent model = ONE-TIME UPFRONT DISCLOSURE** (finishing the thought he paused
+  2026-07-05): choosing full sync shows one plain-words screen listing exactly what the app
+  will/won't touch, then requests the OAuth write scope once. NOT per-run approval — but per-run
+  transparency (counted reports) and surprise-tripwires (first write, schema drift, >50% of rows
+  changing, in BOTH directions) still apply.
+- **Published-sheet-URL step CUT from the staircase.** Publishing a sheet makes it readable by
+  anyone with the link — wrong for data whose secrecy is a theft control (locations, prices),
+  and with OAuth accepted its reason to exist (avoiding OAuth) is gone. Staircase is now:
+  A file upload (shipped) → B OAuth connect+read → C write → D two-way.
+- **Scope stays `drive.file` + Google Picker only** (re-confirmed): the app can touch ONE
+  user-picked spreadsheet, never the rest of Drive. Within a spreadsheet, sync binds to ONE
+  user-chosen TAB — remnant/unused tabs are never read past their names, never written.
+
+**Key architecture calls (see the plan doc for full detail):**
+- **C splits into C1 → C2:** the write engine debuts against an app-CREATED backup spreadsheet
+  ("Plant Collector Backup", relational multi-tab — `drive.file` covers app-created files with
+  no Picker) where a bug costs nothing, and only then mirrors into the user's own sheet.
+- **First-link ID stamping:** full-sync onboarding does import → consent → stamp-IDs as one
+  flow reusing the parse's row indices, with a re-fetch content-match tripwire before stamping
+  (mid-flow sheet edits drop into a side-by-side matcher, never stamped blind).
+- **Two-way (D) = snapshot-and-compare** per the 2026-06-29 problem list: per-row last-agreed
+  snapshots; both-changed = conflict shown side-by-side, never a silent winner; vanished sheet
+  row NEVER auto-deletes an app plant; row-level conflicts in v1.
+- **Migration 011 (draft in plan):** `sheet_link` + `sheet_row_snapshot` (owner-only RLS) +
+  `source_kind` check-constraint swap to add `'sheet_oauth'` (005's constraint does NOT already
+  allow it — Security caught the plan's original wording implying otherwise).
+
+**Security review highlights (all now in the plan):** GIS/Picker scripts are the app's FIRST
+off-origin runtime code (everything else is vendored) → CSP meta tag ships in the same commit
+as the first Google script tag; the C2 mirror copies theft-sensitive fields (location, price)
+outside the RLS boundary into a user-shareable sheet → disclosure says so outright + mapping
+gets a "keep private fields out of the sheet" exclusion option; the mass-change tripwire must
+gate PULLS not just pushes; consent gating honestly reframed as an app-level (not cryptographic)
+guarantee in a client-only architecture; Picker-ID pinning against confused-deputy retargeting;
+`valueInputOption=RAW` on every write (Sheets-side formula-injection defense).
+
+**Next step when building starts (Sonnet, per the model rotation):** Step B alone — GIS token
+client (memory-only token), Picker, tab picker, one-time import through the existing A-core.
+Verify early on iPhone/WebKit (Picker popup behavior on iOS Safari is a named risk). Stephen
+will duplicate his old sheet as the writable sandbox before C/D testing.
+
+---
+
 ## 2026-07-05 — Inventory mode, lite/rolling version (build 2026-07-05a)
 
 Built the lightweight, rolling Inventory feature from `ui-polish-backlog` #4 (Lite tier; Architecture + Build + inline Security, no separate agent — non-risky owned-row-write UI). Deliberately the SIMPLE half: mark-seen + gap-finder only. The harder reconciliation half (duplicate-guard when a physical plant may already be in the DB, "＋ found one here" add shortcut, moved-shelf handling) is **deferred by Stephen's own call** — ship lite, let real use on his phone make the harder answers clearer before designing them.
