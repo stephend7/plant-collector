@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-07d">
+<meta name="app-build" content="2026-07-08a">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1641,9 +1641,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M16 16l-4-4-4 4" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12v9" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span class="grow"><span class="menu-row-t">Google Drive backup</span><small>Keep a live copy of your collection in Google Sheets</small></span>
           </button>
-          <button type="button" class="menu-row" disabled title="Two-way sync is planned but not built yet">
+          <button type="button" class="menu-row" @click="openSync()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="23 4 23 10 17 10" stroke-linecap="round" stroke-linejoin="round"/><polyline points="1 20 1 14 7 14" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span class="grow"><span class="menu-row-t">Sync<span class="menu-soon">coming soon</span></span><small>Two-way sync with Google Sheets</small></span>
+            <span class="grow"><span class="menu-row-t">Sheet sync</span><small>Keep your connected Google Sheet up to date</small></span>
           </button>
         </div>
         <div class="sheet-acts" style="flex-direction:column;align-items:stretch;gap:6px;padding-top:10px">
@@ -1722,6 +1722,151 @@
         <div class="sheet-acts">
           <button @click="backupOpen=false" :disabled="backupBusy">Close</button>
           <button class="go" x-show="!backupMissing" :disabled="backupBusy||!backupLinkKnown" @click="runBackup(false)" x-text="backupBusy?'Backing up…':(backupLink?'Back up now':'Create backup')"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SHEET SYNC (sync step C2 — mirrors the app INTO the user's connected sheet) ===== -->
+    <div class="imp-back" x-show="syncOpen" x-cloak style="display:none">
+      <div class="imp-head">
+        <h2>Sheet sync</h2>
+        <button class="imp-x" :disabled="syncStep==='running'" @click="if(syncStep!=='running')syncOpen=false" aria-label="Close">✕</button>
+      </div>
+      <div class="imp-body">
+        <template x-if="syncError"><div class="imp-err" x-text="syncError"></div></template>
+        <template x-if="syncNote"><div class="imp-note" x-text="syncNote"></div></template>
+
+        <!-- STEP: overview -->
+        <div x-show="syncStep==='overview'">
+          <template x-if="syncLinkKnown && !syncLink">
+            <div>
+              <p style="font-size:14px;color:var(--ink);line-height:1.5">No Google Sheet is connected yet. Connect one by importing from it once — the connection is remembered.</p>
+              <button class="primary" style="width:100%" @click="syncOpen=false; openImport()">Go to Import from spreadsheet</button>
+            </div>
+          </template>
+          <template x-if="syncLink">
+            <div>
+              <div style="background:var(--card,#fff);border:1px solid #DBE3D3;border-radius:12px;padding:14px 16px;font-size:14px;color:var(--ink);line-height:1.5">
+                <div style="font-weight:600" x-text="syncLink.spreadsheet_name||'Google Sheet'"></div>
+                <div style="color:var(--muted);font-size:13px;margin-top:2px" x-text="'Tab: '+(syncLink.tab_title||'—')"></div>
+                <div style="color:var(--muted);font-size:13px;margin-top:4px">
+                  <span x-show="syncLink.mode==='mirror' && syncLink.last_sync_at">Last synced <span x-text="syncWhen()"></span>.</span>
+                  <span x-show="syncLink.mode==='mirror' && !syncLink.last_sync_at">Sync is on — nothing written yet.</span>
+                  <span x-show="syncLink.mode!=='mirror'">Connected for import only — the app doesn’t write to it.</span>
+                </div>
+                <div style="color:var(--muted);font-size:13px;margin-top:2px" x-show="syncLink.last_sync_status" x-text="syncLink.last_sync_status"></div>
+                <div style="color:var(--muted);font-size:13px;margin-top:2px" x-show="syncLink.mode==='mirror' && syncLink.mapping && syncLink.mapping.privacyExclude">Locations and prices are kept out of this sheet.</div>
+                <a style="color:var(--pine-2);cursor:pointer;font-size:13px;display:inline-block;margin-top:8px" :href="'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(syncLink.spreadsheet_id)" target="_blank" rel="noopener">Open in Google Sheets ›</a>
+              </div>
+              <p class="hint" style="margin-top:10px" x-show="syncLink.mode==='mirror'">The app is the source of truth: syncing updates the mapped columns and adds rows for new plants. Edits made in the sheet are not pulled back into the app (yet).</p>
+              <div class="btnrow" style="margin-top:12px">
+                <button class="btn-ghost" @click="syncOpen=false">Close</button>
+                <button class="primary" style="flex:1;margin-top:0" x-show="syncLink.mode!=='mirror'" :disabled="syncBusy||!syncLinkKnown" @click="syncTurnOn()">Turn on sheet sync</button>
+                <button class="primary" style="flex:1;margin-top:0" x-show="syncLink.mode==='mirror'" :disabled="syncBusy||!syncLinkKnown" @click="syncNow()" x-text="syncBusy?'Checking…':'Sync now'"></button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- STEP: the one-time disclosure (SYNC_CONSENT_VERSION — the app's promise, recorded on acceptance) -->
+        <div x-show="syncStep==='disclosure'">
+          <h3 style="margin:0 0 10px;font-size:16px;color:var(--ink)">What this app will do to your spreadsheet</h3>
+          <div style="background:var(--card,#fff);border:1px solid #DBE3D3;border-radius:12px;padding:14px 16px;font-size:14px;color:var(--ink);line-height:1.5">
+            <p style="margin:0 0 10px">• It can only see this one file — never the rest of your Drive.</p>
+            <p style="margin:0 0 10px">• It will update the columns you mapped, on the tab you chose. Nothing else.</p>
+            <p style="margin:0 0 10px">• It will add one column called <strong>“App ID”</strong> so it can tell rows apart.</p>
+            <p style="margin:0 0 10px">• It will add new rows when you add plants in the app.</p>
+            <p style="margin:0 0 10px">• It will <strong>NEVER</strong> delete rows, touch other tabs, or change your formatting.</p>
+            <p style="margin:0 0 10px">• Before its first change it saves a backup copy of your tab, and Google keeps full version history (File → Version history) you can always restore.</p>
+            <p style="margin:0 0 10px">• Google’s next screen says “edit, create, and delete” — that’s Google’s standard wording for this permission; the list above is everything this app actually does.</p>
+            <p style="margin:0"><strong>• This sheet will contain your plant locations and prices — the same fields this app normally keeps private.</strong> Google Sheets sharing is controlled entirely by you: if you share this sheet with anyone, they’ll see those fields too.</p>
+          </div>
+          <label style="display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:14px;color:var(--ink);cursor:pointer">
+            <input type="checkbox" x-model="syncPrivacy" style="margin-top:3px">
+            <span>Keep private fields out of the sheet — don’t write location data or prices into it.</span>
+          </label>
+          <div class="btnrow" style="margin-top:14px">
+            <button class="btn-ghost" @click="syncStep='overview'; syncError=''">← Back</button>
+            <button class="primary" style="flex:1;margin-top:0" :disabled="syncBusy" @click="syncAccept()" x-text="syncBusy?'Working…':'I agree — turn on sync'"></button>
+          </div>
+        </div>
+
+        <!-- STEP: review (rows the matcher won't guess about) -->
+        <div x-show="syncStep==='review'">
+          <h3 style="margin:0 0 6px;font-size:16px;color:var(--ink)" x-text="syncReview.length+' row'+(syncReview.length===1?'':'s')+' need'+(syncReview.length===1?'s':'')+' your eye"></h3>
+          <p class="hint" style="margin:0 0 12px">These sheet rows didn’t clearly match one plant in the app. Pick the right plant for each, or leave the row alone. Plants that end up matched to no row will be <strong>added as new rows</strong> at the bottom of the sheet.</p>
+          <template x-for="item in syncReview" :key="item.r">
+            <div style="border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-bottom:10px">
+              <div style="font-weight:600;font-size:14px"><span x-text="'Row '+item.rowNum+': '"></span><span style="font-family:var(--serif);font-style:italic" x-text="item.label"></span></div>
+              <div style="color:var(--muted);font-size:12px;margin:4px 0 8px">
+                <template x-for="c in item.cells"><span style="margin-right:10px"><span x-text="c.h+': '"></span><span x-text="c.v"></span></span></template>
+              </div>
+              <select x-model="item.choice" style="width:100%">
+                <option value="">Leave this row alone</option>
+                <template x-for="cand in syncPlan?syncPlan.reviewCandidates:[]" :key="cand.id"><option :value="cand.id" x-text="cand.label"></option></template>
+              </select>
+            </div>
+          </template>
+          <p class="hint" x-show="syncReviewChoiceDup()" style="color:#9A3528">The same plant is picked for more than one row.</p>
+          <div class="btnrow">
+            <button class="btn-ghost" @click="syncStep='overview'; syncError=''">Cancel</button>
+            <button class="primary" style="flex:1;margin-top:0" :disabled="syncReviewChoiceDup()" @click="syncReviewDone()">Continue</button>
+          </div>
+        </div>
+
+        <!-- STEP: the counted preview (tripwire gate) -->
+        <div x-show="syncStep==='preview'">
+          <h3 style="margin:0 0 10px;font-size:16px;color:var(--ink)">Here’s what this sync will do</h3>
+          <div class="imp-counts" x-show="syncPlan && syncPlan.counts">
+            <div class="imp-pill"><b x-text="syncPlan&&syncPlan.counts?syncPlan.counts.updated:0"></b>rows updated</div>
+            <div class="imp-pill"><b x-text="syncPlan&&syncPlan.counts?syncPlan.counts.added:0"></b>rows added</div>
+            <div class="imp-pill"><b x-text="syncPlan&&syncPlan.counts?syncPlan.counts.stamped:0"></b>rows get an App ID</div>
+            <div class="imp-pill" x-show="syncPlan&&syncPlan.counts&&syncPlan.counts.leftAlone"><b x-text="syncPlan&&syncPlan.counts?syncPlan.counts.leftAlone:0"></b>rows left alone</div>
+          </div>
+          <p class="hint" x-show="syncPlan&&syncPlan.firstWrite" style="margin-top:10px">First sync for this sheet: a backup copy of the tab is saved inside the same spreadsheet before anything changes.</p>
+          <p class="hint" x-show="syncPlan&&syncPlan.formulaSkipped&&syncPlan.formulaSkipped.length" style="margin-top:6px" x-text="syncPlan&&syncPlan.formulaSkipped&&syncPlan.formulaSkipped.length?('These columns contain formulas and are never written: '+syncPlan.formulaSkipped.join(', ')+'.'):''"></p>
+          <p class="hint" x-show="syncPlan&&syncPlan.counts&&syncPlan.counts.dups" style="margin-top:6px;color:#9A3528" x-text="syncPlan&&syncPlan.counts?(syncPlan.counts.dups+' rows share the same App ID — they’re left untouched. Remove the duplicate rows in the sheet.'):''"></p>
+          <p class="hint" x-show="syncPlan&&syncPlan.counts&&syncPlan.counts.truncated" style="margin-top:6px" x-text="syncPlan&&syncPlan.counts?(syncPlan.counts.truncated+' very long cell(s) were shortened for comparison.'):''"></p>
+          <p class="hint" style="margin-top:6px">Rows are never deleted; only the mapped columns and the App ID column are touched. Google keeps full version history of the file.</p>
+          <div class="btnrow" style="margin-top:12px">
+            <button class="btn-ghost" @click="syncStep='overview'; syncError=''">Cancel</button>
+            <button class="primary" style="flex:1;margin-top:0" :disabled="syncBusy" @click="syncRunPlan()" x-text="syncBusy?'Working…':'Apply to sheet'"></button>
+          </div>
+        </div>
+
+        <!-- STEP: re-map (column drift blocked the sync) -->
+        <div x-show="syncStep==='remap'">
+          <h3 style="margin:0 0 6px;font-size:16px;color:var(--ink)">The sheet’s columns changed</h3>
+          <p class="hint" style="margin:0 0 12px">Sync is paused until the columns are re-matched — nothing was written. Point each field at the right column, then continue.</p>
+          <template x-for="f in syncFields()" :key="f[0]">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <label style="flex:0 0 44%;font-size:13px;color:var(--ink)" x-text="f[1]"></label>
+              <select x-model="syncRemap.map[f[0]]" style="flex:1">
+                <option value="">— not in this sheet —</option>
+                <template x-for="(h,i) in syncRemap.headers" :key="i"><option :value="String(i)" x-text="h"></option></template>
+              </select>
+            </div>
+          </template>
+          <div class="btnrow" style="margin-top:12px">
+            <button class="btn-ghost" @click="syncStep='overview'; syncError=''; syncNote=''">Cancel</button>
+            <button class="primary" style="flex:1;margin-top:0" :disabled="syncBusy" @click="syncSaveRemap()" x-text="syncBusy?'Working…':'Save and continue'"></button>
+          </div>
+        </div>
+
+        <!-- STEP: running -->
+        <div x-show="syncStep==='running'" style="text-align:center;padding:40px 0">
+          <p style="font-size:16px">Syncing your sheet…</p>
+          <p style="color:var(--muted);font-size:13px">Please keep this screen open.</p>
+        </div>
+
+        <!-- STEP: done -->
+        <div x-show="syncStep==='done'">
+          <div style="background:var(--card,#fff);border:1px solid #DBE3D3;border-radius:12px;padding:14px 16px;font-size:14px;color:var(--ink);line-height:1.5">
+            <div style="font-weight:600;color:var(--pine-2)">Done</div>
+            <p style="margin:6px 0 0" x-text="syncResult"></p>
+            <a style="color:var(--pine-2);cursor:pointer;font-size:13px;display:inline-block;margin-top:8px" x-show="syncLink" :href="syncLink?('https://docs.google.com/spreadsheets/d/'+encodeURIComponent(syncLink.spreadsheet_id)):'#'" target="_blank" rel="noopener">Open in Google Sheets ›</a>
+          </div>
+          <div class="btnrow" style="margin-top:12px"><button class="primary" style="flex:1;margin-top:0" @click="syncOpen=false">Close</button></div>
         </div>
       </div>
     </div>
@@ -1976,6 +2121,7 @@
               </template>
             </div>
           </template>
+          <p class="hint" x-show="gSheetId" style="margin-top:10px">This sheet stays connected. Want the app to keep it up to date from now on? <a style="color:var(--pine-2);cursor:pointer" @click="openSync()">Turn on sheet sync</a>.</p>
           <div class="btnrow"><button class="primary" style="flex:1;margin-top:0" @click="closeImport()">Done</button></div>
         </div>
       </div>
@@ -2044,7 +2190,7 @@
   // today's date in the user's OWN timezone (toISOString() uses UTC and rolls a day early in the Americas)
   function todayLocal(){const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
   // one place for the plant query shape (used by full-list load AND single-plant reload)
-  const PLANT_SELECT='id,species_id,vendor_id,growing_location_id,cover_photo_id,form_descriptor,quantity,price:acquisition_price,accession_id,source_url,location_data,country,acquisition_date,acquisition_type,lifecycle_status,notes,last_seen_at,last_seen_count,'+
+  const PLANT_SELECT='id,species_id,vendor_id,growing_location_id,cover_photo_id,form_descriptor,quantity,price:acquisition_price,accession_id,source_url,location_data,country,acquisition_date,acquisition_date_precision,acquisition_type,lifecycle_status,notes,last_seen_at,last_seen_count,'+
     'species:species_id(id,name,care_dormancy,care_water,care_feeding,care_light,care_photoperiod,care_humidity,genus:genus_id(id,name)),vendor:vendor_id(name),growing_location:growing_location_id(name),cover:cover_photo_id(storage_path),'+
     'plant_category(category_id,category:category_id(id,name))';
   async function signThumb(path){ if(!path)return null; const {data}=await sb.storage.from('photos').createSignedUrls([thumbOf(path)],3600); return data&&data[0]&&data[0].signedUrl||null; }
@@ -2246,6 +2392,14 @@
   // the plain-words backup explanation the user accepted (recorded on the sheet_link row).
   const BACKUP_TABS=['Plants','Species','Vendors','Journal'];
   const BACKUP_CONSENT_VERSION='backup-2026-07-07';
+  // Step C2 (write): mirroring into the user's OWN connected sheet. The disclosure text
+  // lives in the sync dialog markup; this version string is recorded with the acceptance
+  // so future-us can prove which promise was shown. The tripwire fraction is the
+  // surprise-gate: a run touching more of the mirror-managed rows than this stops for a
+  // counted confirm (docs/sheets-sync-plan.md "run mechanics").
+  const SYNC_CONSENT_VERSION='mirror-2026-07-08';
+  const TRIPWIRE_ROW_FRACTION=0.5;
+  const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function gCell(v,counters){    // mirror of the worker's cellToString: inert strings only
     if(v===null||v===undefined) return '';
     let s=String(v);             // numbers/bools → text; dates arrive as formatted strings
@@ -2388,7 +2542,51 @@
           {valueInputOption:'RAW',data:data.slice(i,i+5)});
       await call('POST','/'+encodeURIComponent(id)+'/values:batchClear',null,{ranges:clears});
     }
-    return {configured,ensureScripts,ready,getToken,pick,meta,values,dropToken,createFile,ensureTabs,writeTabs};
+    /* ---- WRITE engine, C2 additions — mirror into the USER'S connected sheet
+       (docs/sheets-sync-plan.md step C2). Same law as C1 — valueInputOption=RAW on
+       every write, NO delete calls anywhere — plus the C2 blast-radius rule: every
+       range names the ONE connected tab, and only mapped columns + the App ID column
+       are ever addressed. Structural batchUpdate requests in this entire codebase are
+       exactly addSheet, duplicateSheet, appendDimension — all additive; nothing that
+       removes rows, columns, tabs, or data exists here (condition 6, grep-provable). */
+    // Which columns contain live formula cells (they get excluded from write-back —
+    // warned, never overwritten). FORMULA rendering returns '=' strings for formulas.
+    async function formulaCols(id,tabTitle){
+      const range=quoteTab(tabTitle)+'!A1:'+colLetter(GCAP.COLS)+GCAP.ROWS;
+      const d=await api(encodeURIComponent(id)+'/values/'+encodeURIComponent(range),{valueRenderOption:'FORMULA',majorDimension:'ROWS'});
+      const rows=d.values||[], cols=new Set();
+      for(let r=0;r<rows.length;r++){ const row=rows[r]||[];
+        for(let c=0;c<Math.min(row.length,GCAP.COLS);c++) if(typeof row[c]==='string'&&row[c].charAt(0)==='=') cols.add(c); }
+      return cols;
+    }
+    // The first-write safety net: an additive copy of the tab inside the same
+    // spreadsheet. noRetry — not idempotent (a transit-error retry could strand two
+    // copies); the caller re-checks existence instead.
+    async function duplicateTab(id,tabId,newTitle){
+      await call('POST','/'+encodeURIComponent(id)+':batchUpdate',null,
+        {requests:[{duplicateSheet:{sourceSheetId:tabId,newSheetName:newTitle}}]},true);
+    }
+    // Widen the grid (additive) so the App ID column has somewhere to live.
+    async function ensureGridCols(id,tabId,extra){
+      await call('POST','/'+encodeURIComponent(id)+':batchUpdate',null,
+        {requests:[{appendDimension:{sheetId:tabId,dimension:'COLUMNS',length:extra}}]},true);
+    }
+    // Targeted cell writes: each entry addresses exactly the cells being changed —
+    // unmapped columns are never in any range. Full-overwrite semantics per cell, so
+    // retries and re-runs are safe (same values land again).
+    async function updateCells(id,data){   // data:[{range,values}]
+      for(let i=0;i<data.length;i+=100)
+        await call('POST','/'+encodeURIComponent(id)+'/values:batchUpdate',null,
+          {valueInputOption:'RAW',data:data.slice(i,i+100)});
+    }
+    // New rows after the tab's last data row. noRetry — a retry after a transit error
+    // could double-append; because appended rows carry their App ID, an append that
+    // landed but LOOKED failed is simply matched by ID on the next run, never re-added.
+    async function appendRows(id,tabTitle,rows){
+      await call('POST','/'+encodeURIComponent(id)+'/values/'+encodeURIComponent(quoteTab(tabTitle)+'!A1')+':append',
+        {valueInputOption:'RAW',insertDataOption:'INSERT_ROWS'},{values:rows},true);
+    }
+    return {configured,ensureScripts,ready,getToken,pick,meta,values,dropToken,createFile,ensureTabs,writeTabs,formulaCols,duplicateTab,ensureGridCols,updateCells,appendRows,colLetter};
   })();
 
   document.addEventListener('alpine:init', () => {
@@ -2405,6 +2603,8 @@
       photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
       mainMenuOpen:false, exportDialogOpen:false, exportFileName:'',
       backupOpen:false, backupBusy:false, backupError:'', backupResult:'', backupLink:null, backupMissing:false, backupLinkKnown:false,
+      syncOpen:false, syncStep:'overview', syncBusy:false, syncError:'', syncNote:'', syncResult:'',
+      syncLink:null, syncLinkKnown:false, syncPrivacy:false, syncPlan:null, syncReview:[], syncRemap:{headers:[],map:{}},
       invMode:'shelf', invShelf:null, invSeenId:null, invSeenQty:0, invPrevScreen:'list', invError:'',
       sheetOpen:false, sheet:null, sheetConfirmDelete:false, sheetEditing:false, sheetForm:{comment:'',label:'plant',date:''},
       prevTab:'plants', updateReady:false,
@@ -3868,6 +4068,435 @@
               prod+(e.dose_note?(prod?' — ':'')+e.dose_note:''),
               (pestsByEntry[e.id]||[]).filter(Boolean).join('; '), e.cause||'', e.plant_id||'' ].map(cell); }) ];
         return [ {title:'Plants',rows:plants},{title:'Species',rows:species},{title:'Vendors',rows:vendors},{title:'Journal',rows:journal} ];
+      },
+
+      /* ---- Google Sheet sync (sync step C2 — docs/sheets-sync-plan.md) ----
+         Mirrors the app INTO the user's connected sheet. The app is the source of
+         truth; the sheet follows (edits made in the sheet are NOT pulled back — that's
+         step D, and the disclosure says so). Blast radius: the one connected tab, the
+         mapped columns, plus one "App ID" column the app adds. New plants append at
+         the bottom; rows are NEVER deleted; formula columns are never overwritten.
+         Nothing is written before the one-time disclosure is accepted and recorded
+         (consent_version + consent_at + mode='mirror' on the sheet_link row). */
+      async openSync(){
+        this.mainMenuOpen=false; this.importOpen=false;
+        this.syncError=''; this.syncNote=''; this.syncResult=''; this.syncPlan=null; this.syncReview=[];
+        this.syncStep='overview'; this.syncLinkKnown=false; this.syncLink=null; this._remapped=false;
+        if(!GSheet.configured()) this.syncError='The Google connection isn’t set up on this copy of the app yet (missing Google Cloud values in config.js).';
+        this.syncOpen=true;
+        GSheet.ensureScripts().catch(()=>{});   // preload while the user reads (iOS popup rule)
+        // Same known-state discipline as the backup screen: a failed lookup must not
+        // pose as "nothing connected" — unknown state disables the actions.
+        try{
+          const {data,error}=await sb.from('sheet_link').select('id,spreadsheet_id,spreadsheet_name,tab_id,tab_title,mode,mapping,consent_version,consent_at,last_sync_at,last_sync_status').eq('kind','user_sheet').order('created_at',{ascending:false}).limit(1);
+          if(error) throw error;
+          this.syncLink=(data&&data[0])||null; this.syncLinkKnown=true;
+          this.syncPrivacy=!!(this.syncLink&&this.syncLink.mapping&&this.syncLink.mapping.privacyExclude);
+        }catch(e){ this.syncError=this.syncError||'Couldn’t check your sheet connection. Check your internet and reopen this screen.'; }
+      },
+      syncWhen(){ return this.syncLink&&this.syncLink.last_sync_at ? this.syncLink.last_sync_at.slice(0,16).replace('T',' ') : ''; },
+      // The one-time plain-words disclosure (Stephen-approved copy, versioned in the
+      // markup below). Accepting records consent BEFORE anything can be written.
+      syncTurnOn(){ this.syncError=''; this.syncStep='disclosure'; },
+      async syncAccept(){
+        if(this.syncBusy||!this.syncLink||!this.syncLinkKnown) return;
+        this.syncBusy=true; this.syncError='';
+        try{
+          if(!GSheet.ready()) await GSheet.ensureScripts();
+          await GSheet.getToken();               // Google popup — inside this tap
+          const mapping={...(this.syncLink.mapping||{}),privacyExclude:!!this.syncPrivacy};
+          const rec={mode:'mirror',consent_version:SYNC_CONSENT_VERSION,consent_at:new Date().toISOString(),mapping};
+          const {error}=await sb.from('sheet_link').update(rec).eq('id',this.syncLink.id);
+          if(error) throw error;                 // no consent recorded → no sync happens
+          this.syncLink={...this.syncLink,...rec};
+          await this._syncPrepare();
+        }catch(e){ if(String(e&&e.message)!=='cancelled') this.syncError=(e&&e.message)||'Couldn’t turn on sheet sync. Nothing was changed.'; }
+        finally{ this.syncBusy=false; }
+      },
+      async syncNow(){
+        if(this.syncBusy||!this.syncLink||!this.syncLinkKnown||this.syncLink.mode!=='mirror') return;
+        this.syncBusy=true; this.syncError=''; this.syncResult='';
+        try{
+          if(!GSheet.ready()) await GSheet.ensureScripts();
+          await GSheet.getToken();
+          await this._syncPrepare();
+        }catch(e){ if(String(e&&e.message)!=='cancelled') this.syncError=(e&&e.message)||'Sync didn’t complete. Nothing was changed.'; }
+        finally{ this.syncBusy=false; }
+      },
+      // Fetch the tab, check the header fingerprint, match rows ↔ plants, build the
+      // counted plan; route to review (ambiguous rows) / preview (tripwire) / quiet run.
+      async _syncPrepare(){
+        const link=this.syncLink, mapping=link.mapping||{};
+        if(!mapping.map||!mapping.headers) throw new Error('This sheet has no saved column mapping. Import from it once first (Menu → Import from spreadsheet → Connect a Google Sheet).');
+        if(link.mode!=='mirror'||!link.consent_at) throw new Error('Sheet sync isn’t turned on for this sheet yet.');
+        // Re-verify the target against the LIVE file at each stage (condition 15):
+        // the tab must still exist; the ID acted on is the Picker-pinned stored one.
+        const m=await GSheet.meta(link.spreadsheet_id);
+        const tab=(link.tab_id!=null?m.tabs.find(t=>t.id===link.tab_id):null)||m.tabs.find(t=>t.title===link.tab_title);
+        if(!tab) throw new Error('The tab “'+(link.tab_title||'?')+'” no longer exists in that spreadsheet. Sync stopped — nothing was changed.');
+        if(tab.rows>GCAP.ROWS) throw new Error('That tab has more than '+GCAP.ROWS+' rows — too large to sync safely.');
+        if(m.title&&m.title!==link.spreadsheet_name){ this.syncLink={...this.syncLink,spreadsheet_name:m.title}; try{ await sb.from('sheet_link').update({spreadsheet_name:m.title}).eq('id',link.id); }catch(_){} }
+        // Fresh truth, CHECKED fetch (same rule as the C1 backup): a failed refresh
+        // aborts the run rather than mirroring stale or empty data.
+        const {data:fresh,error:pErr}=await sb.from('plant').select(PLANT_SELECT);
+        if(pErr) throw pErr;
+        const raw=await GSheet.values(link.spreadsheet_id,tab.title);
+        const counters={truncated:0};
+        const rows=raw.map(r=>{ const n=Math.min(r.length,GCAP.COLS); const out=new Array(n); for(let i=0;i<n;i++) out[i]=gCell(r[i],counters); return out; });
+        const header=rows[0]||[];
+        // Header fingerprint (condition 8): every mapped column must still carry the
+        // header it had when mapped. Drift blocks sync until the user re-maps.
+        const drift=[];
+        // Compare in the same normalized form headers are STORED in (blank headers are
+        // stored as their "Column N" placeholder — both at import time and after a
+        // sync), or a blank-headed mapped column would drift forever (Security
+        // 2026-07-08, LOW).
+        const liveH=(i)=>normWS(header[i])||('Column '+(i+1));
+        for(const k in mapping.map){ const ci=mapping.map[k]; if(ci===''||ci==null) continue;
+          const was=normKey(mapping.headers[Number(ci)]||''), is=normKey(liveH(Number(ci)));
+          if(was!==is) drift.push((mapping.headers[Number(ci)]||('column '+(Number(ci)+1)))+' → '+(header[Number(ci)]||'(blank)')); }
+        // A saved App ID column whose header now holds something else is drift too —
+        // stamping over a repurposed column would be silent damage.
+        if(!drift.length&&mapping.appIdCol!=null){ const h=normKey(header[Number(mapping.appIdCol)]||'');
+          if(h!==''&&h!=='app id') drift.push('App ID → '+header[Number(mapping.appIdCol)]); }
+        if(drift.length){ this._syncStartRemap(header,drift); return; }
+        const fcols=await GSheet.formulaCols(link.spreadsheet_id,tab.title);
+        const plan=this._syncBuildPlan(link,mapping,tab,rows,fcols,fresh||[]);
+        plan.truncated=counters.truncated;
+        this.syncPlan=plan;
+        if(plan.review.length){ this.syncReview=plan.review; this.syncStep='review'; return; }
+        this._syncFinishPlan(plan);
+        if(plan.tripped){ this.syncStep='preview'; return; }
+        await this._syncRun();                   // quiet run — under every tripwire
+      },
+      // Which mapped keys the mirror WRITES. Type + wishlist columns are read-only
+      // axes (the app's multi-category list would trample a curated single-axis Type
+      // cell); the privacy option keeps location data + price out of the sheet.
+      _syncWritableKeys(mapping){
+        const skip={wishlist:1,typeCategory:1};
+        if(mapping.privacyExclude){ skip.locationData=1; skip.price=1; }
+        const out=[];
+        for(const k in mapping.map){ const ci=mapping.map[k]; if(ci===''||ci==null||skip[k]) continue;
+          if(mapping.nameMode==='combined' ? (k==='genus'||k==='species') : k==='combinedName') continue;
+          out.push({key:k,col:Number(ci)}); }
+        return out;
+      },
+      // The app-side value written for one mapped key (what the mirror puts in the cell).
+      _syncVal(p,key,mapping){
+        switch(key){
+          case 'genus': return p.species&&p.species.genus?p.species.genus.name:'';
+          case 'species': return p.species?p.species.name:'';
+          case 'combinedName':{ const g=p.species&&p.species.genus?p.species.genus.name:'', s=p.species?p.species.name:'';
+            const accOwnCol=!(mapping.map.accessionId===''||mapping.map.accessionId==null);
+            return ((g+' '+s).trim())+((!accOwnCol&&p.accession_id)?', '+p.accession_id:''); }
+          case 'formDescriptor': return p.form_descriptor||'';
+          case 'vendor': return p.vendor?p.vendor.name:'';
+          case 'acquisitionDate':{ const d=p.acquisition_date||''; if(!d) return '';
+            if(p.acquisition_date_precision==='year') return d.slice(0,4);
+            if(p.acquisition_date_precision==='month') return d.slice(0,7);
+            return d; }
+          case 'price': return p.price==null?'':p.price;     // number stays a number (RAW keeps it numeric)
+          case 'accessionId': return p.accession_id||'';
+          case 'sourceUrl': return p.source_url||'';
+          case 'locationData': return p.location_data||'';
+          case 'country': return p.country||'';
+          case 'notes': return p.notes||'';
+          case 'status': return this.statusLabel(p.lifecycle_status);
+          case 'acquisitionType': return this.acqTypeLabel(p.acquisition_type);
+          default: return '';
+        }
+      },
+      // Does the sheet cell already SAY what the app says? Normalized comparison
+      // (dates through the import date parser, prices numerically, status/acq-type
+      // through the same word-guessers import uses) so a cell in the user's own
+      // format is left untouched when it means the same thing.
+      _syncEq(key,cell,p,mapping){
+        const c=normWS(cell);
+        switch(key){
+          case 'acquisitionDate':{ const pd=parseImportDate(c); const app=p.acquisition_date||null;
+            if(!app&&!pd.iso) return true; if(!app||!pd.iso) return false;
+            const prec=p.acquisition_date_precision||'day';
+            if(prec==='year') return pd.iso.slice(0,4)===app.slice(0,4);
+            if(prec==='month') return pd.iso.slice(0,7)===app.slice(0,7);
+            return pd.iso===app; }
+          case 'price':{ const a=p.price==null?null:Number(p.price), b=cleanPrice(c);
+            return (a==null&&b==null)||(a!=null&&b!=null&&Math.abs(a-b)<0.005); }
+          case 'status':{ const g=guessStatus(c); if(g&&g===(p.lifecycle_status||'in_collection')) return true;
+            return normKey(c)===normKey(this.statusLabel(p.lifecycle_status)); }
+          case 'acquisitionType':{ const t=normKey(c); let e=null;
+            if(/seed/.test(t))e='seed'; else if(/trade/.test(t))e='traded'; else if(/gift/.test(t))e='gift'; else if(/divi/.test(t))e='division'; else if(/buy|bought|purchas/.test(t))e='bought';
+            if(e&&e===p.acquisition_type) return true;
+            return normKey(c)===normKey(this.acqTypeLabel(p.acquisition_type)); }
+          case 'combinedName':{ const pc=parseCombinedName(c);
+            const g=p.species&&p.species.genus?p.species.genus.name:'', s=p.species?p.species.name:'';
+            const accOwnCol=!(mapping.map.accessionId===''||mapping.map.accessionId==null);
+            const accEq=accOwnCol?true:normKey(pc.accession||'')===normKey(p.accession_id||'');
+            return normKey(pc.genus)===normKey(g)&&normKey(pc.species)===normKey(s)&&accEq; }
+          default: return normKey(c)===normKey(String(this._syncVal(p,key,mapping)));
+        }
+      },
+      _syncRowName(row,mapping,cellAt){   // {g,s,f,a} for matching + review labels
+        let g='',s='',f='',a='';
+        if(mapping.nameMode==='combined'&&mapping.map.combinedName!==''&&mapping.map.combinedName!=null){
+          const pc=parseCombinedName(cellAt(row,Number(mapping.map.combinedName))); g=pc.genus; s=pc.species; a=pc.accession||'';
+        }else{
+          if(mapping.map.genus!==''&&mapping.map.genus!=null) g=cellAt(row,Number(mapping.map.genus));
+          if(mapping.map.species!==''&&mapping.map.species!=null) s=cellAt(row,Number(mapping.map.species));
+        }
+        if(mapping.map.formDescriptor!==''&&mapping.map.formDescriptor!=null) f=cellAt(row,Number(mapping.map.formDescriptor));
+        if(mapping.map.accessionId!==''&&mapping.map.accessionId!=null) a=cellAt(row,Number(mapping.map.accessionId))||a;
+        return {g,s,f,a};
+      },
+      // Match sheet rows to plants. Tier 1: rows already stamped with an App ID.
+      // Tier 2: unstamped rows where EVERY mapped field matches a free plant (safe —
+      // interchangeable). Tier 3: a unique name match (genus+species+form+accession).
+      // Anything still ambiguous goes to the side-by-side review — never guessed.
+      _syncBuildPlan(link,mapping,tab,rows,fcols,plants){
+        const cellAt=(row,col)=>{ const v=row?row[col]:null; return normWS(v==null?'':v); };
+        const header=rows[0]||[];
+        const allKeys=[];
+        for(const k in mapping.map){ const ci=mapping.map[k]; if(ci===''||ci==null) continue;
+          if(mapping.nameMode==='combined' ? (k==='genus'||k==='species') : k==='combinedName') continue;
+          allKeys.push({key:k,col:Number(ci)}); }
+        // Where the App ID column lives: saved position → existing "App ID" header →
+        // the first COMPLETELY EMPTY column past the used header row. Emptiness is
+        // checked over every fetched row, not just the header: a headerless column can
+        // still hold user data below row 1, and stamping over it would be silent
+        // damage to an unmapped column (Security review 2026-07-08, HIGH).
+        let appCol=(mapping.appIdCol!=null)?Number(mapping.appIdCol):header.findIndex(h=>normKey(h)==='app id');
+        if(appCol<0){
+          const colEmpty=(c)=>{ if(fcols.has(c)) return false;
+            for(let r=0;r<rows.length;r++){ const row=rows[r]; if(row&&row[c]!=null&&normWS(row[c])!=='') return false; } return true; };
+          let last=header.length; while(last>0&&normWS(header[last-1])==='') last--;
+          appCol=last; while(appCol<GCAP.COLS&&!colEmpty(appCol)) appCol++;
+        }
+        if(appCol>=GCAP.COLS) throw new Error('No empty column left for the App ID column — that sheet uses too many columns.');
+        if(fcols.has(appCol)) throw new Error('The App ID column contains formulas — clear those cells in the sheet, then sync again.');
+        const wkeys=this._syncWritableKeys(mapping);
+        const formulaSkipped=wkeys.filter(x=>fcols.has(x.col)).map(x=>header[x.col]||('column '+(x.col+1)));
+        const writable=wkeys.filter(x=>!fcols.has(x.col));
+        const byId=new Map(plants.map(p=>[p.id,p]));
+        const idCounts={}, rowInfos=[];
+        for(let r=1;r<rows.length;r++){
+          const row=rows[r]||[];
+          const rawId=cellAt(row,appCol);
+          const id=UUID_RE.test(rawId)?rawId.toLowerCase():'';
+          if(!id&&!allKeys.some(x=>cellAt(row,x.col)!=='')) continue;   // fully blank row — invisible
+          if(id) idCounts[id]=(idCounts[id]||0)+1;
+          rowInfos.push({r,row,id,plant:id?(byId.get(id)||null):null,stamp:false});
+        }
+        const dupIds=new Set(Object.keys(idCounts).filter(k=>idCounts[k]>1));
+        for(const info of rowInfos) if(info.id&&dupIds.has(info.id)) info.plant=null;   // duplicate IDs: touch neither copy
+        const claimed=new Set(); for(const info of rowInfos) if(info.plant) claimed.add(info.plant.id);
+        const free=plants.filter(p=>!claimed.has(p.id));
+        const used=new Set(); const pending=[];
+        for(const info of rowInfos){
+          if(info.id) continue;                                          // stamped (or dup/foreign/deleted) — settled above
+          const full=free.filter(p=>!used.has(p.id)&&allKeys.every(x=>this._syncEq(x.key,cellAt(info.row,x.col),p,mapping)));
+          if(full.length){ info.plant=full[0]; info.stamp=true; used.add(full[0].id); continue; }
+          pending.push(info);
+        }
+        const nk=(o)=>normKey(o.g)+'\u0001'+normKey(o.s)+'\u0001'+normKey(o.f)+'\u0001'+normKey(o.a);
+        const pName=(p)=>({g:p.species&&p.species.genus?p.species.genus.name:'',s:p.species?p.species.name:'',f:p.form_descriptor||'',a:p.accession_id||''});
+        const freeByKey={};
+        for(const p of free){ if(used.has(p.id)) continue; const k=nk(pName(p)); (freeByKey[k]=freeByKey[k]||[]).push(p); }
+        const rowsByKey={};
+        for(const info of pending){ const k=nk(this._syncRowName(info.row,mapping,cellAt)); (rowsByKey[k]=rowsByKey[k]||[]).push(info); }
+        const reviewInfos=[];
+        for(const k in rowsByKey){
+          const rs=rowsByKey[k], ps=(freeByKey[k]||[]).filter(p=>!used.has(p.id));
+          if(rs.length===1&&ps.length===1){ rs[0].plant=ps[0]; rs[0].stamp=true; used.add(ps[0].id); }
+          else rs.forEach(i=>reviewInfos.push(i));
+        }
+        const freeLeft=()=>plants.filter(p=>!claimed.has(p.id)&&!used.has(p.id));
+        const review=reviewInfos.map(info=>{
+          const nm=this._syncRowName(info.row,mapping,cellAt);
+          return { r:info.r, rowNum:info.r+1, choice:'',
+            label:[nm.g,nm.s,nm.f].filter(Boolean).join(' ')+(nm.a?', '+nm.a:'')||('Row '+(info.r+1)),
+            cells:allKeys.map(x=>({h:normWS(header[x.col])||('Column '+(x.col+1)),v:cellAt(info.row,x.col)})).filter(c=>c.v!=='') };
+        });
+        return { tab, header, appCol, allKeys, writable, formulaSkipped, rowInfos, mapping, plants,
+                 review, reviewCandidates:freeLeft().map(p=>({id:p.id,label:this.displayName(p)+(p.vendor&&p.vendor.name?' · '+p.vendor.name:'')+(p.acquisition_date?' · '+p.acquisition_date:'')})),
+                 usedIds:used, claimedIds:claimed, cellAt, data:[], appendRows:[], counts:null, tripped:false, truncated:0,
+                 sheetIds:Object.keys(idCounts), dupRows:rowInfos.filter(i=>i.id&&dupIds.has(i.id)).length };
+      },
+      // After review choices (or straight away when nothing needed review): turn the
+      // matches into concrete cell writes + appends, count everything, arm tripwires.
+      _syncFinishPlan(plan){
+        const link=this.syncLink, mapping=plan.mapping, cellAt=plan.cellAt, colL=GSheet.colLetter;
+        const tabQ="'"+String(plan.tab.title).replace(/'/g,"''")+"'!";
+        const wcap=v=>{ if(typeof v==='string'&&v.length>45000) return v.slice(0,45000)+'…'; return v; };
+        const data=[]; let updated=0, stamped=0;
+        if(normKey(plan.header[plan.appCol]||'')!=='app id') data.push({range:tabQ+colL(plan.appCol+1)+'1',values:[['App ID']]});
+        for(const info of plan.rowInfos){
+          if(!info.plant) continue;
+          const rowNum=info.r+1; const cells=[];   // [colIndex, value] for THIS row only
+          for(const x of plan.writable){
+            if(this._syncEq(x.key,cellAt(info.row,x.col),info.plant,mapping)) continue;
+            cells.push([x.col,wcap(this._syncVal(info.plant,x.key,mapping))]);
+          }
+          if(cells.length) updated++;
+          if(info.stamp){ cells.push([plan.appCol,info.plant.id]); stamped++; }
+          // contiguous changed columns share one range (fewer API calls per run —
+          // Security 2026-07-08, LOW); columns not being written never enter a range
+          cells.sort((a,b)=>a[0]-b[0]);
+          for(let i=0;i<cells.length;){
+            let j=i; while(j+1<cells.length&&cells[j+1][0]===cells[j][0]+1) j++;
+            data.push({range:tabQ+colL(cells[i][0]+1)+rowNum+':'+colL(cells[j][0]+1)+rowNum,values:[cells.slice(i,j+1).map(c=>c[1])]});
+            i=j+1;
+          }
+        }
+        // New app plants → appended rows: writable mapped cells + the App ID, blanks
+        // elsewhere. A plant whose ID appears ANYWHERE in the sheet — including rows
+        // the user duplicated (dup IDs are left untouched) — is never re-appended;
+        // otherwise every sync would add another copy (Security 2026-07-08, MEDIUM).
+        const inSheet=new Set(plan.sheetIds||[]);
+        for(const info of plan.rowInfos) if(info.plant) inSheet.add(info.plant.id);
+        const appendPlants=plan.plants.filter(p=>!inSheet.has(p.id));
+        const appends=appendPlants.map(p=>{
+          const row=new Array(plan.appCol+1).fill('');
+          for(const x of plan.writable) row[x.col]=wcap(this._syncVal(p,x.key,mapping));
+          row[plan.appCol]=p.id; return row;
+        });
+        const leftAlone=plan.rowInfos.filter(i=>!i.plant).length;
+        plan.data=data; plan.appendRows=appends;
+        plan.counts={updated,stamped,added:appends.length,leftAlone,dups:plan.dupRows||0,truncated:plan.truncated||0};
+        const managed=Math.max(1,plan.rowInfos.filter(i=>i.plant).length);
+        const touched=plan.rowInfos.filter(i=>i.plant&&(i.stamp||plan.writable.some(x=>!this._syncEq(x.key,cellAt(i.row,x.col),i.plant,mapping)))).length;
+        plan.firstWrite=!link.last_sync_at;
+        // Tripwires (the surprise-gate, not per-run approval): first-ever write to this
+        // sheet; a re-map that hasn't had a successful run yet (appIdCol is null until
+        // one lands — persistent, so closing/reopening the dialog can't skip the
+        // preview; Security 2026-07-08, LOW); a completed review; or a run touching —
+        // by update OR append — more than TRIPWIRE_ROW_FRACTION of the managed rows.
+        plan.tripped=plan.firstWrite||this._remapped||plan.reviewDone
+          ||((link.mapping||{}).appIdCol==null)
+          ||(((touched+appends.length)/managed)>TRIPWIRE_ROW_FRACTION);
+      },
+      syncReviewChoiceDup(){   // the same plant picked for two rows → block Continue
+        const ids=this.syncReview.map(x=>x.choice).filter(Boolean);
+        return ids.length!==new Set(ids).size;
+      },
+      syncReviewDone(){
+        if(this.syncReviewChoiceDup()){ this.syncError='The same plant is matched to two rows — fix that first.'; return; }
+        this.syncError='';
+        const plan=this.syncPlan, byId=new Map(plan.plants.map(p=>[p.id,p]));
+        for(const item of this.syncReview){
+          if(!item.choice) continue;                       // "leave this row alone"
+          const info=plan.rowInfos.find(i=>i.r===item.r);
+          const p=byId.get(item.choice);
+          if(info&&p){ info.plant=p; info.stamp=true; plan.usedIds.add(p.id); }
+        }
+        plan.reviewDone=true;                              // a review always ends in a counted preview
+        this._syncFinishPlan(plan);
+        this.syncStep='preview';
+      },
+      async syncRunPlan(){                                 // "Apply to sheet" on the preview
+        if(this.syncBusy||!this.syncPlan) return;
+        this.syncBusy=true;
+        try{ await GSheet.getToken(); await this._syncRun(); }   // token may have expired while the user read the preview
+        catch(e){ if(String(e&&e.message)!=='cancelled') this.syncError=(e&&e.message)||'Sync didn’t complete.'; }
+        finally{ this.syncBusy=false; }
+      },
+      async _syncRun(){
+        const plan=this.syncPlan, link=this.syncLink;
+        // The consent gate, re-checked at the moment of writing (condition 5).
+        if(link.mode!=='mirror'||!link.consent_at) throw new Error('Sheet sync isn’t turned on.');
+        this.syncStep='running'; this.syncError='';
+        try{
+          // The sheet may have changed while the user sat on the review/preview screen
+          // (row numbers are only as fresh as the plan's fetch): re-fetch and verify
+          // every row about to be written still looks like what the plan saw — already-
+          // stamped rows must still carry the same App ID; rows about to BE stamped
+          // must still hold the same mapped values. Any mismatch aborts before anything
+          // is written (contract §C2 content-match tripwire; Security 2026-07-08, MEDIUM).
+          const raw2=await GSheet.values(link.spreadsheet_id,plan.tab.title);
+          const c2={truncated:0};
+          const rows2=raw2.map(r=>{ const n=Math.min(r.length,GCAP.COLS); const out=new Array(n); for(let i=0;i<n;i++) out[i]=gCell(r[i],c2); return out; });
+          const cAt=(row,col)=>{ const v=row?row[col]:null; return normWS(v==null?'':v); };
+          for(const info of plan.rowInfos){
+            if(!info.plant) continue;
+            const row2=rows2[info.r];
+            const still=info.id ? cAt(row2,plan.appCol).toLowerCase()===info.id
+                                : plan.allKeys.every(x=>cAt(row2,x.col)===plan.cellAt(info.row,x.col));
+            if(!still) throw new Error('The sheet changed while this plan was open. Nothing was written — run Sync now again to re-check against the latest sheet.');
+          }
+          if(plan.appCol>=plan.tab.cols) await GSheet.ensureGridCols(link.spreadsheet_id,plan.tab.id,plan.appCol-plan.tab.cols+1);
+          if(plan.firstWrite){
+            // First-write safety net: duplicate the tab, then VERIFY the copy exists
+            // before any mutation (condition 7). Re-runs reuse a same-day copy.
+            const bname=plan.tab.title+' — backup '+todayLocal();
+            const m0=await GSheet.meta(link.spreadsheet_id);
+            if(!m0.tabs.some(t=>t.title===bname)){
+              await GSheet.duplicateTab(link.spreadsheet_id,plan.tab.id,bname);
+              const m1=await GSheet.meta(link.spreadsheet_id);
+              if(!m1.tabs.some(t=>t.title===bname)) throw new Error('Couldn’t create the backup copy of your tab — stopping before changing anything.');
+            }
+            plan.backupName=bname;
+          }
+          if(plan.data.length) await GSheet.updateCells(link.spreadsheet_id,plan.data);
+          if(plan.appendRows.length) await GSheet.appendRows(link.spreadsheet_id,plan.tab.title,plan.appendRows);
+          const c=plan.counts, bits=[];
+          if(c.updated) bits.push('updated '+c.updated+' row'+(c.updated===1?'':'s'));
+          if(c.added) bits.push('added '+c.added+' row'+(c.added===1?'':'s'));
+          if(c.stamped) bits.push('tagged '+c.stamped+' row'+(c.stamped===1?'':'s')+' with an App ID');
+          if(!bits.length) bits.push('everything already matched');
+          let status='Synced: '+bits.join(', ')+(c.leftAlone?(' · '+c.leftAlone+' row'+(c.leftAlone===1?'':'s')+' left alone'):'');
+          if(c.dups) status+=' · '+c.dups+' rows share the same App ID (untouched — remove the duplicates in the sheet)';
+          if(c.truncated) status+=' · '+c.truncated+' very long cell(s) were shortened for comparison';
+          // Remember where the App ID column landed + the header snapshot, saved in the
+          // same normalized form the drift check compares against (blank headers keep
+          // their "Column N" placeholder; Security 2026-07-08, LOW).
+          // last_sync_at advances ONLY here, after full success.
+          const headerSaved=plan.header.map((h,i)=>normWS(h)||('Column '+(i+1))); headerSaved[plan.appCol]='App ID';
+          const mapping={...(link.mapping||{}),appIdCol:plan.appCol,headers:headerSaved};
+          const now=new Date().toISOString();
+          const {error}=await sb.from('sheet_link').update({last_sync_at:now,last_sync_status:status,mapping}).eq('id',link.id);
+          if(error) throw error;
+          this.syncLink={...link,last_sync_at:now,last_sync_status:status,mapping};
+          this._remapped=false;
+          this.syncResult=status+(plan.backupName?'. A backup copy of your tab (“'+plan.backupName+'”) was saved first.':'.');
+          this.syncStep='done';
+        }catch(e){
+          const msg=String((e&&e.message)||'');
+          this.syncError=(msg||'Sync didn’t complete.')+' Nothing is lost — Sync now re-checks everything from scratch.';
+          // A failed run's plan is DEAD: some writes may have landed, so its row
+          // numbers and appends are stale. Retrying must go back through the full
+          // fetch-and-match, never re-apply this plan (Security 2026-07-08, MEDIUM).
+          this.syncPlan=null; this.syncStep='overview';
+          try{ await sb.from('sheet_link').update({last_sync_status:'error: '+(msg||'unknown')}).eq('id',link.id); }catch(_){}
+        }
+      },
+      /* Column drift → a minimal re-map (no re-import): same field list as the import
+         mapping screen, prefilled from the old mapping where headers still match. */
+      _syncStartRemap(header,drift){
+        this.syncNote='These columns moved or were renamed since they were mapped: '+drift.join(' · ');
+        const heads=header.map((h,i)=>normWS(h)||('Column '+(i+1)));
+        const g=guessImportMap(heads);
+        const old=this.syncLink.mapping||{}; const map={};
+        for(const k in (old.map||{})){ const ci=old.map[k];
+          map[k]=(ci!==''&&ci!=null&&normKey((old.headers||[])[Number(ci)]||'')===normKey(heads[Number(ci)]||''))?String(ci):(g[k]||''); }
+        this.syncRemap={headers:heads,map};
+        this.syncStep='remap';
+      },
+      syncFields(){
+        const nm=(this.syncLink&&this.syncLink.mapping&&this.syncLink.mapping.nameMode)||'split';
+        const all=[['combinedName','Plant name (one column)'],['genus','Genus'],['species','Species'],['formDescriptor','Form / descriptor'],['vendor','Vendor / source'],['acquisitionDate','Date acquired'],['price','Price'],['accessionId','Accession ID'],['sourceUrl','Purchase link'],['locationData','Location data'],['country','Country'],['notes','Notes'],['status','Status'],['acquisitionType','How acquired'],['typeCategory','Type (never written)'],['wishlist','Wishlist (never written)']];
+        return all.filter(f=>nm==='combined'?(f[0]!=='genus'&&f[0]!=='species'):f[0]!=='combinedName');
+      },
+      async syncSaveRemap(){
+        if(this.syncBusy||!this.syncLink) return;
+        const nm=(this.syncLink.mapping||{}).nameMode||'split', m=this.syncRemap;
+        if(nm==='combined'?!m.map.combinedName:(!m.map.genus||!m.map.species)){ this.syncError='Map the plant-name column'+(nm==='combined'?'':'s')+' first.'; return; }
+        this.syncBusy=true; this.syncError='';
+        try{
+          const mapping={...(this.syncLink.mapping||{}),headers:m.headers,map:{...m.map},appIdCol:null};
+          const {error}=await sb.from('sheet_link').update({mapping}).eq('id',this.syncLink.id);
+          if(error) throw error;
+          this.syncLink={...this.syncLink,mapping}; this.syncNote=''; this._remapped=true;   // re-mapped → next run must show the counted preview
+          await this._syncPrepare();
+        }catch(e){ if(String(e&&e.message)!=='cancelled') this.syncError=(e&&e.message)||'Couldn’t save the new mapping.'; }
+        finally{ this.syncBusy=false; }
       },
 
       /* ---- spreadsheet import (FULL TIER; parsing is sandboxed in lib/import-worker.js) ---- */
