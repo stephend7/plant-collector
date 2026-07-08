@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-07b">
+<meta name="app-build" content="2026-07-07c">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -2158,7 +2158,7 @@
       if(/cost|price|paid|amount|\$/.test(t)) set('price');
       if(/^country$|^nation$|^country\s*of\s*origin$/.test(t)) set('country');
       if(/locality|wild|location\s*data|^location$/.test(t)) set('locationData');
-      if(/note|descr|comment|growing/.test(t)) set('notes');
+      if(/note|descr|comment|growing/.test(t) && !/descriptor/.test(t)) set('notes');   // "descr" also hits "Descriptor" headers — exclude those, they belong to formDescriptor below
       if(/status/.test(t)) set('status');
       if(/^want$|wish|interested/.test(t)) set('wishlist');
       if(/how.*acqui|acqui.*type/.test(t)) set('acquisitionType');
