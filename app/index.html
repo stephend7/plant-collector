@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-07c">
+<meta name="app-build" content="2026-07-07d">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1637,6 +1637,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="7 10 12 15 17 10" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="15" x2="12" y2="3" stroke-linecap="round"/></svg>
             <span class="grow"><span class="menu-row-t">Export / download</span><small>Save your whole collection as a CSV file</small></span>
           </button>
+          <button type="button" class="menu-row" @click="openBackup()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M16 16l-4-4-4 4" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12v9" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="grow"><span class="menu-row-t">Google Drive backup</span><small>Keep a live copy of your collection in Google Sheets</small></span>
+          </button>
           <button type="button" class="menu-row" disabled title="Two-way sync is planned but not built yet">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="23 4 23 10 17 10" stroke-linecap="round" stroke-linejoin="round"/><polyline points="1 20 1 14 7 14" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span class="grow"><span class="menu-row-t">Sync<span class="menu-soon">coming soon</span></span><small>Two-way sync with Google Sheets</small></span>
@@ -1667,10 +1671,57 @@
             <span style="color:var(--muted);font-size:14px">.csv</span>
           </div>
           <p class="hint" style="margin-top:10px">Saves all <span x-text="plants.length"></span> plants as a CSV file — opens in Excel, Numbers, or Google Sheets.</p>
+          <p class="hint" style="margin-top:8px">Prefer a live copy that keeps itself current? <a style="color:var(--pine-2);cursor:pointer" @click="openBackup()">Use the Google Drive backup</a>.</p>
         </div>
         <div class="sheet-acts">
           <button @click="exportDialogOpen=false">Cancel</button>
           <button class="go" @click="confirmExportDownload()">Download</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== GOOGLE DRIVE BACKUP (sync step C1 — writes only to the file the app creates) ===== -->
+    <div class="sheet-back" x-show="backupOpen" x-cloak @click.self="if(!backupBusy)backupOpen=false" style="z-index:63">
+      <div class="sheet" style="max-height:82vh">
+        <div class="sheet-grab"></div>
+        <div class="sheet-hd">
+          <span class="nm" style="font-style:normal;font-weight:600;font-size:16px">Google Drive backup</span>
+          <button class="sheet-x" :disabled="backupBusy" @click="if(!backupBusy)backupOpen=false" aria-label="Close">✕</button>
+        </div>
+        <div class="sheet-body">
+          <!-- the plain-words explanation BEFORE anything happens (this screen is the consent the app records) -->
+          <template x-if="!backupLink">
+            <div style="background:var(--card,#fff);border:1px solid #DBE3D3;border-radius:12px;padding:14px 16px;font-size:14px;color:var(--ink);line-height:1.5">
+              <p style="margin:0 0 10px">• Creates a spreadsheet called <strong>“Plant Collector Backup”</strong> in your Google Drive, and rewrites it with your latest collection each time you back up.</p>
+              <p style="margin:0 0 10px">• It writes <strong>only to that one file it creates</strong>. It can’t see the rest of your Drive, and it never changes spreadsheets you made — a future update will ask separately before that.</p>
+              <p style="margin:0 0 10px">• The backup holds everything: plants, species care notes, vendors, and your journal — <strong>including growing locations and prices</strong>, which this app normally keeps private. Only you can open the file unless <em>you</em> share it in Google Drive.</p>
+              <p style="margin:0">• If this app ever disappeared, that file is your whole collection, safe in your own Google account.</p>
+            </div>
+          </template>
+          <!-- connected state: status card -->
+          <template x-if="backupLink">
+            <div style="background:var(--card,#fff);border:1px solid #DBE3D3;border-radius:12px;padding:14px 16px;font-size:14px;color:var(--ink);line-height:1.5">
+              <div style="font-weight:600" x-text="backupLink.spreadsheet_name||'Plant Collector Backup'"></div>
+              <div style="color:var(--muted);font-size:13px;margin-top:4px">
+                <span x-show="backupLink.last_sync_at">Last backed up <span x-text="backupWhen()"></span>.</span>
+                <span x-show="!backupLink.last_sync_at">Not backed up yet.</span>
+              </div>
+              <div style="color:var(--muted);font-size:13px;margin-top:2px" x-show="backupLink.last_sync_status" x-text="backupLink.last_sync_status"></div>
+              <a style="color:var(--pine-2);cursor:pointer;font-size:13px;display:inline-block;margin-top:8px" :href="'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(backupLink.spreadsheet_id)" target="_blank" rel="noopener">Open in Google Sheets ›</a>
+            </div>
+          </template>
+          <template x-if="backupMissing">
+            <div style="border:1px solid #E4C7B8;background:#FBF3EE;border-radius:12px;padding:12px 14px;font-size:13px;color:var(--ink);line-height:1.5;margin-top:10px">
+              That backup file can’t be reached — it may have been deleted in Drive, or you signed in with a different Google account. Nothing in this app is affected.
+              <button class="primary" style="width:100%;margin-top:10px" :disabled="backupBusy" @click="runBackup(true)" x-text="backupBusy?'Working…':'Create a new backup file'"></button>
+            </div>
+          </template>
+          <p x-show="backupResult" style="color:var(--pine-2);font-size:13px;margin:10px 0 0" x-text="backupResult"></p>
+          <p x-show="backupError" style="color:#9A3528;font-size:13px;margin:10px 0 0" x-text="backupError"></p>
+        </div>
+        <div class="sheet-acts">
+          <button @click="backupOpen=false" :disabled="backupBusy">Close</button>
+          <button class="go" x-show="!backupMissing" :disabled="backupBusy||!backupLinkKnown" @click="runBackup(false)" x-text="backupBusy?'Backing up…':(backupLink?'Back up now':'Create backup')"></button>
         </div>
       </div>
     </div>
@@ -2191,6 +2242,10 @@
      Sheet CELL VALUES fetched through this module are UNTRUSTED TEXT, capped to the
      same limits as the file-import worker (GCAP mirrors lib/import-worker.js CAP). */
   const GCAP={ROWS:10000,COLS:100,CELL:8000};   // keep in step with lib/import-worker.js
+  // Step C1 (write): the app-created backup spreadsheet — tab names + which version of
+  // the plain-words backup explanation the user accepted (recorded on the sheet_link row).
+  const BACKUP_TABS=['Plants','Species','Vendors','Journal'];
+  const BACKUP_CONSENT_VERSION='backup-2026-07-07';
   function gCell(v,counters){    // mirror of the worker's cellToString: inert strings only
     if(v===null||v===undefined) return '';
     let s=String(v);             // numbers/bools → text; dates arrive as formatted strings
@@ -2253,14 +2308,25 @@
         p.setVisible(true);
       });
     }
-    async function api(path,params){
+    // One HTTP call to the Sheets API. GET = reads (step B); POST = writes (step C1,
+    // only ever against the backup file the app itself created). 429/5xx retry with
+    // exponential backoff — batched calls, never hammering. e.status carries the HTTP
+    // code so callers can tell "the backup file is gone" (404) apart from other errors.
+    async function call(method,path,params,body,noRetry){
       const q=new URLSearchParams(params||{}).toString();
-      const r=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+path+(q?'?'+q:''),{headers:{Authorization:'Bearer '+token}});
-      if(r.status===401){ dropToken(); throw new Error('Your Google sign-in expired — tap Connect a Google Sheet again.'); }
-      if(r.status===403||r.status===404) throw new Error('Google didn’t give this app access to that spreadsheet. Go back and pick it again in the Google window.');
-      if(!r.ok) throw new Error('Google Sheets error ('+r.status+'). Try again in a moment.');
-      return r.json();
+      const url='https://sheets.googleapis.com/v4/spreadsheets'+path+(q?'?'+q:'');
+      for(let attempt=0;;attempt++){
+        const r=await fetch(url,{method,headers:Object.assign({Authorization:'Bearer '+token},body?{'Content-Type':'application/json'}:{}),body:body?JSON.stringify(body):undefined});
+        if(r.ok) return r.json();
+        if(!noRetry&&(r.status===429||r.status>=500)&&attempt<3){ await new Promise(res=>setTimeout(res,1000*Math.pow(2,attempt))); continue; }
+        let e;
+        if(r.status===401){ dropToken(); e=new Error('Your Google sign-in expired — try again.'); }
+        else if(r.status===403||r.status===404) e=new Error('Google didn’t give this app access to that spreadsheet. Go back and pick it again in the Google window.');
+        else e=new Error('Google Sheets error ('+r.status+'). Try again in a moment.');
+        e.status=r.status; throw e;
+      }
     }
+    function api(path,params){ return call('GET','/'+path,params); }
     // Tab list, fields-limited. Doubles as the immediate read-grant check after picking:
     // if the Picker grant didn't take, this fails LOUDLY (never a silent empty state).
     async function meta(id){
@@ -2278,7 +2344,51 @@
       return d.values||[];
     }
     function colLetter(n){ let s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
-    return {configured,ensureScripts,ready,getToken,pick,meta,values,dropToken};
+
+    /* ---- WRITE engine (sync step C1) — targets ONLY the backup spreadsheet the app
+       itself creates (drive.file grants access to app-created files with no Picker).
+       Contract conditions it embodies (docs/sheets-sync-plan.md):
+       - condition 4: valueInputOption=RAW on EVERY write — values land as literal
+         text/numbers, never interpreted; a plant named "=IMPORTRANGE(…)" stays inert.
+       - condition 6: NO delete calls anywhere — stale rows are blanked with
+         values:batchClear (clears cell contents only; cannot remove rows/columns/tabs;
+         deleteDimension/deleteRange appear nowhere in this codebase).
+       - write order is overwrite-first, trim-after: new values overwrite from A1, the
+         stale tail is cleared last — a failure mid-run never leaves the backup emptier
+         than it started, and a re-run simply overwrites again. */
+    const quoteTab=(t)=>"'"+String(t).replace(/'/g,"''")+"'";
+    // noRetry: create is NOT idempotent — a create that succeeded server-side but errored
+    // in transit must not be re-POSTed into duplicate Drive files (Security 2026-07-07, LOW);
+    // reads and the value writes (full overwrite, same payload) stay safely retryable.
+    async function createFile(title,tabTitles){
+      const d=await call('POST','',null,{properties:{title},sheets:tabTitles.map(t=>({properties:{title:t}}))},true);
+      return {id:d.spreadsheetId};
+    }
+    // The backup file is app-owned, but a person CAN rename/remove its tabs in Drive;
+    // a missing tab is simply re-added (addSheet — additive only, touches nothing else).
+    // Doubles as the "is the file still reachable?" check: throws e.status=404 if gone.
+    async function ensureTabs(id,tabTitles){
+      const m=await meta(id);
+      const have=new Set(m.tabs.map(t=>t.title));
+      const missing=tabTitles.filter(t=>!have.has(t));
+      if(missing.length) await call('POST','/'+encodeURIComponent(id)+':batchUpdate',null,
+        {requests:missing.map(t=>({addSheet:{properties:{title:t}}}))});
+      return m.title;   // current file name — the user may have renamed it in Drive (their right); the UI reflects it honestly
+    }
+    const WRITE_CHUNK_ROWS=2000;   // rows per range chunk — far under the API payload cap
+    async function writeTabs(id,tabs){   // tabs: [{title, rows:[[cells]]}]
+      const data=[], clears=[];
+      for(const t of tabs){
+        for(let i=0;i<t.rows.length;i+=WRITE_CHUNK_ROWS)
+          data.push({range:quoteTab(t.title)+'!A'+(i+1),values:t.rows.slice(i,i+WRITE_CHUNK_ROWS)});
+        clears.push(quoteTab(t.title)+'!'+(t.rows.length+1)+':100000');   // blank stale rows below the new data
+      }
+      for(let i=0;i<data.length;i+=5)
+        await call('POST','/'+encodeURIComponent(id)+'/values:batchUpdate',null,
+          {valueInputOption:'RAW',data:data.slice(i,i+5)});
+      await call('POST','/'+encodeURIComponent(id)+'/values:batchClear',null,{ranges:clears});
+    }
+    return {configured,ensureScripts,ready,getToken,pick,meta,values,dropToken,createFile,ensureTabs,writeTabs};
   })();
 
   document.addEventListener('alpine:init', () => {
@@ -2294,6 +2404,7 @@
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
       photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
       mainMenuOpen:false, exportDialogOpen:false, exportFileName:'',
+      backupOpen:false, backupBusy:false, backupError:'', backupResult:'', backupLink:null, backupMissing:false, backupLinkKnown:false,
       invMode:'shelf', invShelf:null, invSeenId:null, invSeenQty:0, invPrevScreen:'list', invError:'',
       sheetOpen:false, sheet:null, sheetConfirmDelete:false, sheetEditing:false, sheetForm:{comment:'',label:'plant',date:''},
       prevTab:'plants', updateReady:false,
@@ -3636,6 +3747,127 @@
         a.download=name+'.csv';
         a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
         this.exportDialogOpen=false;
+      },
+
+      /* ---- Google Drive backup (sync step C1 — docs/sheets-sync-plan.md) ----
+         Writes ONLY to a spreadsheet the app itself creates; the user's own sheets are
+         never touched (that's step C2, which asks separately). The user's tap on
+         "Create backup" after the plain-words explanation is the recorded consent
+         (consent_version + consent_at on the sheet_link row). last_sync_at advances
+         ONLY after a fully successful write (contract condition 10). */
+      async openBackup(){
+        this.mainMenuOpen=false; this.exportDialogOpen=false;
+        this.backupError=''; this.backupResult=''; this.backupMissing=false;
+        if(!GSheet.configured()) this.backupError='The Google connection isn’t set up on this copy of the app yet (missing Google Cloud values in config.js).';
+        this.backupOpen=true;
+        GSheet.ensureScripts().catch(()=>{});   // preload while the user reads, so the button tap can open Google's popup synchronously (iOS rule)
+        // A failed lookup must NOT pose as "no backup yet" — that shows the first-time
+        // screen to an existing-backup user and invites a duplicate Drive file
+        // (Security review 2026-07-07, LOW). Unknown state disables the action button.
+        this.backupLinkKnown=false;
+        try{
+          const {data,error}=await sb.from('sheet_link').select('id,spreadsheet_id,spreadsheet_name,last_sync_at,last_sync_status').eq('kind','app_backup').order('created_at').limit(1);
+          if(error) throw error;
+          this.backupLink=(data&&data[0])||null; this.backupLinkKnown=true;
+        }catch(e){ this.backupLink=null; this.backupError=this.backupError||'Couldn’t check your backup connection. Check your internet and reopen this screen.'; }
+      },
+      backupWhen(){ return this.backupLink&&this.backupLink.last_sync_at ? this.backupLink.last_sync_at.slice(0,16).replace('T',' ') : ''; },
+      async runBackup(recreate){
+        if(this.backupBusy||!GSheet.configured()||!this.backupLinkKnown) return;
+        this.backupBusy=true; this.backupError=''; this.backupResult=''; this.backupMissing=false;
+        try{
+          if(!GSheet.ready()) await GSheet.ensureScripts();
+          await GSheet.getToken();                 // Google popup — must happen inside this tap
+          // Fresh truth before writing anything — fetched with a CHECKED error, never via
+          // loadPlants() (which swallows failures): a failed refresh must abort the run,
+          // not silently overwrite a good backup with stale or empty data (Security
+          // review 2026-07-07, MEDIUM).
+          const {data:freshPlants,error:pErr}=await sb.from('plant').select(PLANT_SELECT);
+          if(pErr) throw pErr;
+          const tabs=await this._buildBackupTabs(freshPlants||[]);
+          let link=this.backupLink, created=false;
+          if(!link||recreate){
+            // belt-and-suspenders against the flaky-connection duplicate: if the earlier
+            // link lookup failed silently, a row may still exist — re-check before creating
+            // a second Drive file (Security review 2026-07-07, LOW)
+            const {data:again,error:aErr}=await sb.from('sheet_link').select('id,spreadsheet_id,spreadsheet_name,last_sync_at,last_sync_status').eq('kind','app_backup').order('created_at').limit(1);
+            if(aErr) throw aErr;
+            if(again&&again.length&&!recreate){ link=again[0]; this.backupLink=link; }
+          }
+          if(!link||recreate){
+            const f=await GSheet.createFile('Plant Collector Backup',BACKUP_TABS);
+            created=true;
+            // The spreadsheet ID stored here comes ONLY from the create call's own
+            // response — the app-backup analog of condition 15's Picker-ID pinning.
+            const rec={ spreadsheet_id:f.id, spreadsheet_name:'Plant Collector Backup',
+                        tab_id:null, tab_title:null, kind:'app_backup', mode:'mirror',
+                        consent_version:BACKUP_CONSENT_VERSION, consent_at:new Date().toISOString(),
+                        last_sync_at:null, last_sync_status:null };
+            if(link){ const {error}=await sb.from('sheet_link').update(rec).eq('id',link.id); if(error) throw error; link={...link,...rec}; }
+            else{ const {data,error}=await sb.from('sheet_link').insert(rec).select('id,spreadsheet_id,spreadsheet_name,last_sync_at,last_sync_status').single(); if(error) throw error; link=data; }
+            this.backupLink=link;
+          } else {
+            const liveName=await GSheet.ensureTabs(link.spreadsheet_id,BACKUP_TABS);   // also the "file still reachable?" check (throws 404 if gone)
+            if(liveName&&liveName!==link.spreadsheet_name){ link={...link,spreadsheet_name:liveName}; try{ await sb.from('sheet_link').update({spreadsheet_name:liveName}).eq('id',link.id); }catch(_){} }
+          }
+          await GSheet.writeTabs(link.spreadsheet_id,tabs);
+          const status='Backed up '+tabs.map(t=>(t.rows.length-1)+' '+t.title.toLowerCase()).join(', ');
+          const now=new Date().toISOString();
+          const {error:e2}=await sb.from('sheet_link').update({last_sync_at:now,last_sync_status:status}).eq('id',link.id);
+          if(e2) throw e2;
+          this.backupLink={...link,last_sync_at:now,last_sync_status:status};
+          this.backupResult=status+(created?'. The file is in your Google Drive.':'.');
+        }catch(e){
+          const msg=String((e&&e.message)||'');
+          if(msg==='cancelled'){ /* user closed the Google window — not an error */ }
+          else if(e&&e.status===404&&this.backupLink&&!recreate) this.backupMissing=true;
+          else this.backupError=msg||'The backup didn’t complete. Nothing was lost — try again.';
+          if(this.backupLink&&this.backupLink.id&&msg!=='cancelled'){
+            // honest failure record; last_sync_at deliberately NOT advanced (condition 10)
+            try{ await sb.from('sheet_link').update({last_sync_status:'error: '+(msg||'unknown')}).eq('id',this.backupLink.id); }catch(_){}
+          }
+        }finally{ this.backupBusy=false; }
+      },
+      // Assemble the four backup tabs, fetched fresh so the file never holds stale truth.
+      // Values go through the Sheets API with RAW input — own-DB data still lands as
+      // literal text, so even a formula-shaped name can never execute in the sheet.
+      async _buildBackupTabs(plantRows){
+        const [sp,vd,jn]=await Promise.all([
+          sb.from('species').select('id,name,care_dormancy,care_water,care_feeding,care_light,care_photoperiod,care_humidity,genus:genus_id(name)').order('name'),
+          sb.from('vendor').select('id,name,company,address,phone,url,notes').order('name'),
+          sb.from('journal_entry').select('id,plant_id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause,product_id,dose_note').order('entry_date',{ascending:true}),
+        ]);
+        if(sp.error) throw sp.error; if(vd.error) throw vd.error; if(jn.error) throw jn.error;
+        let jp=[];
+        try{ const ids=(jn.data||[]).map(e=>e.id);
+          if(ids.length){ const {data}=await sb.from('journal_entry_pest').select('journal_entry_id,pest_id').in('journal_entry_id',ids); jp=data||[]; } }catch(_){}
+        const pestName=new Map(this.pests.map(p=>[p.id,p.name]));
+        const pestsByEntry={}; for(const j of jp)(pestsByEntry[j.journal_entry_id]=pestsByEntry[j.journal_entry_id]||[]).push(pestName.get(j.pest_id)||'');
+        const prodName=new Map(this.products.map(p=>[p.id,p.name]));
+        const plantById=new Map(plantRows.map(p=>[p.id,p]));
+        // Sheets rejects cells over 50k characters and that would fail the whole write —
+        // shorten (own data, sizes we control; in practice nothing gets near this).
+        const cell=v=>{ if(v===null||v===undefined) return ''; if(typeof v==='string'&&v.length>45000) return v.slice(0,45000)+'…'; return v; };
+        const plants=[ ['Genus','Species','Form/Descriptor','Vendor','Growing location','Quantity','Price','Accession ID','Purchase link','Location data','Country','Acquisition date','How acquired','Status','Notes','Categories','App ID'],
+          ...plantRows.map(p=>[
+            p.species&&p.species.genus?p.species.genus.name:'', p.species?p.species.name:'',
+            p.form_descriptor||'', p.vendor?p.vendor.name:'', p.growing_location?p.growing_location.name:'',
+            p.quantity, p.price==null?'':p.price, p.accession_id||'', p.source_url||'', p.location_data||'', p.country||'',
+            p.acquisition_date||'', this.acqTypeLabel(p.acquisition_type), this.statusLabel(p.lifecycle_status), p.notes||'',
+            (p.plant_category||[]).map(pc=>pc.category&&pc.category.name).filter(Boolean).join('; '), p.id
+          ].map(cell)) ];
+        const species=[ ['Genus','Species','Dormancy','Water','Feeding','Light','Photoperiod','Humidity','App ID'],
+          ...(sp.data||[]).map(s=>[ s.genus?s.genus.name:'', s.name, s.care_dormancy||'', s.care_water||'', s.care_feeding||'', s.care_light||'', s.care_photoperiod||'', s.care_humidity||'', s.id ].map(cell)) ];
+        const vendors=[ ['Name','Company','Address','Phone','Website','Notes','App ID'],
+          ...(vd.data||[]).map(v=>[ v.name, v.company||'', v.address||'', v.phone||'', v.url||'', v.notes||'', v.id ].map(cell)) ];
+        const journal=[ ['Plant','Date','Event','Note','Measurement','Product / dose','Pests','Cause','Plant App ID'],
+          ...(jn.data||[]).map(e=>{ const p=plantById.get(e.plant_id);
+            const prod=prodName.get(e.product_id)||'';
+            return [ p?this.displayName(p):'(deleted plant)', e.entry_date||'', this.eventTypeLabel(e.event_type), e.body||'',
+              (e.measure_label||e.measure_value!=null)?((e.measure_label?e.measure_label+': ':'')+(e.measure_value==null?'':e.measure_value)+(e.measure_unit?' '+e.measure_unit:'')):'',
+              prod+(e.dose_note?(prod?' — ':'')+e.dose_note:''),
+              (pestsByEntry[e.id]||[]).filter(Boolean).join('; '), e.cause||'', e.plant_id||'' ].map(cell); }) ];
+        return [ {title:'Plants',rows:plants},{title:'Species',rows:species},{title:'Vendors',rows:vendors},{title:'Journal',rows:journal} ];
       },
 
       /* ---- spreadsheet import (FULL TIER; parsing is sandboxed in lib/import-worker.js) ---- */

@@ -4,6 +4,67 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-07 — Sheets sync step C1 BUILT & security-PASSED (app-created Google Drive backup; build 2026-07-07d — awaiting live verification)
+
+The first write path to Google, built per the approved contract (`docs/sheets-sync-plan.md`,
+step C1 only — the zero-risk half of step C). On **Fable 5** (Stephen's explicit call again;
+he also decided 2026-07-07 that **C2 stays on Fable 5** — stronger model on the step he flagged
+as risky, accepting the usage-budget cost; the Sonnet rotation default stands elsewhere).
+FULL TIER, pipeline honored: build → **REAL separated Security agent reviewed the actual diff**
+(reviewer ≠ author) → **CONDITIONAL PASS** (1 MEDIUM, 2 LOW, 3 INFO) → all findings fixed →
+**independent re-verification of the fixes → PASS.** C2 (writing into the user's OWN sheet)
+is deliberately NOT in this build — it gets its own session and its own Security review.
+
+**What shipped in the code:**
+- **"Google Drive backup"** in the main menu (+ a cross-link from the Export dialog — the
+  two-entry-points rule): the app creates its own spreadsheet ("Plant Collector Backup") via
+  the Sheets API and rewrites 4 tabs (Plants / Species / Vendors / Journal — full relational
+  export, the promised shape-(b) backup) on each manual "Back up now". `drive.file` lets the
+  app write to files it CREATES with no Picker; nothing the user made can be touched.
+- **Write engine** (the machinery C2 will reuse): chunked `values.batchUpdate` with
+  **`valueInputOption=RAW` on every write** (formula-shaped names land inert), 429/5xx
+  exponential backoff, **no delete calls anywhere** (stale rows are blanked via `batchClear`,
+  never removed), and overwrite-first/trim-after ordering so a mid-run failure can never leave
+  the backup emptier than it started.
+- **Consent + honesty:** first open shows a plain-words screen (creates its own file; can't
+  see the rest of Drive; never touches user-made sheets until C2 asks separately; **the backup
+  contains locations and prices** — the anti-theft fields — and sharing the file is the user's
+  choice). The tap on "Create backup" is recorded as `consent_version`/`consent_at` on the
+  `sheet_link` row (kind='app_backup'). Runs report real counts; `last_sync_at` advances ONLY
+  after a fully successful write; failures record an error status honestly.
+- **Deleted-file handling:** a 404 on the stored file (deleted in Drive / different Google
+  account) is explained and offers "Create a new backup file" — never a silent duplicate.
+
+**Security findings worth remembering (all fixed):**
+- [MEDIUM] the backup originally refreshed plants via `loadPlants()`, which swallows fetch
+  errors — a failed refresh could have overwritten a good backup with stale/empty data and
+  still reported success. Now a CHECKED fetch aborts the run on error.
+- [LOW] a failed "existing backup?" lookup looked like "no backup yet" and invited a duplicate
+  Drive file; now unknown state disables the button + a pre-create re-check reuses any
+  existing row.
+- [LOW] spreadsheet **creation** is exempt from the retry/backoff (not idempotent — a retry
+  after a transit error would strand duplicate files); reads and full-overwrite value writes
+  stay retryable.
+- Judgment call the reviewer accepted: NO hard check that the backup file is still literally
+  named "Plant Collector Backup" — the user may rename their own file, and a title proves
+  nothing; instead the app syncs the live name back into the UI. Real guards: ID pinned from
+  the create response, kind='app_backup' row filter, owner-only RLS.
+
+**No schema change needed** — migration 011 (shipped with B) already carries kind='app_backup',
+mode, and the consent columns. No CSP change — `sheets.googleapis.com` was already in
+`connect-src`.
+
+**Verification status: NOT yet verified live** (this entry updates when it is). The OAuth
+client's authorized origin is locked to `stephend7.github.io`, so the flow can only run on the
+deployed site — same as B. Gate 2 from the plan: file appears in the Google account's Drive,
+tab counts match `select count(*)` per table, and a formula-shaped plant name (`=IMPORTRANGE…`)
+lands as inert text. Local checks done: app script parses clean (JavaScriptCore), Security PASS
+on the diff. Worktree note: the sandbox preview server still can't serve files (same
+2026-06-17 limitation) — `.claude/launch.json` was updated to point at the worktree with an
+explicit directory, which fixed startup but not per-request file reads.
+
+---
+
 ## 2026-07-07 — Sheets sync step B SHIPPED & VERIFIED (connect & read; final build 2026-07-07c)
 
 Built the same day the design was approved (entry below), on **Fable 5** (Stephen's explicit call
