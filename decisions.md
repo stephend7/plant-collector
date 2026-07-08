@@ -4,7 +4,7 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
-## 2026-07-07 — Sheets sync step C1 BUILT & security-PASSED (app-created Google Drive backup; build 2026-07-07d — awaiting live verification)
+## 2026-07-07 — Sheets sync step C1 SHIPPED & VERIFIED (app-created Google Drive backup; build 2026-07-07d)
 
 The first write path to Google, built per the approved contract (`docs/sheets-sync-plan.md`,
 step C1 only — the zero-risk half of step C). On **Fable 5** (Stephen's explicit call again;
@@ -54,14 +54,31 @@ is deliberately NOT in this build — it gets its own session and its own Securi
 mode, and the consent columns. No CSP change — `sheets.googleapis.com` was already in
 `connect-src`.
 
-**Verification status: NOT yet verified live** (this entry updates when it is). The OAuth
-client's authorized origin is locked to `stephend7.github.io`, so the flow can only run on the
-deployed site — same as B. Gate 2 from the plan: file appears in the Google account's Drive,
-tab counts match `select count(*)` per table, and a formula-shaped plant name (`=IMPORTRANGE…`)
-lands as inert text. Local checks done: app script parses clean (JavaScriptCore), Security PASS
-on the diff. Worktree note: the sandbox preview server still can't serve files (same
-2026-06-17 limitation) — `.claude/launch.json` was updated to point at the worktree with an
-explicit directory, which fixed startup but not per-request file reads.
+**VERIFIED LIVE 2026-07-08 (Claude-in-Chrome on the deployed site) — every gate-2 check from
+the plan passed empirically, on Stephen's REAL account by his explicit choice** (the C1 write
+target is a brand-new file, so the sandbox-sheet rule wasn't in play; he approved in chat
+before any Google consent was touched):
+- Created a throwaway test plant with `=2+2` in Form/Descriptor and `=IMPORTRANGE("evil",…)`
+  in Notes → ran "Create backup" from the real menu → **"Plant Collector Backup" appeared in
+  Drive** with all 4 tabs. The Google grant was silent (returning user from step B) — no
+  re-consent popup, as GIS is designed to do.
+- **Counts exact, twice**: run 1 reported "168 plants, 162 species, 58 vendors, 19 journal" —
+  Plants tab ends at A169 (168+header), Species A163, Vendors A59, Journal A20; every number
+  matches the app's own data. Journal assembly verified rich: dates, event types, notes,
+  product/dose ("Imidacloprid — …"), pests ("Mealybugs", "Aphids; Thrips"), plant App IDs.
+- **RAW proven**: C169 holds `'=2+2` and O169 holds `'=IMPORTRANGE("evil","Sheet1!A1")` —
+  Sheets' own leading-apostrophe text marker; displayed as literal text, not `4`, not a fetch.
+- **Second run + trim proven**: deleted the test plant (167), ran "Back up now" (the
+  existing-file path incl. ensureTabs) → "167 plants, …, 18 journal" and the stale row 169 is
+  blanked — Plants now ends at A168. The status card, last-backed-up time, counts line, and
+  "Open in Google Sheets" link all render correctly.
+- Consent screen shows all four plain-words bullets including the locations-and-prices
+  disclosure; consent recorded on the sheet_link row before the first write.
+Not yet checked: iPhone Safari pass (no Picker involved in C1, so lower risk than B — but
+worth a tap-through when Stephen next opens the app on his phone). **STATUS: SHIPPED.**
+Worktree note: the sandbox preview server still can't serve files (same 2026-06-17
+limitation) — `.claude/launch.json` was updated to point at the worktree with an explicit
+directory, which fixed startup but not per-request file reads.
 
 ---
 
