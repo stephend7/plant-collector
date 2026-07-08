@@ -4,6 +4,71 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-07 — Sheets sync step B BUILT (connect & read, build 2026-07-07a) — NOT yet deployed/verified
+
+Built the same day the design was approved (entry below), on **Fable 5** (Stephen's explicit call
+for this build — the playbook's Sonnet default stands for future steps). FULL TIER, pipeline
+honored: approved contract (`docs/sheets-sync-plan.md`) → build → **REAL separated Security agent
+reviewed the actual diff** (reviewer ≠ author) → verdict **CONDITIONAL PASS, zero critical/high**
+→ all actionable findings applied. **NOT deployed, NOT live-verified yet** — blocked on Stephen's
+Google Cloud setup (client ID / API key / project number → `app/config.js` placeholders), running
+migration 011 in Supabase, then push + Chrome + **early iPhone Picker check** (named WebKit risk).
+
+**What shipped (worktree branch, one logical change):**
+- **Migration 011** (`app/migrations/011_sheet_link_and_sheet_oauth.sql`): `sheet_link` +
+  `sheet_row_snapshot` (owner-only RLS keyed on `user_id = auth.uid()` directly; parent-ownership
+  guards `app_owns_sheet_link` / `app_owns_plant` per the 005 pattern; RLS enabled before policies
+  = fails closed; `unique(user_id, spreadsheet_id, kind)` added from a Security LOW), and the
+  `import_batch.source_kind` constraint swap adding `'sheet_oauth'` (005 did NOT allow it).
+- **CSP meta tag in the same change as the first off-origin scripts** (contract condition 12):
+  script-src = `'self' 'unsafe-eval'` + accounts.google.com + apis.google.com ONLY. `'unsafe-eval'`
+  is required by stock Alpine (`new Function` for x-* expressions) and permits no cross-origin
+  loading — reviewer ruled the deviation correct. gstatic.com added to img/style ONLY (Picker
+  dialog shell assets), NEVER script-src. Known named gap: `style-src 'unsafe-inline'` (the app's
+  inline styles predate the CSP) — CSS injection isn't blocked; script injection is.
+- **`GSheet` closure module** in `app/index.html`: token in closure memory ONLY (grep-provable —
+  no localStorage/sessionStorage/cookie/Supabase/window anywhere near it); scope exactly
+  `drive.file` + a granted-scope check that HALTS if Google grants more; GIS + gapi scripts
+  lazy-loaded only when connecting (preloaded during the consent read so the popup opens inside
+  the user's tap — the iOS Safari popup rule); Picker single-spreadsheet; **the ID acted on comes
+  only from the Picker's own callback** (condition 15); tab-list fetch doubles as the immediate
+  read-grant check (fails loudly, never a silent empty state); values fetch is range-capped to the
+  file-worker's exact caps (GCAP mirrors `lib/import-worker.js` CAP; over-long cells truncate +
+  count with a visible note — the plan doc's stale "reject-not-truncate" parenthetical was
+  corrected per the reviewer's ruling: mirror the proven A control, fix the doc).
+- **Feeds the untouched A-core**: fetched values → same `_receiveRows` seam → same mapping →
+  preview → `runImport` (now `source_kind: 'sheet_oauth'` for the g-path) → same batch + undo.
+  A `sheet_link` row (kind `user_sheet`, mode `read_only`, mapping jsonb) records the connection.
+  **No re-pull button by design** (no sync-IDs yet → re-read can only create rows); reconnecting a
+  previously-imported sheet shows an honest "adds NEW copies, never merges" note.
+- **Plain-words consent step** before Google's popup (the honest-consent rule): says Google's
+  screen will read "edit" because drive.file has no read-only variant, that step B only reads,
+  and that a future write step will ask separately.
+- **NO step C/D code**: grep-provable zero write-capable Sheets calls in the codebase. C needs its
+  own build-stage Security review before any write code lands.
+
+**Deploy-safety notes:** the build is safe to deploy BEFORE migration 011 (only the g-path touches
+the new tables and it fails with an honest error; file imports don't) and before the Google values
+exist (the connect button explains "not set up yet"). The CSP is the one all-users change — the
+live pass must regression-check photos/import/export under it, not just the new flow.
+
+**Security review (separated agent, read-only): CONDITIONAL PASS.**
+MED gstatic-absent-from-CSP (fixed: img/style only) · MED unused www.googleapis.com in connect-src
+(fixed: dropped — least privilege) · MED plan-doc contradiction on truncate-vs-reject (fixed in the
+doc) · LOW sheet_link upsert race (fixed via unique constraint) · LOW public API key/appId (by
+design; console-side referrer restriction is Stephen's checklist item) · INFO passes on: token
+scoping, RLS pattern match, Picker-ID pinning end-to-end, A1-range escaping, CSV re-export
+injection coverage, x-text-only rendering of all sheet-derived strings.
+
+**Verify-your-verification catch (process honesty):** the first JS parse check this session was a
+FALSE GREEN — the `jsc` binary path was empty, the command never ran, and the shell pipeline
+reported success anyway (the playbook's exact missing-binary trap). Caught, redone with a proven
+instrument (control file that must fail, then the real script): the app's single inline script
+parses clean (jsc reached runtime and stopped only at the browser-only `supabase` global). Also
+found: an HTML comment containing literal `<script>` breaks naive script-extraction regexes.
+
+---
+
 ## 2026-07-07 — Google Sheets sync DESIGNED & approved (no code yet; build later on Sonnet)
 
 The two-way-sync design session paused 2026-07-05 resumed and finished on **Fable 5** (the

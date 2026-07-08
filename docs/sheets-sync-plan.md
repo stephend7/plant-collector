@@ -313,7 +313,11 @@ tables or anywhere in Supabase.
 2. **Scope string is exactly `drive.file`** — a test asserts the token request contains
    no other scope; adding a scope is a design change, not a tweak.
 3. **All fetched cell values are untrusted text**: same caps as file import enforced on
-   fetched ranges (max rows/cols/cell length, reject-not-truncate); `x-text` rendering
+   fetched ranges (max rows/cols/cell length — enforced exactly as the shipped, already-
+   reviewed A worker does: ranges capped, over-long cells truncated + counted with a
+   visible note; this doc's original "reject-not-truncate" wording contradicted A's
+   approved behavior and was corrected at the build-stage Security review, 2026-07-07 —
+   mirroring the proven control beats inventing a new untested path); `x-text` rendering
    only; formula strings inert; CSV-injection prefixing on any export path (already
    shipped in A — extend coverage to the C1 backup writer, which must prefix
    `= + - @ \t \r` cells it writes… **no**: C1 writes via the Sheets API with

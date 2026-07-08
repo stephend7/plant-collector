@@ -4,7 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
-<meta name="app-build" content="2026-07-05a">
+<!-- CSP (ships in the SAME change as the first off-origin <script>, per the sheets-sync
+     security contract): the ONLY origins that may ever run script here are this site plus
+     Google's two auth/picker loaders (GIS + gapi) — they cannot be vendored or SRI-pinned
+     (Google serves live-rotating code), so this tag is the containment: no OTHER origin's
+     script can load even via a future injection bug. 'unsafe-eval' is required by Alpine.js
+     (it compiles x-* expressions with new Function) — it permits no cross-origin loading.
+     connect/frame limited to self + Supabase + the Google endpoints step B talks to.
+     gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
+     from there — 2026-07-07 Security review) — NEVER in script-src. Known accepted gap,
+     named honestly: style-src 'unsafe-inline' (the app's inline styles predate the CSP),
+     so CSS-injection is not blocked — script injection is. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
+<meta name="app-build" content="2026-07-07a">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1677,6 +1689,13 @@
           </label>
           <p style="font-size:12px;color:var(--muted);margin-top:10px">Nothing is added to your collection until you review a preview and confirm. Files up to 15 MB.</p>
 
+          <div style="display:flex;align-items:center;gap:10px;margin:16px 0 0">
+            <span style="flex:1;height:1px;background:#DBE3D3"></span><span style="color:var(--muted);font-size:12px">or</span><span style="flex:1;height:1px;background:#DBE3D3"></span>
+          </div>
+          <button type="button" class="imp-sheet" style="margin-top:12px" @click="openGConnect()">
+            <span>Connect a Google Sheet</span><small>Import straight from Google — no download needed</small>
+          </button>
+
           <template x-if="importBatches.length">
             <div style="margin-top:22px">
               <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Previous imports</h3>
@@ -1695,6 +1714,23 @@
               </template>
             </div>
           </template>
+        </div>
+
+        <!-- STEP: Google connect — the plain-words screen BEFORE Google's own popup
+             (the honest-consent rule: Google's wording says "edit" because drive.file
+             has no read-only variant; we say so out loud before they see it) -->
+        <div x-show="importStep==='gconsent'">
+          <h3 style="margin:0 0 10px;font-size:16px;color:var(--ink)">Connect your Google Sheet</h3>
+          <div style="background:var(--card,#fff);border:1px solid #DBE3D3;border-radius:12px;padding:14px 16px;font-size:14px;color:var(--ink);line-height:1.5">
+            <p style="margin:0 0 10px">• You’ll pick <strong>one spreadsheet</strong> in Google’s own window. This app can only ever see that one file — never the rest of your Drive.</p>
+            <p style="margin:0 0 10px">• Google’s permission screen will say the app can <em>“see, edit, create, and delete”</em> that file. That’s Google’s standard wording for this permission — a read-only version doesn’t exist.</p>
+            <p style="margin:0 0 10px">• Right now this app <strong>only reads</strong> your sheet, to import plants. It changes nothing in it. A future update can keep a live backup in your sheet — it will ask you separately, in plain words, before it ever writes.</p>
+            <p style="margin:0">• Nothing is added to your collection until you review a preview and confirm — exactly like a file import.</p>
+          </div>
+          <div class="btnrow" style="margin-top:14px">
+            <button class="btn-ghost" @click="importStep='pick'">← Back</button>
+            <button class="primary" style="flex:1;margin-top:0" :disabled="gBusy" @click="gContinue()" x-text="gBusy?'Connecting…':'Continue to Google'"></button>
+          </div>
         </div>
 
         <!-- STEP: pick a tab -->
@@ -2136,6 +2172,107 @@
   }
   const LIFECYCLE_STATUSES=['in_collection','dead','sold','traded','given_away'];
 
+  /* ---- Google Sheets connect (sync step B — READ ONLY) — docs/sheets-sync-plan.md ----
+     A closure module so the OAuth access token lives ONLY inside this scope: never on
+     window, never in localStorage/sessionStorage/a cookie/Supabase (security contract
+     condition 1 — grep-provable). Scope is exactly drive.file (condition 2): the token
+     can only ever touch files the user personally picks in Google's own Picker, plus
+     files the app itself creates (step C, later). The two Google scripts (GIS + gapi)
+     are this app's ONLY off-origin code — Google requires loading them live — and the
+     CSP <meta> in <head> pins script-src so no other origin can ever load script here.
+     Sheet CELL VALUES fetched through this module are UNTRUSTED TEXT, capped to the
+     same limits as the file-import worker (GCAP mirrors lib/import-worker.js CAP). */
+  const GCAP={ROWS:10000,COLS:100,CELL:8000};   // keep in step with lib/import-worker.js
+  function gCell(v,counters){    // mirror of the worker's cellToString: inert strings only
+    if(v===null||v===undefined) return '';
+    let s=String(v);             // numbers/bools → text; dates arrive as formatted strings
+    if(s.length>GCAP.CELL){ counters.truncated++; s=s.slice(0,GCAP.CELL); }
+    return s;
+  }
+  const GSheet=(()=>{
+    const SCOPE='https://www.googleapis.com/auth/drive.file';   // exactly this — adding a scope is a design change, not a tweak
+    let token=null;         // in-memory only; dies with the page (the accepted cost of never persisting it)
+    let tokenClient=null, scriptsP=null;
+    const loadScript=(src)=>new Promise((res,rej)=>{
+      const s=document.createElement('script'); s.src=src; s.async=true;
+      s.onload=res; s.onerror=()=>rej(new Error('Couldn’t reach Google. Check your connection and try again.'));
+      document.head.appendChild(s);
+    });
+    function configured(){ return typeof GOOGLE_CLIENT_ID==='string' && !/PASTE_/.test(GOOGLE_CLIENT_ID+GOOGLE_API_KEY+GOOGLE_APP_ID); }
+    function ensureScripts(){
+      if(!scriptsP) scriptsP=(async()=>{
+        await Promise.all([
+          loadScript('https://accounts.google.com/gsi/client'),
+          loadScript('https://apis.google.com/js/api.js')
+        ]);
+        await new Promise((res,rej)=>gapi.load('picker',{callback:res,onerror:()=>rej(new Error('Google Picker failed to load.'))}));
+      })().catch(e=>{ scriptsP=null; throw e; });
+      return scriptsP;
+    }
+    function ready(){ return !!(window.google&&google.accounts&&google.accounts.oauth2&&google.picker); }
+    // Must run inside a user tap (iOS Safari popup rule) — scripts are preloaded while
+    // the user reads the consent copy, so this call opens the popup synchronously.
+    function getToken(){
+      return new Promise((res,rej)=>{
+        if(token){ res(token); return; }
+        if(!tokenClient) tokenClient=google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:SCOPE,callback:()=>{},error_callback:()=>{}});
+        tokenClient.callback=(r)=>{
+          if(r&&r.access_token){
+            // verify the GRANT, not just the request: anything beyond drive.file stops the flow
+            if(r.scope&&r.scope.split(' ').some(sc=>sc&&sc!==SCOPE)){ rej(new Error('Google granted more access than this app asked for — stopping to be safe.')); return; }
+            token=r.access_token; res(token);
+          } else rej(new Error((r&&r.error_description)||'Google sign-in didn’t complete.'));
+        };
+        tokenClient.error_callback=(e)=>rej(new Error(e&&(e.type==='popup_closed'||e.type==='user_cancel')?'cancelled':'The Google sign-in window was blocked or failed. Allow pop-ups for this site, then try again.'));
+        tokenClient.requestAccessToken();
+      });
+    }
+    function dropToken(){ token=null; }
+    // Google's own Picker; single spreadsheet. The ID we act on comes ONLY from the
+    // Picker's own callback (condition 15 — no retargeting via stored/altered values).
+    function pick(){
+      return new Promise((res)=>{
+        const p=new google.picker.PickerBuilder()
+          .setOAuthToken(token)
+          .setDeveloperKey(GOOGLE_API_KEY)
+          .setAppId(GOOGLE_APP_ID)
+          .addView(new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS))
+          .setCallback((d)=>{
+            if(d.action===google.picker.Action.PICKED){ const doc=(d.docs&&d.docs[0])||null; res(doc?{id:doc.id,name:doc.name||''}:null); }
+            else if(d.action===google.picker.Action.CANCEL) res(null);
+          })
+          .build();
+        p.setVisible(true);
+      });
+    }
+    async function api(path,params){
+      const q=new URLSearchParams(params||{}).toString();
+      const r=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+path+(q?'?'+q:''),{headers:{Authorization:'Bearer '+token}});
+      if(r.status===401){ dropToken(); throw new Error('Your Google sign-in expired — tap Connect a Google Sheet again.'); }
+      if(r.status===403||r.status===404) throw new Error('Google didn’t give this app access to that spreadsheet. Go back and pick it again in the Google window.');
+      if(!r.ok) throw new Error('Google Sheets error ('+r.status+'). Try again in a moment.');
+      return r.json();
+    }
+    // Tab list, fields-limited. Doubles as the immediate read-grant check after picking:
+    // if the Picker grant didn't take, this fails LOUDLY (never a silent empty state).
+    async function meta(id){
+      const d=await api(encodeURIComponent(id),{fields:'properties.title,sheets(properties(sheetId,title,gridProperties(rowCount,columnCount)))'});
+      return { title:(d.properties&&d.properties.title)||'',
+               tabs:(d.sheets||[]).map(s=>({ id:s.properties.sheetId, title:s.properties.title,
+                 rows:(s.properties.gridProperties||{}).rowCount||0, cols:(s.properties.gridProperties||{}).columnCount||0 })) };
+    }
+    // One tab's values, range-capped to the SAME limits as file import. Values only,
+    // never formulas; dates as formatted strings (verify against the sandbox fixture).
+    async function values(id,tabTitle){
+      const range="'"+String(tabTitle).replace(/'/g,"''")+"'!A1:"+colLetter(GCAP.COLS)+GCAP.ROWS;
+      const d=await api(encodeURIComponent(id)+'/values/'+encodeURIComponent(range),
+        {valueRenderOption:'UNFORMATTED_VALUE',dateTimeRenderOption:'FORMATTED_STRING',majorDimension:'ROWS'});
+      return d.values||[];
+    }
+    function colLetter(n){ let s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+    return {configured,ensureScripts,ready,getToken,pick,meta,values,dropToken};
+  })();
+
   document.addEventListener('alpine:init', () => {
     Alpine.data('app', () => ({
       view:'loading', mode:'signin', email:'', password:'', message:'', ok:false, busy:false, userEmail:'', userId:'',
@@ -2177,6 +2314,8 @@
       importPreview:null, importResult:null, importProgress:0, importProgressTotal:0,
       importBatches:[], importBatchBusy:'', _importWorker:null,
       importViewBatch:null, importViewPlants:[], importViewFrom:'pick',
+      /* Google Sheet connect (step B) — NOTE: no token here; it lives inside GSheet's closure */
+      gBusy:false, gSheetId:'', gSheetName:'', gTabs:[],
 
       init(){
         sb.auth.onAuthStateChange((event,session)=>{
@@ -3505,6 +3644,7 @@
         this.importNameMode='split'; this.importSourceAsNotes=false; this.importDefaultStatus='in_collection';
         this.importStatusRules=[]; this.importPreview=null; this.importResult=null; this.importUndoId='';
         for(const k in this.importMap) this.importMap[k]='';
+        this._gReset();
         this.importOpen=true; this.loadImportBatches();
       },
       closeImport(){ this.importOpen=false; if(this._importWorker){ try{this._importWorker.postMessage({kind:'reset'});}catch(e){} } },
@@ -3512,6 +3652,7 @@
         const file=ev.target.files&&ev.target.files[0]; ev.target.value='';
         if(!file) return;
         if(file.size>15*1024*1024){ this.importError='That file is over the 15 MB import limit.'; return; }
+        this._gReset();   // a file pick after a Google pick must not stay in sheet mode
         this.importError=''; this.importNote=''; this.importBusy=true; this.importFileName=file.name;
         try{ const buf=await file.arrayBuffer(); this._importWorkerInit().postMessage({kind:'load',buffer:buf},[buf]); }
         catch(e){ this.importBusy=false; this.importError='Could not read that file.'; }
@@ -3526,7 +3667,72 @@
           if(this.importSheets.length===1) this.chooseSheet(this.importSheets[0].name);
         } else if(d.kind==='rows'){ this._receiveRows(d); }
       },
-      chooseSheet(name){ this.importSheetName=name; this.importError=''; this.importBusy=true; this._importWorkerInit().postMessage({kind:'rows',sheetName:name}); },
+      chooseSheet(name){
+        if(this.gSheetId){ this.gChooseTab(name); return; }   // connected-sheet path (step B); file path below unchanged
+        this.importSheetName=name; this.importError=''; this.importBusy=true; this._importWorkerInit().postMessage({kind:'rows',sheetName:name});
+      },
+
+      /* ---- Google Sheet connect (sync step B: READ-ONLY import — writes are step C,
+              a separate future session with its own security review) ---- */
+      _gReset(){ this.gSheetId=''; this.gSheetName=''; this.gTabs=[]; this.gBusy=false; },
+      openGConnect(){
+        this.importError=''; this.importNote='';
+        if(!GSheet.configured()){ this.importError='The Google connection isn’t set up on this copy of the app yet (missing Google Cloud values in config.js).'; return; }
+        this._gReset();
+        this.importStep='gconsent';
+        GSheet.ensureScripts().catch(()=>{});   // preload while the user reads, so Continue can open the popup inside the tap (iOS rule)
+      },
+      async gContinue(){
+        if(this.gBusy) return;
+        this.gBusy=true; this.importError='';
+        try{
+          if(!GSheet.ready()) await GSheet.ensureScripts();
+          await GSheet.getToken();               // Google popup — called from this tap
+          const picked=await GSheet.pick();      // Google's own Picker; ONE spreadsheet
+          if(!picked) return;                    // cancelled — stay on the consent step, no harm
+          const m=await GSheet.meta(picked.id);  // tab list + the immediate read-grant check (fails loudly, never silent-empty)
+          this.gSheetId=picked.id;               // pinned from the Picker callback only
+          this.gSheetName=m.title||picked.name||'Google Sheet';
+          this.importFileName=this.gSheetName;   // feeds source_name exactly like a file name
+          this.gTabs=m.tabs;
+          this.importSheets=m.tabs.map(t=>({name:t.title,rows:t.rows,cols:t.cols}));
+          if(!this.importSheets.length){ this.importError='That spreadsheet has no tabs.'; return; }
+          // Honest re-import note (no re-pull exists at this step by design: without
+          // sync-IDs in the sheet, re-reading can only ever CREATE rows, never match them)
+          try{
+            const {data}=await sb.from('sheet_link').select('id').eq('spreadsheet_id',picked.id).eq('kind','user_sheet').limit(1);
+            if(data&&data.length) this.importNote='You’ve imported from this sheet before. Importing again adds NEW copies of those plants — it never merges. You can undo any import afterwards.';
+          }catch(e){}   // pre-migration-011 or offline: the note is a courtesy, the preview still tells the truth
+          this.importStep='sheet';
+          if(this.importSheets.length===1) this.chooseSheet(this.importSheets[0].name);
+        }catch(e){ if(String(e&&e.message)!=='cancelled') this.importError=(e&&e.message)||'Could not connect to Google.'; }
+        finally{ this.gBusy=false; }
+      },
+      async gChooseTab(title){
+        this.importSheetName=title; this.importError=''; this.importBusy=true;
+        try{
+          const raw=await GSheet.values(this.gSheetId,title);     // range-capped to GCAP rows/cols
+          const counters={truncated:0};
+          const rows=raw.map(r=>{ const n=Math.min(r.length,GCAP.COLS); const out=new Array(n); for(let i=0;i<n;i++) out[i]=gCell(r[i],counters); return out; });
+          const tab=this.gTabs.find(t=>t.title===title);
+          this._receiveRows({rows, rowCapped:!!(tab&&tab.rows>GCAP.ROWS), rowCap:GCAP.ROWS, truncatedCells:counters.truncated});
+        }catch(e){ this.importError=(e&&e.message)||'Could not read that tab.'; this.importStep='sheet'; }
+        finally{ this.importBusy=false; }
+      },
+      // Record the connection on the sheet_link row (spreadsheet id/name, tab, mapping).
+      // Never credentials — a spreadsheet ID is an identifier; access always requires the
+      // user's own Google session. Called from runImport after the batch row exists.
+      async _recordSheetLink(){
+        const tab=this.gTabs.find(t=>t.title===this.importSheetName)||{};
+        const rec={ spreadsheet_id:this.gSheetId, spreadsheet_name:this.gSheetName,
+                    tab_id:(tab.id!=null?tab.id:null), tab_title:this.importSheetName,
+                    kind:'user_sheet', mode:'read_only',
+                    mapping:{headers:this.importHeaders, map:{...this.importMap}, nameMode:this.importNameMode} };
+        const {data,error}=await sb.from('sheet_link').select('id').eq('spreadsheet_id',this.gSheetId).eq('kind','user_sheet').limit(1);
+        if(error) throw error;
+        if(data&&data.length){ const {error:e2}=await sb.from('sheet_link').update(rec).eq('id',data[0].id); if(e2) throw e2; }
+        else{ const {error:e3}=await sb.from('sheet_link').insert(rec); if(e3) throw e3; }
+      },
       _receiveRows(d){
         const rows=d.rows||[];
         if(rows.length<1){ this.importError='That tab looks empty.'; this.importStep='sheet'; return; }
@@ -3612,8 +3818,9 @@
         const P=this.importPreview;
         this.importStep='running'; this.importError=''; this.importProgress=0; this.importProgressTotal=P.plants.length;
         try{
-          const {data:batch,error:bErr}=await sb.from('import_batch').insert({source_name:this.importFileName+(this.importSheetName?(' · '+this.importSheetName):''),source_kind:'file'}).select('id').single();
+          const {data:batch,error:bErr}=await sb.from('import_batch').insert({source_name:this.importFileName+(this.importSheetName?(' · '+this.importSheetName):''),source_kind:this.gSheetId?'sheet_oauth':'file'}).select('id').single();
           if(bErr) throw bErr; const batchId=batch.id;
+          if(this.gSheetId) await this._recordSheetLink();   // records the connection (needs migration 011, same as 'sheet_oauth' above)
           const genusByKey=new Map(this.genera.map(g=>[normKey(g.name),g]));
           const toAddG=P.newGenera.filter(n=>!genusByKey.has(normKey(n)));
           if(toAddG.length){ const {data,error}=await sb.from('genus').insert(toAddG.map(name=>({name}))).select('id,name'); if(error) throw error; data.forEach(g=>{ this.genera.push(g); genusByKey.set(normKey(g.name),g); }); }
