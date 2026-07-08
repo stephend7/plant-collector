@@ -4,15 +4,61 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
-## 2026-07-07 — Sheets sync step B BUILT (connect & read, build 2026-07-07a) — NOT yet deployed/verified
+## 2026-07-07 — Sheets sync step B SHIPPED & VERIFIED (connect & read; final build 2026-07-07c)
 
 Built the same day the design was approved (entry below), on **Fable 5** (Stephen's explicit call
 for this build — the playbook's Sonnet default stands for future steps). FULL TIER, pipeline
 honored: approved contract (`docs/sheets-sync-plan.md`) → build → **REAL separated Security agent
 reviewed the actual diff** (reviewer ≠ author) → verdict **CONDITIONAL PASS, zero critical/high**
-→ all actionable findings applied. **NOT deployed, NOT live-verified yet** — blocked on Stephen's
-Google Cloud setup (client ID / API key / project number → `app/config.js` placeholders), running
-migration 011 in Supabase, then push + Chrome + **early iPhone Picker check** (named WebKit risk).
+→ all actionable findings applied → Stephen created the Google Cloud project (client ID / API key
+/ project number into `app/config.js`) → migration 011 run in Supabase → deployed → **verified
+end-to-end in Chrome AND on Stephen's iPhone Safari, including the named Picker-popup risk.**
+**STATUS: SHIPPED.**
+
+**Two real bugs found live during verification, both fixed same session (not false-green — see
+the "verify your verification" note below for how the first one nearly was):**
+
+1. **Build `07a` broke the ENTIRE live app (blank page).** The CSP's `script-src` had `'self'
+   'unsafe-eval'` + the two Google origins but no `'unsafe-inline'`. CSP's `'self'` covers script
+   FILES (`<script src>`), never inline `<script>` content — and this app's whole business logic
+   is one inline script block that predates the CSP by months. Result: the inline script never
+   ran, `Alpine.data('app', ...)` was never registered, `x-data="app"` fell back to Alpine's
+   empty-object default, and the page rendered nothing — with ZERO fatal top-level errors logged
+   (only a cascade of caught-and-swallowed `ReferenceError`s from inside Alpine's directive
+   evaluator, one per state property). **Caught within minutes** by the live-Chrome verify pass
+   that immediately followed the deploy (not skipped, not assumed). **Fix (build `07b`):** added
+   `'unsafe-inline'` to script-src, matching the already-accepted style-src trade-off — the CSP's
+   real new protection (no OTHER origin can ever load script/style here) stays fully intact; what
+   it can't additionally stop is a future XSS injecting inline content, which was equally
+   unprotected before any CSP existed. Re-verified clean: build marker correct, zero console
+   errors, `_x_dataStack` populated, both Google scripts (GIS + Picker) loaded and ready under the
+   live CSP.
+2. **`guessImportMap`'s Notes auto-detect (`/note|descr|comment|growing/`) collided with
+   Form/Descriptor's (`/descriptor|form\b|variety|cultivar/`)** — a header spelled "Descriptor"
+   satisfies both (via the bare "descr" fragment), so the same source column got silently mapped
+   into BOTH target fields. Found by Stephen re-testing the mapping screen against his real sandbox
+   sheet. **Fix (build `07c`):** excluded literal "descriptor" from the Notes match — "Description"
+   still auto-maps to Notes as before, "Descriptor" now maps only to Form/Descriptor. This bug
+   predates step B (same shared mapper file imports already used) and is now fixed for both paths.
+
+**Verified live end-to-end (Chrome + iPhone Safari, Stephen driving, real sandbox sheet):**
+connect → consent screen → Google popup → Picker shows both his spreadsheets → tab picked → values
+fetched → mapping screen (post-fix, correct) → preview (151 plants, counts reconciled) → import →
+result counts confirmed → **undo removed exactly that batch, nothing else touched.** iPhone Safari
+separately confirmed: consent screen renders correctly, Picker popup opens cleanly and lists
+spreadsheets — **the plan's one named risk (iOS Picker-popup behavor) is clear.**
+
+**Steer captured mid-verification (Stephen): no merging of extra/unmappable sheet columns into
+Notes** — a column with no true app counterpart stays in the sheet, UNMAPPED (sync already never
+touches unmapped columns, so nothing is lost); a merged Notes blob can't be split back into source
+columns once two-way sync exists. A multi-column→Notes mapper upgrade was offered and DECLINED for
+exactly this reason — logged in the `import-sync-design` memory so a future session doesn't
+rebuild it. Also logged (ui-polish-backlog memory): the import preview table only shows 8 fixed
+columns regardless of what's mapped — pre-existing UX gap, confirmed confusing, deferred (not
+blocking, everything mapped still imports correctly).
+
+**NEXT:** step C (write — app-created backup first, then mirror into the user's sheet) is a
+separate future session with its own build-stage Security review before any write code lands.
 
 **What shipped (worktree branch, one logical change):**
 - **Migration 011** (`app/migrations/011_sheet_link_and_sheet_oauth.sql`): `sheet_link` +
