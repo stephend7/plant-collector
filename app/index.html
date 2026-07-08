@@ -5,18 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8EDE0">
 <!-- CSP (ships in the SAME change as the first off-origin <script>, per the sheets-sync
-     security contract): the ONLY origins that may ever run script here are this site plus
+     security contract): the ONLY origins that may ever LOAD script here are this site plus
      Google's two auth/picker loaders (GIS + gapi) — they cannot be vendored or SRI-pinned
      (Google serves live-rotating code), so this tag is the containment: no OTHER origin's
      script can load even via a future injection bug. 'unsafe-eval' is required by Alpine.js
      (it compiles x-* expressions with new Function) — it permits no cross-origin loading.
+     'unsafe-inline' on script-src is ALSO required, not optional: this entire app's logic
+     is one inline <script> block (predates the CSP by months), and CSP's 'self' covers
+     script FILES (<script src>), never inline <script> content — without 'unsafe-inline'
+     the whole app fails to boot (confirmed live 2026-07-07: blank page, Alpine's x-data
+     silently fell back to {} with zero fatal errors logged — a real deploy caught and
+     fixed the same day). Same accepted trade-off as style-src below: the CSP's actual new
+     protection — blocking any OTHER origin from ever loading script/style here — stays
+     fully intact; what's NOT blocked is a future XSS injecting inline script/style, which
+     was equally unprotected before this tag existed, so this is not a regression from the
+     pre-CSP baseline, just a limit on how much this tag can improve on it.
      connect/frame limited to self + Supabase + the Google endpoints step B talks to.
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
-     from there — 2026-07-07 Security review) — NEVER in script-src. Known accepted gap,
-     named honestly: style-src 'unsafe-inline' (the app's inline styles predate the CSP),
-     so CSS-injection is not blocked — script injection is. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-07a">
+     from there — 2026-07-07 Security review) — NEVER in script-src. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
+<meta name="app-build" content="2026-07-07b">
 <title>Plant Collector</title>
 <style>
   :root{
