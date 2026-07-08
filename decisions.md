@@ -4,6 +4,99 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-08 — Sheets sync step C2 SHIPPED & VERIFIED (mirror into the user's OWN sheet; build 2026-07-08a)
+
+The risky half of step C: the app now writes into the user's OWN connected Google Sheet
+(not just a file it created). Per `docs/sheets-sync-plan.md` step C2 and the standing steer
+that this step gets extra ceremony, this was built and reviewed on **Fable 5** (Stephen's
+2026-07-07 call for the risky step). FULL TIER, pipeline honored: architect plan written
+first → build → **REAL separated Security agent reviewed the actual diff** (reviewer ≠
+author) → **CONDITIONAL PASS** (1 HIGH, 3 MEDIUM, 3 LOW, 3 INFO) → all findings fixed →
+**independent re-verification of the fixes → PASS** → live verification on the sandbox
+sheet (`CP DB2 - For software test`, the designated agent-writable fixture).
+
+**What shipped:** "Sheet sync" in the main menu (+ a cross-link after a Google-Sheet
+import). Turns a step-B read-only connection into a living mirror: a one-time plain-words
+disclosure (versioned `mirror-2026-07-08`, Stephen's approved copy, with an opt-in
+"keep private fields out of the sheet" checkbox) is accepted BEFORE any write. Then:
+row↔plant matching (stamped App ID → full-signature match on free rows → unique name
+match; anything still ambiguous goes to a side-by-side review, never guessed), a counted
+preview gate ("Apply to sheet") on first write / post-remap / post-review / >50% of
+managed rows (appends count toward that fraction too), then the actual write — mapped
+cells + one added "App ID" column, `valueInputOption=RAW` throughout, new plants appended,
+existing rows never deleted, formula-holding columns detected and excluded from
+write-back. First write duplicates the connected tab as an in-spreadsheet backup and
+re-verifies it exists before mutating anything. A write-time re-fetch re-verifies every
+row about to be touched still matches what the plan saw (content-match tripwire from the
+contract) — protects against the sheet changing while the user sat on the review/preview
+screens.
+
+**Security findings worth remembering (all fixed):**
+- [HIGH] the auto-picked "App ID" column only checked the HEADER row for emptiness — a
+  headerless column holding real user data below row 1 (common spreadsheet shape) would
+  have been silently stamped over. Now every fetched row is checked; the first
+  **completely empty**, non-formula column is used.
+- [MEDIUM] a failed run returned to the preview holding the stale plan; re-clicking
+  "Apply to sheet" could double-append rows that had actually landed. Now any run failure
+  discards the plan entirely and returns to the overview — the only retry path is a full
+  re-fetch-and-match.
+- [MEDIUM] a plant referenced by a DUPLICATE App ID (both copies correctly left untouched)
+  was still being re-appended as a third row on every subsequent sync — unbounded growth
+  from an ordinary "duplicate this row" action in the sheet. Fixed: any plant ID present
+  ANYWHERE in the sheet, including inside duplicate rows, is never re-appended.
+- [MEDIUM] no re-verification between building the plan and applying it — a sheet edited
+  (re-sorted, rows inserted) while the user sat on the review/preview screen could get
+  wrong-row writes and permanent bad stamps. Fixed: `_syncRun` re-fetches and content-
+  verifies every target row immediately before the first mutation; any mismatch aborts
+  with nothing written.
+- [LOW] the post-remap "must preview" flag lived only in page memory — closing/reopening
+  the dialog could skip the preview after a remap. Now derived from persistent state
+  (`mapping.appIdCol==null` until a run succeeds).
+- [LOW] a mapped column with a genuinely blank header could drift-loop forever (stored
+  placeholder vs freshly-fetched blank never matching). Fixed: both sides normalize blank
+  headers to the same "Column N" placeholder.
+- [LOW] one Sheets API call per changed cell risked the per-minute write quota on a large
+  first sync. Fixed: contiguous changed columns in the same row are coalesced into one
+  range.
+
+**VERIFIED LIVE 2026-07-08 (Claude-in-Chrome, real account, sandbox sheet
+`CP DB2 - For software test` — the designated agent-writable fixture, per the contract's
+sandbox-only testing rule):**
+- **First write**: accepted the disclosure (rendered exactly as approved, checkbox off by
+  default) → 26 ambiguous rows correctly routed to review (duplicate-signature rows like
+  two identical "Byblis liniflora" entries) → picked one real match, left 25 alone →
+  counted preview showed **0 updated · 41 added · 126 get an App ID** (tripped: first
+  write) → applied. Result: backup tab `Plants — backup 2026-07-08` created and verified
+  first; 126 rows stamped; 41 new plants appended; **all 16 other tabs (Species, Journal,
+  Images, the user's own genus/species reference tabs, etc.) byte-identical before/after**;
+  the backup tab is a byte-identical copy of the PRE-sync Plants data. Only column 16 (App
+  ID, correctly the first fully-empty column past the 16 used headers) changed anywhere in
+  the pre-existing rows — proves the mapped-column blast-radius claim empirically, not just
+  by code reading.
+- **Second write (real update)**: mutated one matched plant's notes to `=2+2` directly in
+  the app's DB, ran "Sync now" (a real Google 401 fired mid-attempt first — token expiry —
+  and was handled exactly as designed: plan discarded, honest error, back to overview, no
+  stale-retry). Re-ran: review reappeared for the same 25 rows (correct — still genuinely
+  ambiguous), preview showed **1 updated**, applied. **RAW proven**: `Plants!J2` reads
+  back as the literal string `"=2+2"` via `UNFORMATTED_VALUE` (a live formula would have
+  returned the computed number `4`) — confirmed a second way via `valueRenderOption=
+  FORMULA`, which also returned the bare string `=2+2`, no formula, no leading-apostrophe
+  escaping needed. Only that one cell changed; app plant count stayed at 167 throughout
+  (sync never touches app data, only the sheet).
+- Not exercised live (code-verified twice by Security instead): the `>50%`-of-rows
+  fraction trip in isolation — every run against this fixture already forces a preview
+  via the "review happened" gate (the sandbox has genuine duplicate-name rows that are
+  perpetually ambiguous), a stronger trigger than the fraction check, so the fraction
+  branch specifically never got to fire alone. Also not exercised: a formula-holding
+  mapped column (the fixture has none) — `formulaSkipped` stayed empty both runs. Both
+  are simple, isolated boolean branches that two independent Security passes read line-
+  by-line; a follow-up live check against a purpose-built fixture (no ambiguous dupes,
+  one formula column) would close the gap if this becomes safety-critical later.
+- iPhone Safari tap-through: not yet done (same standing gap as B/C1 — lower risk here
+  since C2 involves no Picker). **STATUS: SHIPPED.**
+
+---
+
 ## 2026-07-07 — Sheets sync step C1 SHIPPED & VERIFIED (app-created Google Drive backup; build 2026-07-07d)
 
 The first write path to Google, built per the approved contract (`docs/sheets-sync-plan.md`,
