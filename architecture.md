@@ -234,5 +234,9 @@ Each phase ends with a real verification gate (tested in a real browser, Safari 
   Curated-library **crowdsourcing**; auto-fetch / automated Google care-info search;
   **scrape description + grow data from a plant's purchase link** (the `source_url` field —
   vendor listing pages often carry growing instructions; pull them into notes/care guide);
-  breeding & seed tracking (parentage); lost-tag photo-match ID; analytics
+  breeding & seed tracking (parentage — incl. an explicit **Hybrid vs Species type flag** on
+  the reference level and **parent links** on a plant/species so complex hybrid lineage is
+  structured, not parsed out of the name string; Sarracenia/Pinguicula especially. Partial
+  support already exists via the `crossed` event's optional second-plant. Requested by Stephen
+  2026-07-08 — see the `feature-hybrid-parentage` memory); lost-tag photo-match ID; analytics
   (collection-over-time, losses, repurchase-after-death); P-Touch label printing; paid registration.
