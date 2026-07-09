@@ -83,15 +83,37 @@ sandbox-only testing rule):**
   FORMULA`, which also returned the bare string `=2+2`, no formula, no leading-apostrophe
   escaping needed. Only that one cell changed; app plant count stayed at 167 throughout
   (sync never touches app data, only the sheet).
-- Not exercised live (code-verified twice by Security instead): the `>50%`-of-rows
-  fraction trip in isolation — every run against this fixture already forces a preview
-  via the "review happened" gate (the sandbox has genuine duplicate-name rows that are
-  perpetually ambiguous), a stronger trigger than the fraction check, so the fraction
-  branch specifically never got to fire alone. Also not exercised: a formula-holding
-  mapped column (the fixture has none) — `formulaSkipped` stayed empty both runs. Both
-  are simple, isolated boolean branches that two independent Security passes read line-
-  by-line; a follow-up live check against a purpose-built fixture (no ambiguous dupes,
-  one formula column) would close the gap if this becomes safety-critical later.
+**Follow-up live checks, same day (2026-07-08, on Sonnet 5 — Tester role, the risky build/
+review work was already done and passed on Fable 5):** the two gaps noted above were
+closed rather than left as a code-only claim.
+- **Investigated why the sandbox always forces review**: the 25 perpetually-ambiguous rows
+  turned out to be genuine sandbox cruft, not a code issue — duplicate legacy entries in
+  `CP DB2` (e.g. two "Drosera intermedia" rows) where the real 167-plant account only has
+  ONE matching plant, so the twin has nothing to match (confirmed: zero free plant
+  candidates remained for any of them). Not fixable by picking matches — there's no real
+  plant to assign. Left as-is; it's correct, safe behavior (never auto-guess), just noisy.
+- **Fraction tripwire (`>50% of managed rows`), isolated for real**: mutated 80 of 167
+  matched plants' prices via direct DB update (**80/167 = 47.9%** → correctly did NOT
+  trip), then 10 more (**90/167 = 53.9%** → correctly DID trip) — tested by calling the
+  actual `_syncPrepare`/`_syncFinishPlan` functions against live-fetched sheet data with
+  the review array cleared (to isolate the fraction branch from the review-forces-preview
+  gate), never applying the plan. Confirms the threshold fires exactly where the code says
+  it should, at a realistic boundary, not just by reading the arithmetic. All 90 prices
+  restored afterward from the sheet's own (never-written-to) Cost column — verified back
+  to `updated:0` (byte-identical to pre-test) before moving on.
+- **Formula-column exclusion**: wrote a real formula (`=1+1`, `USER_ENTERED`) into an
+  unused cell in the mapped Cost column — `formulaSkipped` correctly caught it. Also
+  surfaced a real (non-blocking) finding: a leftover artifact from the RAW-proof test
+  earlier the same day (`=2+2`, written as literal RAW text into the Notes/Description
+  column) was ALSO flagged, because `formulaCols()` detects anything `FORMULA`-rendered
+  as starting with `=`, which can't distinguish "genuine formula" from "RAW-written text
+  that happens to start with =". This is a reasonable, conservative call, not a bug — but
+  it meant that leftover was silently blocking all future writes to the Notes column.
+  Both artifacts cleared from the sandbox; confirmed clean afterward (`formulaSkipped:[]`,
+  `updated:0`, matches the state right after the very first sync).
+- App plant count held at 167 throughout every mutation/restore cycle above — confirms (as
+  designed) that none of this testing ever touched real collection data, only the sandbox
+  spreadsheet and, transiently, two already-restored test fields.
 - iPhone Safari tap-through: not yet done (same standing gap as B/C1 — lower risk here
   since C2 involves no Picker). **STATUS: SHIPPED.**
 
