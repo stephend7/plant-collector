@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-08a">
+<meta name="app-build" content="2026-07-08b">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1750,7 +1750,7 @@
                 <div style="font-weight:600" x-text="syncLink.spreadsheet_name||'Google Sheet'"></div>
                 <div style="color:var(--muted);font-size:13px;margin-top:2px" x-text="'Tab: '+(syncLink.tab_title||'—')"></div>
                 <div style="color:var(--muted);font-size:13px;margin-top:4px">
-                  <span x-show="syncLink.mode==='mirror' && syncLink.last_sync_at">Last synced <span x-text="syncWhen()"></span>.</span>
+                  <span x-show="syncLink.mode==='mirror' && syncLink.last_sync_at">Last completed sync: <span x-text="syncWhen()"></span>.</span>
                   <span x-show="syncLink.mode==='mirror' && !syncLink.last_sync_at">Sync is on — nothing written yet.</span>
                   <span x-show="syncLink.mode!=='mirror'">Connected for import only — the app doesn’t write to it.</span>
                 </div>
@@ -1763,6 +1763,17 @@
                 <button class="btn-ghost" @click="syncOpen=false">Close</button>
                 <button class="primary" style="flex:1;margin-top:0" x-show="syncLink.mode!=='mirror'" :disabled="syncBusy||!syncLinkKnown" @click="syncTurnOn()">Turn on sheet sync</button>
                 <button class="primary" style="flex:1;margin-top:0" x-show="syncLink.mode==='mirror'" :disabled="syncBusy||!syncLinkKnown" @click="syncNow()" x-text="syncBusy?'Checking…':'Sync now'"></button>
+              </div>
+              <!-- Disconnect (forget completely) — the sheet itself is never modified -->
+              <div style="margin-top:16px;text-align:center" x-show="!syncConfirmDisconnect">
+                <a style="color:#9A3528;cursor:pointer;font-size:13px" @click="syncError=''; syncConfirmDisconnect=true">Disconnect this sheet</a>
+              </div>
+              <div x-show="syncConfirmDisconnect" style="border:1px solid #E4C7B8;background:#FBF3EE;border-radius:12px;padding:12px 14px;font-size:13px;color:var(--ink);line-height:1.5;margin-top:14px">
+                Forget this sheet? Your Google Sheet and everything in it — including the “App ID” column the app added — stays exactly as it is. The app just stops syncing and no longer remembers it. You can reconnect any time by importing from it.
+                <div style="display:flex;gap:8px;margin-top:10px">
+                  <button class="btn-ghost" style="flex:1" :disabled="syncBusy" @click="syncConfirmDisconnect=false">Keep it connected</button>
+                  <button style="flex:1;padding:10px;border-radius:10px;border:none;background:#9A3528;color:#fff;font-size:14px;cursor:pointer" :disabled="syncBusy" @click="syncDisconnect()" x-text="syncBusy?'Working…':'Forget this sheet'"></button>
+                </div>
               </div>
             </div>
           </template>
@@ -1939,6 +1950,16 @@
 
         <!-- STEP: pick a tab -->
         <div x-show="importStep==='sheet'">
+          <!-- For a Google-sourced import: show which file is selected and let the user
+               re-open Google's Picker to choose a DIFFERENT one — so a wrong pick is never
+               a dead end (found on iPhone, 2026-07-08). gContinue() leaves the current
+               selection intact if the Picker is cancelled. -->
+          <template x-if="gSheetId">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;padding:10px 12px;background:var(--card,#fff);border:1px solid #DBE3D3;border-radius:10px">
+              <div style="font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="color:var(--muted)">From: </span><span style="font-weight:600" x-text="gSheetName"></span></div>
+              <a style="color:var(--pine-2);cursor:pointer;font-size:13px;white-space:nowrap" @click="if(!gBusy)gContinue()">Pick a different sheet</a>
+            </div>
+          </template>
           <p style="color:var(--muted);font-size:13px">This workbook has several tabs. Which one holds the plants?</p>
           <template x-for="s in importSheets" :key="s.name">
             <button class="imp-sheet" @click="chooseSheet(s.name)">
@@ -2604,7 +2625,7 @@
       mainMenuOpen:false, exportDialogOpen:false, exportFileName:'',
       backupOpen:false, backupBusy:false, backupError:'', backupResult:'', backupLink:null, backupMissing:false, backupLinkKnown:false,
       syncOpen:false, syncStep:'overview', syncBusy:false, syncError:'', syncNote:'', syncResult:'',
-      syncLink:null, syncLinkKnown:false, syncPrivacy:false, syncPlan:null, syncReview:[], syncRemap:{headers:[],map:{}},
+      syncLink:null, syncLinkKnown:false, syncPrivacy:false, syncPlan:null, syncReview:[], syncRemap:{headers:[],map:{}}, syncConfirmDisconnect:false,
       invMode:'shelf', invShelf:null, invSeenId:null, invSeenQty:0, invPrevScreen:'list', invError:'',
       sheetOpen:false, sheet:null, sheetConfirmDelete:false, sheetEditing:false, sheetForm:{comment:'',label:'plant',date:''},
       prevTab:'plants', updateReady:false,
@@ -3971,7 +3992,7 @@
           this.backupLink=(data&&data[0])||null; this.backupLinkKnown=true;
         }catch(e){ this.backupLink=null; this.backupError=this.backupError||'Couldn’t check your backup connection. Check your internet and reopen this screen.'; }
       },
-      backupWhen(){ return this.backupLink&&this.backupLink.last_sync_at ? this.backupLink.last_sync_at.slice(0,16).replace('T',' ') : ''; },
+      backupWhen(){ return this.localWhen(this.backupLink&&this.backupLink.last_sync_at); },
       async runBackup(recreate){
         if(this.backupBusy||!GSheet.configured()||!this.backupLinkKnown) return;
         this.backupBusy=true; this.backupError=''; this.backupResult=''; this.backupMissing=false;
@@ -4081,7 +4102,7 @@
       async openSync(){
         this.mainMenuOpen=false; this.importOpen=false;
         this.syncError=''; this.syncNote=''; this.syncResult=''; this.syncPlan=null; this.syncReview=[];
-        this.syncStep='overview'; this.syncLinkKnown=false; this.syncLink=null; this._remapped=false;
+        this.syncStep='overview'; this.syncLinkKnown=false; this.syncLink=null; this._remapped=false; this.syncConfirmDisconnect=false;
         if(!GSheet.configured()) this.syncError='The Google connection isn’t set up on this copy of the app yet (missing Google Cloud values in config.js).';
         this.syncOpen=true;
         GSheet.ensureScripts().catch(()=>{});   // preload while the user reads (iOS popup rule)
@@ -4094,7 +4115,26 @@
           this.syncPrivacy=!!(this.syncLink&&this.syncLink.mapping&&this.syncLink.mapping.privacyExclude);
         }catch(e){ this.syncError=this.syncError||'Couldn’t check your sheet connection. Check your internet and reopen this screen.'; }
       },
-      syncWhen(){ return this.syncLink&&this.syncLink.last_sync_at ? this.syncLink.last_sync_at.slice(0,16).replace('T',' ') : ''; },
+      // Timestamps are stored UTC; SHOW them in the viewer's own timezone so a stale
+      // success can't masquerade as "just now" against a clock that doesn't match
+      // (the raw-UTC display confused a real user — 2026-07-08).
+      localWhen(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleString([],{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }catch(e){ return iso.slice(0,16).replace('T',' '); } },
+      syncWhen(){ return this.localWhen(this.syncLink&&this.syncLink.last_sync_at); },
+      // Forget this sheet: delete the connection row (RLS-scoped to this user; the extra
+      // kind filter is belt-and-suspenders so the app-backup link can never be hit). The
+      // user's Google Sheet — including the App ID column the app added — is left exactly
+      // as it is; only what THIS app remembers is removed. Reconnect = import from it again.
+      async syncDisconnect(){
+        if(this.syncBusy||!this.syncLink) return;
+        this.syncBusy=true; this.syncError='';
+        try{
+          const {error}=await sb.from('sheet_link').delete().eq('id',this.syncLink.id).eq('kind','user_sheet');
+          if(error) throw error;
+          this.syncLink=null; this.syncConfirmDisconnect=false; this.syncPlan=null; this.syncReview=[];
+          this.syncStep='overview'; this.syncNote='That sheet is disconnected. Your Google Sheet was not changed.';
+        }catch(e){ this.syncError=(e&&e.message)||'Couldn’t disconnect that sheet. Check your internet and try again.'; }
+        finally{ this.syncBusy=false; }
+      },
       // The one-time plain-words disclosure (Stephen-approved copy, versioned in the
       // markup below). Accepting records consent BEFORE anything can be written.
       syncTurnOn(){ this.syncError=''; this.syncStep='disclosure'; },
