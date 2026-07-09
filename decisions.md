@@ -4,6 +4,52 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-08 — Sheet-sync UX fixes from Stephen's real iPhone session (build 2026-07-08b)
+
+Stephen tried C2 for real on his iPhone (real account, 16 plants) right after it shipped
+and hit three rough edges — reported live, investigated with him in the same session
+before touching anything.
+
+**What actually happened (confirmed via direct, read-only DB checks before any fix):**
+his 16 hand-entered plants were untouched (`import_batch_id` null on all of them — an
+earlier CP DB2 test import had already been fully undone); no wrong spreadsheet ever got
+linked (picking the wrong file in Google's Picker and backing out without finishing an
+import discards it — nothing is saved until `_recordSheetLink()` runs at the end of a
+completed import); and his "it looks synced but I don't think it synced" instinct was
+correct — the `last_sync_at` shown was stale, from an earlier desktop test run, and his
+phone attempt never completed (a completed run would have advanced that timestamp).
+No data was ever at risk; the confusion was three real, separate UX gaps:
+
+1. **No way to disconnect a sheet.** The only path was editing the database directly.
+   Added **"Disconnect this sheet"** to the Sheet sync screen (confirm-gated, mirrors the
+   existing undo-import pattern). Deletes only that one `sheet_link` row — `kind='user_sheet'`
+   is part of the delete filter so it can never touch the `app_backup` link even by
+   accident — and RLS scopes it to the signed-in user regardless. **The user's Google
+   Sheet, including the App ID column the app added, is never touched** — disconnecting
+   only makes the app forget the connection; reconnecting later is a normal re-import.
+2. **Picking the wrong Google Sheet was a dead end.** The tab-picker step (after Google's
+   Picker closes) now shows "From: `<sheet name>`" with a **"Pick a different sheet"**
+   link that re-opens the Picker; cancelling it leaves the current pick untouched.
+3. **Sync/backup timestamps displayed raw UTC**, unlabeled — a stale success from hours
+   earlier read as "just happened" against a clock in the wrong timezone. Now rendered in
+   the viewer's local time via a shared `localWhen()` helper, and relabeled **"Last
+   completed sync"** so a stale value can't be mistaken for the outcome of the most recent
+   tap.
+
+Built and reviewed inline (Lite tier — each change mirrors an already-shipped, already-
+security-reviewed pattern: the disconnect mirrors undo-import's delete-with-confirm; the
+picker link reuses the existing `gContinue()` re-entry point unchanged; the timestamp
+change is display-only). **VERIFIED LIVE 2026-07-08** (Claude-in-Chrome, Stephen's real
+account, build `2026-07-08b`): local-time conversion checked against the known UTC value
+(20:32 UTC → 1:32 PM, correct offset); disconnect exercised for real — confirmed via
+direct DB read that only the `CP DB2` `user_sheet` link was removed, the `app_backup`
+link was untouched, and the plant count held at 16; the picker-recovery link confirmed
+rendering with a live "From: …" preview. This also completed the cleanup from the C2
+verification session: Stephen's real account is no longer wired to sync into the sandbox
+test sheet.
+
+---
+
 ## 2026-07-08 — Sheets sync step C2 SHIPPED & VERIFIED (mirror into the user's OWN sheet; build 2026-07-08a)
 
 The risky half of step C: the app now writes into the user's OWN connected Google Sheet
