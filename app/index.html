@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-08c">
+<meta name="app-build" content="2026-07-08d">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -2416,8 +2416,15 @@
   const GCAP={ROWS:10000,COLS:100,CELL:8000};   // keep in step with lib/import-worker.js
   // Step C1 (write): the app-created backup spreadsheet — tab names + which version of
   // the plain-words backup explanation the user accepted (recorded on the sheet_link row).
-  const BACKUP_TABS=['Plants','Species','Vendors','Journal'];
+  const BACKUP_README_TAB='How to read this';
+  const BACKUP_TABS=[BACKUP_README_TAB,'Plants','Species','Vendors','Journal'];
   const BACKUP_CONSENT_VERSION='backup-2026-07-07';
+  // Hover-notes written onto the ID-key header cells so the file explains itself even if
+  // the app is gone (Stephen, 2026-07-08). The App ID is the ONLY reliable way to group a
+  // plant's journal entries, because the data model treats same-named plants as distinct
+  // individuals (the lineage rule) — the name columns alone can merge two different plants.
+  const BACKUP_NOTE_JOURNAL_ID='Each plant’s unique ID. This tab is already grouped by plant, then by date. Sort by this column to regroup a plant’s history — two plants can share the same genus and species but are different plants, so the name columns alone can’t reliably separate them.';
+  const BACKUP_NOTE_PLANTS_ID='Each plant’s unique ID. The Journal tab’s “Plant App ID” column holds the same code, which is what links every journal entry back to its plant.';
   // Step C2 (write): mirroring into the user's OWN connected sheet. The disclosure text
   // lives in the sync dialog markup; this version string is recorded with the acceptance
   // so future-us can prove which promise was shown. The tripwire fraction is the
@@ -2616,7 +2623,20 @@
       await call('POST','/'+encodeURIComponent(id)+'/values/'+encodeURIComponent(quoteTab(tabTitle)+'!A1')+':append',
         {valueInputOption:'RAW',insertDataOption:'INSERT_ROWS'},{values:rows},true);
     }
-    return {configured,ensureScripts,ready,getToken,pick,meta,values,dropToken,createFile,ensureTabs,writeTabs,formulaCols,duplicateTab,ensureGridCols,updateCells,appendRows,colLetter};
+    // Set hover-notes on individual header cells (row 0). specs:[{sheetId,col,note}].
+    // updateCells with fields:'note' touches ONLY the note — never the cell value, never
+    // formatting, never other cells. No delete anywhere. Used only on the app-created
+    // backup file to make it self-explanatory.
+    async function setNotes(id,specs){
+      if(!specs||!specs.length) return;
+      await call('POST','/'+encodeURIComponent(id)+':batchUpdate',null,{
+        requests:specs.map(s=>({updateCells:{
+          rows:[{values:[{note:String(s.note)}]}], fields:'note',
+          start:{sheetId:s.sheetId,rowIndex:0,columnIndex:s.col}
+        }}))
+      });
+    }
+    return {configured,ensureScripts,ready,getToken,pick,meta,values,dropToken,createFile,ensureTabs,writeTabs,formulaCols,duplicateTab,ensureGridCols,updateCells,appendRows,colLetter,setNotes};
   })();
 
   document.addEventListener('alpine:init', () => {
@@ -4041,7 +4061,19 @@
             if(liveName&&liveName!==link.spreadsheet_name){ link={...link,spreadsheet_name:liveName}; try{ await sb.from('sheet_link').update({spreadsheet_name:liveName}).eq('id',link.id); }catch(_){} }
           }
           await GSheet.writeTabs(link.spreadsheet_id,tabs);
-          const status='Backed up '+tabs.map(t=>(t.rows.length-1)+' '+t.title.toLowerCase()).join(', ');
+          // Self-documenting hover-notes on the ID-key columns. Best-effort: the data is
+          // already safely written, so a note failure must never fail the backup.
+          try{
+            const m=await GSheet.meta(link.spreadsheet_id);
+            const idOf=t=>{ const x=m.tabs.find(z=>z.title===t); return x?x.id:null; };
+            const jt=tabs.find(t=>t.title==='Journal'), pt=tabs.find(t=>t.title==='Plants');
+            const jId=idOf('Journal'), pId=idOf('Plants'), specs=[];
+            if(jId!=null&&jt){ const c=jt.rows[0].indexOf('Plant App ID'); if(c>=0) specs.push({sheetId:jId,col:c,note:BACKUP_NOTE_JOURNAL_ID}); }
+            if(pId!=null&&pt){ const c=pt.rows[0].indexOf('App ID'); if(c>=0) specs.push({sheetId:pId,col:c,note:BACKUP_NOTE_PLANTS_ID}); }
+            await GSheet.setNotes(link.spreadsheet_id,specs);
+          }catch(_){}
+          // The "How to read this" tab isn't a data table — don't report a row count for it.
+          const status='Backed up '+tabs.filter(t=>t.title!==BACKUP_README_TAB).map(t=>(t.rows.length-1)+' '+t.title.toLowerCase()).join(', ');
           const now=new Date().toISOString();
           const {error:e2}=await sb.from('sheet_link').update({last_sync_at:now,last_sync_status:status}).eq('id',link.id);
           if(e2) throw e2;
@@ -4090,14 +4122,50 @@
           ...(sp.data||[]).map(s=>[ s.genus?s.genus.name:'', s.name, s.care_dormancy||'', s.care_water||'', s.care_feeding||'', s.care_light||'', s.care_photoperiod||'', s.care_humidity||'', s.id ].map(cell)) ];
         const vendors=[ ['Name','Company','Address','Phone','Website','Notes','App ID'],
           ...(vd.data||[]).map(v=>[ v.name, v.company||'', v.address||'', v.phone||'', v.url||'', v.notes||'', v.id ].map(cell)) ];
-        const journal=[ ['Plant','Date','Event','Note','Measurement','Product / dose','Pests','Cause','Plant App ID'],
-          ...(jn.data||[]).map(e=>{ const p=plantById.get(e.plant_id);
-            const prod=prodName.get(e.product_id)||'';
-            return [ p?this.displayName(p):'(deleted plant)', e.entry_date||'', this.eventTypeLabel(e.event_type), e.body||'',
-              (e.measure_label||e.measure_value!=null)?((e.measure_label?e.measure_label+': ':'')+(e.measure_value==null?'':e.measure_value)+(e.measure_unit?' '+e.measure_unit:'')):'',
-              prod+(e.dose_note?(prod?' — ':'')+e.dose_note:''),
-              (pestsByEntry[e.id]||[]).filter(Boolean).join('; '), e.cause||'', e.plant_id||'' ].map(cell); }) ];
-        return [ {title:'Plants',rows:plants},{title:'Species',rows:species},{title:'Vendors',rows:vendors},{title:'Journal',rows:journal} ];
+        // Journal — enriched so it stands on its own if the app is gone: leads with the
+        // plant's identifying fields + the exact linking ID, and the ROWS are pre-sorted
+        // by Genus→Species→Form→Plant App ID→Date so each plant's history arrives already
+        // clustered (same-named plants stay in separate blocks, kept apart by their ID).
+        // Deleted-plant rows (should be none — cascade — but defended anyway) sink to the end.
+        const jHeader=['Genus','Species','Form/Descriptor','Accession ID','Plant App ID','Date','Event','Note','Measurement','Product / dose','Pests','Cause'];
+        const jItems=(jn.data||[]).map(e=>{ const p=plantById.get(e.plant_id);
+          const g=p&&p.species&&p.species.genus?p.species.genus.name:'';
+          const s=p&&p.species?p.species.name:''; const f=p?(p.form_descriptor||''):'';
+          const prod=prodName.get(e.product_id)||'';
+          const meas=(e.measure_label||e.measure_value!=null)?((e.measure_label?e.measure_label+': ':'')+(e.measure_value==null?'':e.measure_value)+(e.measure_unit?' '+e.measure_unit:'')):'';
+          return { missing:!p, g, s, f, id:e.plant_id||'', date:String(e.entry_date||''),
+            row:[ p?g:'(deleted plant)', s, f, p?(p.accession_id||''):'', e.plant_id||'', e.entry_date||'',
+                  this.eventTypeLabel(e.event_type), e.body||'', meas,
+                  prod+(e.dose_note?(prod?' — ':'')+e.dose_note:''),
+                  (pestsByEntry[e.id]||[]).filter(Boolean).join('; '), e.cause||'' ] }; });
+        jItems.sort((a,b)=> (a.missing?1:0)-(b.missing?1:0)
+          || a.g.localeCompare(b.g) || a.s.localeCompare(b.s) || a.f.localeCompare(b.f)
+          || a.id.localeCompare(b.id) || a.date.localeCompare(b.date));
+        const journal=[ jHeader, ...jItems.map(x=>x.row.map(cell)) ];
+        // A plain-language "How to read this" tab so a stranger (or future Stephen, in
+        // another app) can make sense of the file — Stephen's ask, 2026-07-08.
+        const readme=[
+          ['How to read this backup'],[''],
+          ['This spreadsheet is an automatic backup of your plant collection from the Plant Collector app.'],
+          ['It is rewritten each time you back up. Keep it, download it, or use it to rebuild your collection'],
+          ['in another program if you ever stop using the app.'],[''],
+          ['The tabs'],
+          ['• Plants — one row per plant you own, with its details.'],
+          ['• Species — care notes shared by every plant of a species.'],
+          ['• Vendors — where plants came from.'],
+          ['• Journal — the dated history (notes, feedings, pests, measurements…) for each plant.'],[''],
+          ['How the tabs connect'],
+          ['• Every plant on the Plants tab has a unique code in its "App ID" column.'],
+          ['• Each Journal row carries that same code in its "Plant App ID" column — that is what ties'],
+          ['  a journal entry to its plant.'],[''],
+          ['Why the ID matters (important)'],
+          ['Two plants can have the exact same genus and species and still be different individual plants.'],
+          ['So a plant’s name alone cannot reliably group its journal entries — only the App ID can.'],
+          ['The Journal tab is already grouped by plant, then by date. To regroup it yourself, sort the'],
+          ['Journal by its "Plant App ID" column.'],[''],
+          ['Generated '+todayLocal()+' by Plant Collector.'],
+        ];
+        return [ {title:BACKUP_README_TAB,rows:readme},{title:'Plants',rows:plants},{title:'Species',rows:species},{title:'Vendors',rows:vendors},{title:'Journal',rows:journal} ];
       },
 
       /* ---- Google Sheet sync (sync step C2 — docs/sheets-sync-plan.md) ----
