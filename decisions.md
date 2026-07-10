@@ -4,6 +4,42 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-09 — Found + cleaned: undo-import leaves orphaned reference rows; real account had 167 plants from live testing
+
+Stephen was testing the sheet-sync flow on his real account and noticed 167 plants where he
+expected 16. Traced live: import→undo is safe for the PLANTS (delete-by-`import_batch_id`,
+RLS-scoped, already reviewed) but does NOT clean up the genus/species/vendor/category rows
+that import created for those plants — those are left behind as unused reference entries.
+Repeated test import→undo cycles compound this. Confirmed empirically before touching
+anything: computed "used" sets from live `plant` rows (species_id/vendor_id/plant_category
+FKs) and diffed against the full reference tables.
+
+**Cleaned up (2026-07-09, direct scoped deletes via the signed-in user's own RLS-protected
+session — same permission boundary the app itself operates under):** undid the outstanding
+151-plant CP DB2 test import via the existing `undoImportBatch` path, then removed 149
+orphaned species, 53 orphaned vendors, 4 orphaned categories, 5 orphaned genera (deleted in
+dependency order: species/vendors/categories first, genera last, re-verifying orphan status
+fresh before each irreversible step). Verified after: 16 plants, 0 import batches, 0 orphans
+anywhere (13 species / 5 vendors / 3 genera / 1 category, every one referenced by a real
+plant).
+
+**Product gap, not yet fixed:** `undoImportBatch` (app/index.html) should clean up — or
+offer to clean up — the reference rows an import created, so this doesn't recur on every
+test cycle or on a real user's undone mistake. Not fixed this session (scope: touches the
+import/undo review boundary from the FULL-tier import work; wants its own pass, not a
+drive-by edit). **Practical workaround going forward: Stephen will use a throwaway account
+(`test@test.com`) for future import/sync testing** so practicing doesn't touch the real
+16-plant collection at all.
+
+**Surfaced in the same cleanup:** real, recurring vendor-name duplication (e.g. "California
+Carnivores's" / "California Carnivoresâs" — a mangled apostrophe from an old export — plus
+several "Ed Read" variants) → captured as [[feature-merge-duplicates]] memory, a real feature
+request (merge duplicate vendors/species/genera/categories), not yet designed. Species merge
+is the hard case (Care Guide ownership); vendor/category merge is straightforward repoint-
+and-delete.
+
+---
+
 ## 2026-07-08 — Sequencing: settle the data model BEFORE two-way sync (step D)
 
 Stephen asked whether to "back off sync until we've done more with the database, then build
