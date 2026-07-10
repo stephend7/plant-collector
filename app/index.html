@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-08b">
+<meta name="app-build" content="2026-07-08c">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -2010,6 +2010,8 @@
             <select x-model="importMap.country"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
           <div class="imp-maprow"><label>Notes</label>
             <select x-model="importMap.notes"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
+          <div class="imp-maprow"><label>Additional notes column <small>a second free-text column — appended after Notes</small></label>
+            <select x-model="importMap.notes2"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
           <div class="imp-maprow"><label>Type → Category <small>Plant / Seed / Cutting… added as a category tag</small></label>
             <select x-model="importMap.typeCategory"><option value="">— ignore —</option><template x-for="(h,i) in importHeaders" :key="i"><option :value="i" x-text="h"></option></template></select></div>
           <div class="imp-maprow"><label>How acquired <small>bought / traded / gift…</small></label>
@@ -2363,7 +2365,7 @@
   function cleanPrice(raw){ const s=String(raw==null?'':raw).replace(/[^0-9.]/g,''); return s===''?null:(isNaN(Number(s))?null:Number(s)); }
   // Best-effort header→field guesses (user confirms on the mapping screen).
   function guessImportMap(headers){
-    const map={genus:'',species:'',combinedName:'',formDescriptor:'',vendor:'',acquisitionDate:'',price:'',accessionId:'',sourceUrl:'',locationData:'',country:'',notes:'',status:'',wishlist:'',acquisitionType:'',typeCategory:''};
+    const map={genus:'',species:'',combinedName:'',formDescriptor:'',vendor:'',acquisitionDate:'',price:'',accessionId:'',sourceUrl:'',locationData:'',country:'',notes:'',notes2:'',status:'',wishlist:'',acquisitionType:'',typeCategory:''};
     headers.forEach((h,i)=>{
       const t=normKey(h); if(!t) return; const set=(k)=>{ if(map[k]==='') map[k]=String(i); };
       if(/genus/.test(t)) set('genus');
@@ -2376,7 +2378,10 @@
       if(/cost|price|paid|amount|\$/.test(t)) set('price');
       if(/^country$|^nation$|^country\s*of\s*origin$/.test(t)) set('country');
       if(/locality|wild|location\s*data|^location$/.test(t)) set('locationData');
-      if(/note|descr|comment|growing/.test(t) && !/descriptor/.test(t)) set('notes');   // "descr" also hits "Descriptor" headers — exclude those, they belong to formDescriptor below
+      // "descr" also hits "Descriptor" headers — exclude those, they belong to formDescriptor below.
+      // A SECOND notes-shaped column (sheets often carry both "Description" and "Notes") goes to
+      // notes2 rather than being silently dropped — it's appended into the one app notes field.
+      if(/note|descr|comment|growing/.test(t) && !/descriptor/.test(t)){ if(map.notes==='') set('notes'); else set('notes2'); }
       if(/status/.test(t)) set('status');
       if(/^want$|wish|interested/.test(t)) set('wishlist');
       if(/how.*acqui|acqui.*type/.test(t)) set('acquisitionType');
@@ -2420,6 +2425,10 @@
   // counted confirm (docs/sheets-sync-plan.md "run mechanics").
   const SYNC_CONSENT_VERSION='mirror-2026-07-08';
   const TRIPWIRE_ROW_FRACTION=0.5;
+  // import-only mapping keys: never a sync write target, never used for row matching
+  // (notes2 folds into the single app notes field at import time, so a live sheet cell
+  // for it has nothing single-valued to compare against or write back).
+  const SYNC_IGNORE_KEYS={wishlist:1,typeCategory:1,notes2:1};
   const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function gCell(v,counters){    // mirror of the worker's cellToString: inert strings only
     if(v===null||v===undefined) return '';
@@ -2648,7 +2657,7 @@
       importOpen:false, importStep:'pick', importBusy:false, importError:'', importNote:'',
       importFileName:'', importSheets:[], importSheetName:'', importRows:[], importHeaders:[],
       importNameMode:'split',
-      importMap:{genus:'',species:'',combinedName:'',formDescriptor:'',vendor:'',acquisitionDate:'',price:'',accessionId:'',sourceUrl:'',locationData:'',country:'',notes:'',status:'',wishlist:'',acquisitionType:'',typeCategory:''},
+      importMap:{genus:'',species:'',combinedName:'',formDescriptor:'',vendor:'',acquisitionDate:'',price:'',accessionId:'',sourceUrl:'',locationData:'',country:'',notes:'',notes2:'',status:'',wishlist:'',acquisitionType:'',typeCategory:''},
       importSourceAsNotes:false, importDefaultStatus:'in_collection',
       importStatusRules:[], importUndoId:'',
       importPreview:null, importResult:null, importProgress:0, importProgressTotal:0,
@@ -4213,7 +4222,7 @@
       // axes (the app's multi-category list would trample a curated single-axis Type
       // cell); the privacy option keeps location data + price out of the sheet.
       _syncWritableKeys(mapping){
-        const skip={wishlist:1,typeCategory:1};
+        const skip={...SYNC_IGNORE_KEYS};
         if(mapping.privacyExclude){ skip.locationData=1; skip.price=1; }
         const out=[];
         for(const k in mapping.map){ const ci=mapping.map[k]; if(ci===''||ci==null||skip[k]) continue;
@@ -4295,7 +4304,7 @@
         const cellAt=(row,col)=>{ const v=row?row[col]:null; return normWS(v==null?'':v); };
         const header=rows[0]||[];
         const allKeys=[];
-        for(const k in mapping.map){ const ci=mapping.map[k]; if(ci===''||ci==null) continue;
+        for(const k in mapping.map){ const ci=mapping.map[k]; if(ci===''||ci==null||SYNC_IGNORE_KEYS[k]) continue;
           if(mapping.nameMode==='combined' ? (k==='genus'||k==='species') : k==='combinedName') continue;
           allKeys.push({key:k,col:Number(ci)}); }
         // Where the App ID column lives: saved position → existing "App ID" header →
@@ -4710,6 +4719,7 @@
           let typeCategory='';
           if(this.importMap.typeCategory!==''){ typeCategory=normWS(this._imp(row,'typeCategory')); }
           let notes=this._imp(row,'notes');
+          if(this.importMap.notes2!==''){ const n2=this._imp(row,'notes2'); if(n2) notes=(notes?notes+' · ':'')+n2; }
           if(vendorToNotes) notes=(notes?notes+' · ':'')+'Source: '+vendorToNotes;
           if(extraNotes) notes=(notes?notes+' · ':'')+extraNotes;
           if(warnings.length) warnCount++;
