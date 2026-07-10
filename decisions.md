@@ -4,6 +4,43 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-08 — Sequencing: settle the data model BEFORE two-way sync (step D)
+
+Stephen asked whether to "back off sync until we've done more with the database, then build
+it again" — worried that upcoming data-model work (new fields, and especially the
+plant-parentage relationship he wants — see [[feature-hybrid-parentage]]) would invalidate
+the sync already shipped. **Decision: don't pause or rebuild anything already built; instead
+hold ONLY the model-sensitive stage (step D, two-way) until the model settles.**
+
+Why the "rebuild it later" premise doesn't hold:
+- **Adding a field is additive, not a rebuild.** Precedent: the `country` field (migration
+  009) threads through ~22 spots in `app/index.html`, but only 3–4 are sync touchpoints
+  (`_syncVal`, `_syncEq`, the writable-keys list, the mapping field list) — each a few-line
+  copy-the-pattern edit, same tax as export + backup. The import/export/sync/backup spine was
+  built to absorb new fields with minimal fuss; every field makes the next cheaper.
+- **Parentage is orthogonal to the flat-sheet mirror.** A parent link is a relationship
+  between plants, which doesn't fit a flat spreadsheet cell — same as photos and the journal,
+  which already (by design) don't round-trip through the mirror. So building parentage later
+  won't invalidate C1/C2.
+
+The three sync stages, by model-sensitivity:
+- **C1 (app-created Drive backup): keep, unaffected.** Dumps everything relationally; doesn't
+  care about field structure. Pure durability insurance.
+- **C2 (mirror into the user's own sheet): shipped & stable; nothing to back off.** Stephen
+  has put no real data through it (he disconnected the test connection). It absorbs new fields
+  incrementally; just don't adopt it on the real sheet until the fields feel settled.
+- **D (two-way pull + conflict resolution): HOLD — build last, on a settled model.** This is
+  the only stage whose correctness genuinely depends on the final field/relationship shape
+  (snapshot-diff, conflict buckets, what round-trips). Was always "build last" in the
+  contract; this decision hardens that into "explicitly gated on the data model."
+
+**Sequenced plan going forward:** (1) cheap data-model work first — specific known fields +
+the Hybrid/Species flag; (2) the parentage design conversation (own session); (3) THEN two-way
+sync (D) on top of a model Stephen is happy with. Gets the "solid DB before heavy sync"
+outcome without discarding the durability insurance already working.
+
+---
+
 ## 2026-07-08 — Sheet-sync UX fixes from Stephen's real iPhone session (build 2026-07-08b)
 
 Stephen tried C2 for real on his iPhone (real account, 16 plants) right after it shipped

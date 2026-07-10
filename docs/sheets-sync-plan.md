@@ -218,6 +218,12 @@ version was accepted, when) — so future-us can prove what was promised.
 
 ## Step D — Two-way (snapshot-diff pull + conflict review) — build LAST
 
+> **GATE (Stephen, 2026-07-08 — see decisions.md):** do NOT start D until the data model
+> is settled — the known new fields + the Hybrid/Species flag are in, and the plant-parentage
+> design conversation has happened. D's correctness (snapshot-diff, conflict buckets, what
+> round-trips) is the sync work most sensitive to the final field/relationship shape; C1/C2
+> are stable and absorb new fields incrementally, D should not be built on a moving model.
+
 The full problem list gathered 2026-06-29 (import-sync-design memory) is the checklist
 this section must survive. Core design:
 
