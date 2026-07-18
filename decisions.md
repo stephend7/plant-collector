@@ -4,6 +4,45 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-18 — Tag scanner stays on Sonnet 4.6; Haiku 4.5 rejected on accuracy (empirical)
+
+Follow-up to the 07-18 scan-speed work: the remaining speed lever was the model itself, so
+ran a controlled Haiku-4.5-vs-Sonnet-4.6 bake-off before deciding. Method (all real, no
+predicted results): Stephen's 13 real June-16 tag photos, resized through the app's EXACT
+pipeline (orig → 1600px q0.85 → 1100px q0.8, matching what `scanTag` uploads live), sent
+with the verbatim production prompt and `max_tokens:512` from `supabase/functions/scan-tag/
+index.ts`, each photo run through each model TWICE (52 calls total, 0 errors) to capture both
+timing spread and run-to-run consistency. Ground truth established by reading every tag by eye.
+
+**Result — decisive, keep Sonnet:**
+- **Accuracy:** Haiku misread the plant identity on 6 of the 12 real single-tag photos,
+  including EVERY hybrid/cultivar tag — the exact thing Stephen said he will not trade for
+  speed. Worst cases: *Pinguicula laueana* 'Tangerine' × cyclosecta → "huerema"/"huehueteca"
+  (a different hallucinated name each pass); *Utricularia beaugleholei* ssp. orientalis →
+  genus **Drosera** + invented care notes ("Bearded. Acid."); Pinguicula 'BCP Crystal' →
+  genus **Aeonium**. Also invented a vendor ("Exotica Plants") on a Rainbow Carnivorous tag,
+  blanked two dim-shelf photos Sonnet read fine, and kept filing the `#A3` internal code as
+  an accession (prompt says ignore — Sonnet obeyed). Sonnet read all 12 essentially perfectly
+  (only blemish: misread one angled $15 as $5). Haiku's failure mode is *confident
+  hallucination* — plausible wrong answers with no cheap signal to detect them.
+- **Speed:** Haiku mean 1.66s / median 1.54s vs Sonnet mean 2.80s / median 2.55s — only
+  ~1.1s faster. The 07-18 upload+warm-up work already cut the warm round trip to ~2.75s, and
+  this test confirms the model call is only ~2.8s of that. Not worth trading name accuracy
+  for ~1s.
+
+**Decision:** Scanner stays `claude-sonnet-4-6`. Both earlier options are now dead:
+the "quick-scan vs regular-scan" two-button idea AND Claude's auto-re-run-on-weak-result
+counter-proposal both fail here, because Haiku misses easy tags too and its errors aren't
+detectable (a hallucinated valid-looking name gives nothing to trigger a re-run on). No code
+change shipped — this was the empirical + decision step. If speed is ever revisited without
+losing accuracy, the only sane levers are tighter Sonnet `max_tokens` or Haiku strictly as a
+fallback when Sonnet is unreachable — never on the primary scan path. **Speed is considered
+solved by the 07-18 build; the model question is settled.** (Aside: the multi-tag tray
+overview photo made Sonnet correctly return one JSON object per tag, which the single-object
+parser can't handle — a non-issue for real one-tag scans, noted for completeness.)
+
+---
+
 ## 2026-07-18 — Tag-scan speed: smaller scan copy + Edge Function warm-up (Lite) (build 2026-07-18a)
 
 Stephen reported tag scans feel slow and asked what could speed them up (his hypothesis:
