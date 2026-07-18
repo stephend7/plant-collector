@@ -8,3 +8,6 @@ docs/ModelPairedDev.pdf
 
 # Local editor/agent tooling
 .claude/
+
+# Local-only folder for secrets/screenshots Claude may read but never publish
+Claude to ignore/
