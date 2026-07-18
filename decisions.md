@@ -38,6 +38,12 @@ Verify: local Browser-pane boot clean (no console errors, new code present, buil
 (accuracy + timing) and a form-open→network check of the warm ping via the authenticated
 test@test.com Chrome session.
 
+**Caught during live verify (build 2026-07-18b, one-char fix):** the sync-review header's
+`x-text` shipped 2026-07-08 with an unterminated string (`+' your eye"` — missing closing
+`'`), throwing a SyntaxError on every page load since and rendering that `<h3>` blank.
+Found by sweeping every Alpine directive on the live page through `new AsyncFunction`
+(same sweep as the 2026-07-01c curly-quote hunt). Pre-existing — not from the scan change.
+
 ## 2026-07-09 — Found + cleaned: undo-import leaves orphaned reference rows; real account had 167 plants from live testing
 
 Stephen was testing the sheet-sync flow on his real account and noticed 167 plants where he

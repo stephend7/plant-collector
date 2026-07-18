@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-18a">
+<meta name="app-build" content="2026-07-18b">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -1804,7 +1804,7 @@
 
         <!-- STEP: review (rows the matcher won't guess about) -->
         <div x-show="syncStep==='review'">
-          <h3 style="margin:0 0 6px;font-size:16px;color:var(--ink)" x-text="syncReview.length+' row'+(syncReview.length===1?'':'s')+' need'+(syncReview.length===1?'s':'')+' your eye"></h3>
+          <h3 style="margin:0 0 6px;font-size:16px;color:var(--ink)" x-text="syncReview.length+' row'+(syncReview.length===1?'':'s')+' need'+(syncReview.length===1?'s':'')+' your eye'"></h3>
           <p class="hint" style="margin:0 0 12px">These sheet rows didn’t clearly match one plant in the app. Pick the right plant for each, or leave the row alone. Plants that end up matched to no row will be <strong>added as new rows</strong> at the bottom of the sheet.</p>
           <template x-for="item in syncReview" :key="item.r">
             <div style="border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-bottom:10px">
