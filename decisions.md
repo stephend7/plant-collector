@@ -33,10 +33,17 @@ Security (Lite, inline): no new endpoint, no new egress, no new data leaving the
 (warm ping = existing token + `{}` to the existing function; scan payload strictly smaller,
 server-side limits untouched). Throttle caps warm-ping cost. PASS.
 
-Verify: local Browser-pane boot clean (no console errors, new code present, build marker
-2026-07-18a). **Live verification pending deploy** — needs a real-tag rescan at 1100px
-(accuracy + timing) and a form-open→network check of the warm ping via the authenticated
-test@test.com Chrome session.
+Verify: local Browser-pane boot clean, then **VERIFIED LIVE 2026-07-18** on build 2026-07-18b
+via Chrome + the NEW test account (`stephenwd@sbcglobal.net` — replaces test@test.com, which
+stopped working; memory updated):
+- **Warm ping:** opening the Add Plant form fired a 2-byte POST → 400 in **1166 ms** — that
+  ~1.2s cold-start+auth cost is now paid while framing the photo instead of on the first scan.
+- **Real-tag scan at 1100px:** the account's real Utricularia tag photo (748 KB stored full)
+  went up as a **273 KB** base64 payload (was ~1 MB under the old full-image path, ~73% less);
+  round trip **2.75 s** warm, **3.24 s** total including client resize+encode+apply. Read
+  CORRECTLY: genus Utricularia, species tricolor, price 25, vendor "Rainbow Carnivorous
+  Plants" (small print!), `#A3` internal code correctly ignored — accuracy held at 1100px,
+  fields auto-filled, tag photo kept. Test scan discarded, no data saved.
 
 **Caught during live verify (build 2026-07-18b, one-char fix):** the sync-review header's
 `x-text` shipped 2026-07-08 with an unterminated string (`+' your eye"` — missing closing
