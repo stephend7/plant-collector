@@ -34,8 +34,8 @@ Security (Lite, inline): no new endpoint, no new egress, no new data leaving the
 server-side limits untouched). Throttle caps warm-ping cost. PASS.
 
 Verify: local Browser-pane boot clean, then **VERIFIED LIVE 2026-07-18** on build 2026-07-18b
-via Chrome + the NEW test account (`stephenwd@sbcglobal.net` — replaces test@test.com, which
-stopped working; memory updated):
+via Chrome + the NEW throwaway test account (address in Claude's private memory — replaces
+test@test.com, which stopped working; memory updated):
 - **Warm ping:** opening the Add Plant form fired a 2-byte POST → 400 in **1166 ms** — that
   ~1.2s cold-start+auth cost is now paid while framing the photo instead of on the first scan.
 - **Real-tag scan at 1100px:** the account's real Utricularia tag photo (748 KB stored full)

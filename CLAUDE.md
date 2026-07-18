@@ -32,8 +32,8 @@ Switch models in the model picker after the architecture plan is agreed and befo
 - **Source control:** stage specific files (never `git add -A`); one logical change per commit;
   co-author tag; commit/push only when Stephen asks. **Deploy = `git push`** (GitHub Pages rebuilds;
   bump the `<meta name="app-build">` marker so the in-app updater offers it).
-- **Verify in a real browser** before claiming UI works (Claude-in-Chrome + the
-  `stephenwd@sbcglobal.net` throwaway account — replaced `test@test.com` 2026-07-18;
+- **Verify in a real browser** before claiming UI works (Claude-in-Chrome + the throwaway
+  test account — address is in Claude's private memory; replaced `test@test.com` 2026-07-18;
   Chrome is Blink, so WebKit-specific bugs still need Stephen's iPhone).
 - **Stephen is non-technical** — explain plainly, surface trade-offs with a recommendation, don't
   bury him in jargon.
