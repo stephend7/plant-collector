@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-08d">
+<meta name="app-build" content="2026-07-18a">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -2210,6 +2210,20 @@
     return fullPath;
   }
   const thumbOf=path=>path.replace(/\.jpg$/,'_thumb.jpg');
+  // Wake the scan-tag Edge Function while the user is still framing their photo — a cold
+  // (idle) function adds ~1-2s to the first scan of a session. The bodyless POST boots the
+  // function and fails fast server-side (400, no model call); throttled so reopening the
+  // form doesn't spam it. Fire-and-forget: a failed warm-up must never surface an error.
+  let _scanWarmAt=0;
+  async function warmScanFn(){
+    if(Date.now()-_scanWarmAt<5*60*1000)return;
+    _scanWarmAt=Date.now();
+    try{
+      const {data:{session}}=await sb.auth.getSession();
+      if(!session)return;
+      fetch(`${SUPABASE_URL}/functions/v1/scan-tag`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:'{}'}).catch(()=>{});
+    }catch(e){}
+  }
   // today's date in the user's OWN timezone (toISOString() uses UTC and rolls a day early in the Americas)
   function todayLocal(){const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
   // one place for the plant query shape (used by full-list load AND single-plant reload)
@@ -3024,8 +3038,12 @@
           // Process ONCE (handles HEIC on Safari/iOS): a full JPEG used both to read the
           // tag AND to keep as the plant's tag photo, plus a thumb for that photo.
           const {full,thumb}=await processImage(file);
-          // base64-encode the full JPEG for the Edge Function
-          const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(full);});
+          // The scan itself uses a SMALLER copy (1100px): tag print is large type, and
+          // halving the pixels roughly halves both the upload and the model's image
+          // processing time. The photo SAVED with the plant stays the 1600px `full`.
+          const scanCopy=await resizeImage(full,1100,.8);
+          // base64-encode the scan copy for the Edge Function
+          const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(scanCopy);});
           // auth token
           const {data:{session}}=await sb.auth.getSession();
           if(!session)throw new Error('Not signed in');
@@ -3097,7 +3115,7 @@
       },
 
       /* ---- form open/close/save ---- */
-      openForm(){this.editId=null;this.resetForm();this.screen='form';},
+      openForm(){this.editId=null;this.resetForm();this.screen='form';warmScanFn();},
       closeForm(){this.clearPendingPhotos(); if(this.editId){this.editId=null;this.screen='detail';} else this.screen='list';},
       resetForm(){
         this.formError=''; this.detectedNote=''; this.clearPendingPhotos();

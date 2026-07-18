@@ -4,6 +4,40 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-18 — Tag-scan speed: smaller scan copy + Edge Function warm-up (Lite) (build 2026-07-18a)
+
+Stephen reported tag scans feel slow and asked what could speed them up (his hypothesis:
+upload time; his idea: crop on the phone first). Measured where the time actually goes
+before changing anything, using his real June-16 tag photos through the app's exact resize
+settings (1600px q0.85): **the app was uploading 450–650 KB per scan (+33% base64)** — fine
+on Wi-Fi, 5–10s on weak greenhouse/show cellular — plus a 1–2s Supabase cold-start on the
+first scan of a session (he scans in bursts after idle, so he pays it almost every time),
+plus ~4–7s for the Sonnet vision call itself.
+
+**Shipped (both client-only; the Edge Function is unchanged):**
+1. **Scan copy at 1100px q0.8** — `scanTag` now sends a smaller re-resize of the processed
+   image (measured: 240–330 KB on the same photos, ~half the upload) and the model processes
+   ~half the image tokens. The tag photo SAVED with the plant is still the 1600px `full`;
+   only the bytes sent to the scanner shrank.
+2. **Warm-up ping (`warmScanFn`)** — opening the Add Plant form fires a throttled (5-min),
+   fire-and-forget bodyless POST to scan-tag with the session token: boots the isolate while
+   the user frames the photo, fails fast server-side (400 before any model call), never
+   surfaces an error, does nothing signed out.
+
+**Deliberately NOT done:** a crop UI (extra taps every scan likely cost more than they save;
+the 1100px resize captures most of the upload win — revisit only if small-image accuracy
+disappoints) and a model switch to Haiku (Stephen wants to discuss accuracy trade-offs
+first; a "quick scan vs. careful scan" two-button idea is on the table — see next session).
+
+Security (Lite, inline): no new endpoint, no new egress, no new data leaving the device
+(warm ping = existing token + `{}` to the existing function; scan payload strictly smaller,
+server-side limits untouched). Throttle caps warm-ping cost. PASS.
+
+Verify: local Browser-pane boot clean (no console errors, new code present, build marker
+2026-07-18a). **Live verification pending deploy** — needs a real-tag rescan at 1100px
+(accuracy + timing) and a form-open→network check of the warm ping via the authenticated
+test@test.com Chrome session.
+
 ## 2026-07-09 — Found + cleaned: undo-import leaves orphaned reference rows; real account had 167 plants from live testing
 
 Stephen was testing the sheet-sync flow on his real account and noticed 167 plants where he
