@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-18c">
+<meta name="app-build" content="2026-07-18d">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -91,6 +91,7 @@
   .formwrap h2,.detailwrap h2{font-size:17px;margin:0 0 4px}
   .detailwrap h2{font-family:var(--serif);font-style:italic;font-weight:500;font-size:21px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid2>*{min-width:0}
   @media(max-width:520px){.grid2{grid-template-columns:1fr}}
   .pickrow{display:flex;gap:8px;align-items:flex-end}
   .pickrow > div:first-child{flex:1}

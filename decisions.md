@@ -4,6 +4,36 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-18 — Long species names overflowed the form horizontally (CSS Grid fix)
+
+Found by Stephen on his iPhone testing the batch-entry feature: a long tag-scanned species name
+("(heterophylla × medusina) × gigantea white flower") pushed the whole Add-plant form wider than
+the viewport instead of ellipsizing, cutting off "Edit this species" and adding a horizontal
+scrollbar. Root cause: the Species field's `.sp-val` span already had the correct
+`overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0` — but its ancestor is a
+**CSS Grid** cell (`.grid2`), and grid items get an implicit `min-width:auto` (sized to their
+content's intrinsic width) unless overridden. That let the unbreakable species string blow out
+its grid column — and since the SAME `.grid2` class is reused in ~11 places across the form/
+event editors, the bug wasn't unique to Species; anything with unbreakable long text in a grid2
+row was one bad string away from the same overflow. **Fix:** one rule, `.grid2>*{min-width:0}`,
+applied globally rather than patching the Species field alone.
+
+Reproduced and confirmed live at `https://stephend7.github.io` (Browser-pane JS against the real
+DOM): before the fix, the Species field's button measured 405px wide inside a 305px grid track
+(and 343px form), forcing real page-level horizontal scroll. **Verified after the fix on the
+live site, build `2026-07-18d`, using Stephen's own existing test-account plant carrying that
+exact long species name** (no fabricated data needed) — no cleanup required.
+
+**Process note:** file:// navigation to a path outside the project root in the Browser pane can
+silently fail to switch the tab's JS execution context (shows a static snapshot while
+`javascript_tool` keeps running against whatever page was previously loaded — `location.href` is
+the tell). Local file:// pre-push verification worked in the prior session but did NOT reproduce
+this session; treat it as unreliable and always confirm `location.href` matches the intended
+target before trusting a "local" check. Push-then-verify-on-live remains the dependable route.
+See [[testing-setup]].
+
+---
+
 ## 2026-07-18 — "Save & add another" button on the add-plant form (batch entry)
 
 Stephen: when scanning tags after a buying trip, per-plant entry was save → land on the plant
