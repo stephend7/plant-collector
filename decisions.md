@@ -36,6 +36,17 @@ qty + note also correct. All test side-effects reverted (counts, notes, photo, s
 hidden x-show'd button via querySelector — impossible for a real finger; app logic was correct
 for the plant actually invoked.)*
 
+**Landing revised same day (build `2026-07-18f`) after Stephen's first real use:** the
+original "reset to a fresh form batch-style" landing left him with an empty Add screen and "no
+clue if it had been added to anything or what it was added to." Changed: **"Add to this one"
+now opens the plant it added to**, with a green banner under the hero — "✓ Added ×1 to this
+plant — now ×2, photo added" (8s) — so the new count and attached photo are visible right
+there. (Deliberate divergence from Save-&-add-another, which keeps the batch-style fresh-form
+landing: a NEW plant saved is expected; a merge into something unseen needs showing. Continuing
+a batch from the plant page is one ＋ tap.) Verified live end-to-end on the test account:
+landed on the correct plant, banner text right, qty tile ×2, photo visible in Photos strip;
+test data reverted.
+
 ---
 
 ## 2026-07-18 — Long species names overflowed the form horizontally (CSS Grid fix)
