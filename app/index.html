@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-18e">
+<meta name="app-build" content="2026-07-18f">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -680,6 +680,9 @@
             </div>
           </div>
         </div>
+
+        <!-- confirmation after "Add to this one" (duplicate check) — says WHERE it went -->
+        <div class="detected" x-show="savedNote" x-transition x-text="savedNote" style="margin-top:12px"></div>
 
         <!-- ── INFO CARD: location tiles + detail fields ── -->
         <div class="info-card">
@@ -3311,17 +3314,16 @@
             }
           }
           this.rememberPicks();
+          this.clearPendingPhotos();
           const fresh=await this.reloadPlant(p.id);
-          const name=fresh?this.displayName(fresh):'plant';
-          if(fresh)this.galleryGenus=this.genusOf(fresh);
-          const keepVendor=this.form.vendorId;
-          this.resetForm();
-          this.form.vendorId=keepVendor;
-          this.savedNote='Added ×'+add+' to '+name+' — now ×'+newQty+' ✓';
+          // Land ON the plant we added to (Stephen 2026-07-18: a fresh empty form gave no
+          // clue what happened or where it went) — the page shows the new count + photo,
+          // with a banner saying what just happened.
+          this.savedNote='✓ Added ×'+add+' to this plant — now ×'+newQty+(withPhotos?', photo added':'');
           clearTimeout(this._savedNoteTimer);
-          this._savedNoteTimer=setTimeout(()=>{this.savedNote='';},6000);
-          const sc=document.querySelector('.appscroll'); if(sc)sc.scrollTop=0;
-          warmScanFn();
+          this._savedNoteTimer=setTimeout(()=>{this.savedNote='';},8000);
+          if(fresh){ this.galleryGenus=this.genusOf(fresh); await this.openDetail(fresh); const sc=document.querySelector('.appscroll'); if(sc)sc.scrollTop=0; }
+          else this.screen='list';
         }catch(e){
           this.formError=(e&&e.message)||'Could not update the plant.';
         }finally{this.dupBusyId=null;this.dupAskId=null;}
