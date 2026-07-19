@@ -47,6 +47,19 @@ a batch from the plant page is one ＋ tap.) Verified live end-to-end on the tes
 landed on the correct plant, banner text right, qty tile ×2, photo visible in Photos strip;
 test data reverted.
 
+**Banner-flash fix, same day (build `2026-07-18g`):** Stephen: "flashed so quickly I hardly
+saw it and couldn't read anything." Root cause: `savedNote` was set BEFORE `openDetail()` ran,
+so for a brief window `screen` was still `'form'` while the note was already truthy — Alpine's
+reactivity would show it in the FORM's own banner slot (under the header) an instant before the
+screen actually flipped to the plant page, which is not where anyone would be looking. Fixed by
+reordering: switch screens first, set the note after. Also added a manual **dismiss** link
+(matching the existing photo-auto-fill `detectedNote` pattern) to both this banner and the
+Save-&-add-another one, and extended their bare-timeout fallbacks (8s→20s, 6s→15s) — removes
+any race against a timer to actually read the text. Verified live: polled Alpine state every
+20ms through the whole transition — `screen` flips to `'detail'` ~340ms after the click,
+`savedNote` is set ~280ms after THAT (no window where it could show in the wrong place), stays
+present well past the sample window, and the dismiss link clears it on tap. Test data reverted.
+
 ---
 
 ## 2026-07-18 — Long species names overflowed the form horizontally (CSS Grid fix)
