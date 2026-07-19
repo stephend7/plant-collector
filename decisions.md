@@ -60,6 +60,13 @@ any race against a timer to actually read the text. Verified live: polled Alpine
 `savedNote` is set ~280ms after THAT (no window where it could show in the wrong place), stays
 present well past the sample window, and the dismiss link clears it on tap. Test data reverted.
 
+**Color revised (build `2026-07-18h`):** the green banner "gets lost" against the sage theme
+(Stephen) — both confirmation banners (plant-page + Save-&-add-another) now use the same amber
+palette as the duplicate notice (`.savedbar`, bold text + dismiss link). **Standing UI rule
+worth remembering: green-on-sage is invisible for status messages — anything that must be
+NOTICED uses the amber family; green is the theme, not a signal.** Verified live on the test
+account (screenshot: amber bar directly under the hero, clearly visible); test data reverted.
+
 ---
 
 ## 2026-07-18 — Long species names overflowed the form horizontally (CSS Grid fix)
