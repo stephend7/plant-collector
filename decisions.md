@@ -4,6 +4,40 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-18 — Duplicate check on entry: notice existing plants, offer "add to count" (Lite)
+
+Stephen's need (first-time collection entry): the same plant may be spread around the
+greenhouse, so while adding plants he wants the app to notice "you already have this" and offer
+to bump that plant's count instead of creating a duplicate row — WITHOUT slowing entry down.
+
+**Design (his three calls, same day):** notice appears **on species pick** (inline, under the
+Species field, also fires when a tag scan fills the species); tapping "＋ Add to this one" with
+photos attached **asks** whether to add them to that plant (the scanned tag photo is
+deliberately never offered — a tag shot exists to read a label; the plant already has a
+record); the count bump **logs a dated journal note** ("Count +1 (now ×2) — matched an
+existing plant during entry") as a paper trail.
+
+**Anti-PITA + anti-merge guarantees:** the check is a pure client-side filter over the
+already-loaded plants array — instant, zero network, zero waiting. It is notice-only: an amber
+banner you can ignore completely; Save works exactly as before, nothing blocks, no popups. And
+it never auto-merges — candidates are listed WITH their differentiators (form, vendor,
+accession, locality, qty, thumbnail) and the user decides, honoring the architecture rule that
+origin is identity (a Rainbow cyclosecta and a Cal-Carn cyclosecta stay separate plants). Only
+in-collection plants match (dead/sold/traded never offered). "Add to this one" uses the form's
+Quantity value (+N, not just +1) and then behaves like Save & add another (form resets, genus/
+type/vendor sticky, "Added ×1 to … — now ×2 ✓" note, scroll to top, scanner re-warmed).
+
+**Verified live (build `2026-07-18e`, test account):** notice appeared for the two real
+duplicate U. tricolor rows with correct counts/differentiators; direct add bumped ×1→×2 with
+the journal note written; the photo-ask branch appeared when photos were pending, and the Yes
+path uploaded the photo appended AFTER the plant's existing photos (sort_order correct) with
+qty + note also correct. All test side-effects reverted (counts, notes, photo, storage).
+*(Test-driver footnote: an apparent mis-target during verification was the driver clicking a
+hidden x-show'd button via querySelector — impossible for a real finger; app logic was correct
+for the plant actually invoked.)*
+
+---
+
 ## 2026-07-18 — Long species names overflowed the form horizontally (CSS Grid fix)
 
 Found by Stephen on his iPhone testing the batch-entry feature: a long tag-scanned species name
