@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-18d">
+<meta name="app-build" content="2026-07-18e">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -107,6 +107,15 @@
   button.saveadd:disabled{opacity:.55;cursor:default}
   .hint{font-size:12px;color:var(--muted);margin-top:4px}
   .detected{margin-top:10px;padding:9px 12px;border-radius:10px;background:rgba(63,125,84,.18);border:1px solid var(--pine);color:var(--pine-2);font-size:13px}
+  .dupnote{margin-top:10px;padding:9px 12px;border-radius:10px;background:rgba(201,154,60,.14);border:1px solid #C99A3C;color:#7d5c14;font-size:13px;cursor:pointer}
+  .dupnote u{text-decoration:underline}
+  .duplist{margin-top:8px;border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden}
+  .duprow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .duprow:last-child{border-bottom:0}
+  .duprow img{width:40px;height:40px;border-radius:8px;object-fit:cover;border:1px solid var(--line);flex:0 0 auto}
+  .duprow .dmain{flex:1;min-width:0}
+  .duprow .dname{font-family:var(--serif);font-style:italic;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .duprow .dmeta{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .thumbs{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
   .thumb{position:relative;width:88px}
   .thumb img{width:88px;height:88px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}
@@ -479,6 +488,33 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- duplicate check: you may already own this species (first-entry batches) -->
+      <div x-show="!editId && dupMatches().length" x-transition>
+        <div class="dupnote" @click="dupOpen=!dupOpen">
+          <span x-text="'⚠ Already in your collection: '+dupMatches().length+(dupMatches().length>1?' plants':' plant')+' of this species — '"></span><u x-text="dupOpen?'hide':'see them'"></u>
+        </div>
+        <div class="duplist" x-show="dupOpen" x-transition>
+          <template x-for="p in dupMatches()" :key="p.id">
+            <div class="duprow">
+              <img x-show="p.thumbUrl" :src="p.thumbUrl" alt="">
+              <div class="dmain">
+                <div class="dname" x-text="displayName(p)"></div>
+                <div class="dmeta" x-text="dupMeta(p)"></div>
+              </div>
+              <button type="button" class="mini" x-show="dupAskId!==p.id" :disabled="!!dupBusyId" @click="dupTapAdd(p)" x-text="dupBusyId===p.id?'Adding…':'＋ Add to this one'"></button>
+              <div x-show="dupAskId===p.id" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+                <span style="font-size:12px;color:var(--muted)" x-text="'Add your '+pendingPhotos.length+(pendingPhotos.length>1?' photos':' photo')+' too?'"></span>
+                <div style="display:flex;gap:6px">
+                  <button type="button" class="ok" :disabled="!!dupBusyId" @click="addToExisting(p,true)">Yes</button>
+                  <button type="button" class="no" :disabled="!!dupBusyId" @click="addToExisting(p,false)">No</button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+        <p class="hint" x-show="dupOpen" style="margin-top:6px">Adding to one raises its count (and logs a note in its journal). Different source, form, or locality? Just save as a new plant — separate origins stay separate.</p>
       </div>
 
       <label>Form / Descriptor</label>
@@ -2664,7 +2700,7 @@
       genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[], products:[], pests:[],
       addingProduct:false, newProductName:'', addingPest:false, newPestName:'',
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'', lastAcquisitionType: localStorage.getItem('lastAcquisitionType')||'',
-      screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], scannedTagPhoto:null, keepTagPhoto:true, detectedNote:'', savedNote:'',
+      screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], scannedTagPhoto:null, keepTagPhoto:true, detectedNote:'', savedNote:'', dupOpen:false, dupAskId:null, dupBusyId:null,
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
       tileEdit:'', tileQty:1, tileStatus:'in_collection', tileCause:'', tileSpot:'', tileAddingSpot:false, tileNewSpot:'',
       detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
@@ -2828,7 +2864,7 @@
         const i=list.findIndex(s=>s.id===this.lastSpeciesId); if(i>0){const[x]=list.splice(i,1);list.unshift(x);}
         return list;
       },
-      onGenusChange(){this.form.speciesId='';this.cancelRename('species');this.cancelDeleteSpecies();this.spPanel=false;this.spSearch='';this.spEditMode=false;},
+      onGenusChange(){this.form.speciesId='';this.cancelRename('species');this.cancelDeleteSpecies();this.spPanel=false;this.spSearch='';this.spEditMode=false;this.dupOpen=false;this.dupAskId=null;},
 
       speciesName(id){const s=this.speciesAll.find(s=>s.id===id);return s?s.name:'';},
       genusName(id){const g=this.genera.find(g=>g.id===id);return g?g.name:'';},
@@ -2875,7 +2911,7 @@
         const q=(this.spSearch||'').trim().toLowerCase();
         return !!q&&this.speciesOptions().some(s=>s.name.toLowerCase()===q);
       },
-      pickSpecies(id){this.form.speciesId=id;this.closeSpPanel();this.spEditMode=false;},
+      pickSpecies(id){this.form.speciesId=id;this.closeSpPanel();this.spEditMode=false;this.dupOpen=false;this.dupAskId=null;},
       async spCreate(){
         const name=(this.spSearch||'').trim();
         if(!name||!this.form.genusId)return;
@@ -3124,6 +3160,7 @@
       closeForm(){this.clearPendingPhotos(); if(this.editId){this.editId=null;this.screen='detail';} else this.screen='list';},
       resetForm(){
         this.formError=''; this.detectedNote=''; this.savedNote=''; this.clearPendingPhotos();
+        this.dupOpen=false; this.dupAskId=null;
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
         Object.keys(this.renaming).forEach(k=>this.renaming[k]=false);
         this.confirmDelSpecies=false; this.delSpeciesBlockMsg='';
@@ -3224,6 +3261,70 @@
             ? 'Save was blocked — your sign-in may have expired. Reload the page, sign in again, and retry.'
             : (m||'Could not save the plant.');
         }finally{this.saving=false;}
+      },
+
+      /* ---- duplicate check (first-entry batches: same plant spread around) ---- */
+      // Match = same species, still in the collection. We only NOTICE, never auto-merge:
+      // origin is identity (architecture.md), so the differentiators are shown and the
+      // user decides. Pure client-side lookup — this.plants is already loaded.
+      dupMatches(){
+        if(this.editId||!this.form.speciesId)return[];
+        return this.plants.filter(p=>p.species_id===this.form.speciesId&&p.lifecycle_status==='in_collection');
+      },
+      dupMeta(p){
+        const bits=[];
+        if(p.form_descriptor)bits.push(p.form_descriptor);
+        if(p.vendor&&p.vendor.name)bits.push(p.vendor.name);
+        if(p.accession_id)bits.push(p.accession_id);
+        if(p.location_data)bits.push(p.location_data);
+        if(!bits.length)bits.push('no source recorded');
+        bits.push('×'+(p.quantity||1));
+        return bits.join(' · ');
+      },
+      dupTapAdd(p){
+        if(this.pendingPhotos.length)this.dupAskId=p.id;
+        else this.addToExisting(p,false);
+      },
+      async addToExisting(p,withPhotos){
+        if(this.dupBusyId)return;
+        this.dupBusyId=p.id; this.formError='';
+        try{
+          const add=Number(this.form.quantity)||1;
+          const newQty=(p.quantity||1)+add;
+          const {error}=await sb.from('plant').update({quantity:newQty}).eq('id',p.id);
+          if(error)throw error;
+          await this.logEvent(p.id,'note',{body:'Count +'+add+' (now ×'+newQty+') — matched an existing plant during entry'}).catch(()=>{});
+          // Photos only on request; the scanned tag photo is deliberately NOT offered —
+          // a tag shot exists to read a label, and this plant already has its record.
+          if(withPhotos&&this.pendingPhotos.length){
+            const {count}=await sb.from('photo').select('id',{count:'exact',head:true}).eq('plant_id',p.id);
+            const base=count||0;
+            for(let i=0;i<this.pendingPhotos.length;i++){
+              const ph=this.pendingPhotos[i];
+              const path=await uploadPhoto(this.userId,ph.id,ph.full,ph.thumb);
+              const {error:perr}=await sb.from('photo').insert({id:ph.id,plant_id:p.id,storage_path:path,label:ph.label,sort_order:base+i});
+              if(perr)throw perr;
+            }
+            if(!p.cover_photo_id){
+              const {error:cerr}=await sb.from('plant').update({cover_photo_id:this.pendingPhotos[0].id}).eq('id',p.id);
+              if(cerr)throw cerr;
+            }
+          }
+          this.rememberPicks();
+          const fresh=await this.reloadPlant(p.id);
+          const name=fresh?this.displayName(fresh):'plant';
+          if(fresh)this.galleryGenus=this.genusOf(fresh);
+          const keepVendor=this.form.vendorId;
+          this.resetForm();
+          this.form.vendorId=keepVendor;
+          this.savedNote='Added ×'+add+' to '+name+' — now ×'+newQty+' ✓';
+          clearTimeout(this._savedNoteTimer);
+          this._savedNoteTimer=setTimeout(()=>{this.savedNote='';},6000);
+          const sc=document.querySelector('.appscroll'); if(sc)sc.scrollTop=0;
+          warmScanFn();
+        }catch(e){
+          this.formError=(e&&e.message)||'Could not update the plant.';
+        }finally{this.dupBusyId=null;this.dupAskId=null;}
       },
 
       /* ---- detail view ---- */
