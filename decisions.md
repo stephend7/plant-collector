@@ -4,6 +4,31 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-18 — "Save & add another" button on the add-plant form (batch entry)
+
+Stephen: when scanning tags after a buying trip, per-plant entry was save → land on the plant
+page → back → ＋ add again. Added a second footer button in **add mode only** (edit keeps its
+two-button footer unchanged): **Save & add another** — same `savePlant()` path with an
+`addAnother` flag that, after a successful insert, stays on the form, resets it (sticky
+last-genus + last-acquisition-type still apply via `resetForm()`), shows a green
+"Saved *{plant name}* ✓" note under the header for 6s, scrolls the form back to the top, and
+re-warms the scan-tag Edge Function for the next tag. The gallery drill is retargeted to the
+saved plant's genus (same reasoning as the plain-save fix), so Cancel after a batch lands on a
+list containing the new plants. Layout: add-mode footer wraps — full-width "Save plant"
+(primary, unchanged default) on row 1; outlined "Save & add another" + Cancel on row 2.
+
+**Vendor is also sticky between save-and-add saves** (Stephen approved same day): buying-trip
+batches are usually one vendor, so the vendor selection carries into the next form. Scoped to
+the save-and-add path ONLY — it does NOT persist to localStorage or across sessions like
+last-genus does, and a plain "Save plant" / fresh form still starts with no vendor, so next
+trip's entries can't silently inherit last trip's vendor.
+
+Verified end-to-end in the browser against the live test account (insert confirmed with the
+vendor recorded on the row, form reset with genus + vendor kept and species/notes cleared,
+note text correct, scroll reset; all test plants deleted after). Build `2026-07-18c`.
+
+---
+
 ## 2026-07-18 — Tag scanner stays on Sonnet 4.6; Haiku 4.5 rejected on accuracy (empirical)
 
 Follow-up to the 07-18 scan-speed work: the remaining speed lever was the model itself, so

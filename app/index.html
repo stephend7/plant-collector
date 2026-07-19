@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-18b">
+<meta name="app-build" content="2026-07-18c">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -102,6 +102,8 @@
   .addbox .no{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:0 12px;cursor:pointer}
   .formfoot{display:flex;gap:10px;margin-top:18px}
   .formfoot .primary{margin-top:0}
+  button.saveadd{flex:1;margin-top:0;padding:11px;border-radius:10px;background:transparent;border:1.5px solid var(--pine);color:var(--pine);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+  button.saveadd:disabled{opacity:.55;cursor:default}
   .hint{font-size:12px;color:var(--muted);margin-top:4px}
   .detected{margin-top:10px;padding:9px 12px;border-radius:10px;background:rgba(63,125,84,.18);border:1px solid var(--pine);color:var(--pine-2);font-size:13px}
   .thumbs{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
@@ -392,6 +394,7 @@
     <!-- entry / edit form -->
     <div class="formwrap" x-show="screen==='form'" x-transition>
       <h2 x-text="editId?'Edit plant':'Add a plant'"></h2>
+      <div class="msg ok" x-show="savedNote" x-transition style="margin-top:4px;min-height:0" x-text="savedNote"></div>
       <p class="hint">Pick the genus first, then tap the species field to search or create.</p>
 
       <!-- PHOTOS (only when adding; managed in the detail view when editing) -->
@@ -590,8 +593,9 @@
       </div>
 
       <div class="msg err" x-text="formError"></div>
-      <div class="formfoot">
+      <div class="formfoot" :style="editId?'':'flex-wrap:wrap'">
         <button class="primary" @click="savePlant()" :disabled="saving||photoBusy||scanBusy" x-text="saving?'Saving…':(editId?'Save changes':'Save plant')"></button>
+        <button type="button" class="saveadd" x-show="!editId" @click="savePlant(true)" :disabled="saving||photoBusy||scanBusy">Save &amp; add another</button>
         <button class="ghost" @click="closeForm()" :disabled="saving">Cancel</button>
       </div>
     </div>
@@ -2659,7 +2663,7 @@
       genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[], products:[], pests:[],
       addingProduct:false, newProductName:'', addingPest:false, newPestName:'',
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'', lastAcquisitionType: localStorage.getItem('lastAcquisitionType')||'',
-      screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], scannedTagPhoto:null, keepTagPhoto:true, detectedNote:'',
+      screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], scannedTagPhoto:null, keepTagPhoto:true, detectedNote:'', savedNote:'',
       detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
       tileEdit:'', tileQty:1, tileStatus:'in_collection', tileCause:'', tileSpot:'', tileAddingSpot:false, tileNewSpot:'',
       detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
@@ -3118,7 +3122,7 @@
       openForm(){this.editId=null;this.resetForm();this.screen='form';warmScanFn();},
       closeForm(){this.clearPendingPhotos(); if(this.editId){this.editId=null;this.screen='detail';} else this.screen='list';},
       resetForm(){
-        this.formError=''; this.detectedNote=''; this.clearPendingPhotos();
+        this.formError=''; this.detectedNote=''; this.savedNote=''; this.clearPendingPhotos();
         Object.keys(this.adding).forEach(k=>this.adding[k]=false);
         Object.keys(this.renaming).forEach(k=>this.renaming[k]=false);
         this.confirmDelSpecies=false; this.delSpeciesBlockMsg='';
@@ -3144,7 +3148,7 @@
         };
       },
       rememberPicks(){this.lastGenusId=this.form.genusId;localStorage.setItem('lastGenusId',this.lastGenusId);this.lastSpeciesId=this.form.speciesId;localStorage.setItem('lastSpeciesId',this.lastSpeciesId);if(this.form.acquisitionType){this.lastAcquisitionType=this.form.acquisitionType;localStorage.setItem('lastAcquisitionType',this.lastAcquisitionType);}},
-      async savePlant(){
+      async savePlant(addAnother=false){
         this.formError='';
         if(!this.form.genusId)return this.formError='Please choose a genus.';
         if(!this.form.speciesId)return this.formError='Please choose a species.';
@@ -3192,6 +3196,19 @@
             this.rememberPicks();
             this.clearPendingPhotos();
             const fresh=await this.reloadPlant(plantId);
+            if(addAnother){
+              // Stay on the form for the next plant (batch entry after a buying trip).
+              if(fresh)this.galleryGenus=this.genusOf(fresh);
+              const keepVendor=this.form.vendorId; // buying-trip batches are usually one vendor
+              this.resetForm();
+              this.form.vendorId=keepVendor;
+              this.savedNote='Saved '+(fresh?this.displayName(fresh):'plant')+' ✓';
+              clearTimeout(this._savedNoteTimer);
+              this._savedNoteTimer=setTimeout(()=>{this.savedNote='';},6000);
+              const sc=document.querySelector('.appscroll'); if(sc)sc.scrollTop=0;
+              warmScanFn();
+              return;
+            }
             // Open the plant we just saved (mirrors the edit branch). Without this we
             // returned to screen='list' under the stale genus drill the user came FROM —
             // so saving a different genus than you were browsing showed a list that can't
