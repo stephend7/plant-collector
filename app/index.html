@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-07-18f">
+<meta name="app-build" content="2026-07-18g">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -404,7 +404,10 @@
     <!-- entry / edit form -->
     <div class="formwrap" x-show="screen==='form'" x-transition>
       <h2 x-text="editId?'Edit plant':'Add a plant'"></h2>
-      <div class="msg ok" x-show="savedNote" x-transition style="margin-top:4px;min-height:0" x-text="savedNote"></div>
+      <div class="msg ok" x-show="savedNote" x-transition style="margin-top:4px;min-height:0">
+        <span x-text="savedNote"></span>
+        <a x-show="savedNote" @click="savedNote=''" style="color:var(--pine-2);cursor:pointer;margin-left:6px">dismiss</a>
+      </div>
       <p class="hint">Pick the genus first, then tap the species field to search or create.</p>
 
       <!-- PHOTOS (only when adding; managed in the detail view when editing) -->
@@ -682,7 +685,10 @@
         </div>
 
         <!-- confirmation after "Add to this one" (duplicate check) — says WHERE it went -->
-        <div class="detected" x-show="savedNote" x-transition x-text="savedNote" style="margin-top:12px"></div>
+        <div class="detected" x-show="savedNote" x-transition style="margin-top:12px">
+          <span x-text="savedNote"></span>
+          <a @click="savedNote=''" style="color:var(--pine-2);cursor:pointer;margin-left:6px">dismiss</a>
+        </div>
 
         <!-- ── INFO CARD: location tiles + detail fields ── -->
         <div class="info-card">
@@ -3245,7 +3251,7 @@
               this.form.vendorId=keepVendor;
               this.savedNote='Saved '+(fresh?this.displayName(fresh):'plant')+' ✓';
               clearTimeout(this._savedNoteTimer);
-              this._savedNoteTimer=setTimeout(()=>{this.savedNote='';},6000);
+              this._savedNoteTimer=setTimeout(()=>{this.savedNote='';},15000);
               const sc=document.querySelector('.appscroll'); if(sc)sc.scrollTop=0;
               warmScanFn();
               return;
@@ -3318,12 +3324,17 @@
           const fresh=await this.reloadPlant(p.id);
           // Land ON the plant we added to (Stephen 2026-07-18: a fresh empty form gave no
           // clue what happened or where it went) — the page shows the new count + photo,
-          // with a banner saying what just happened.
+          // with a banner saying what just happened. Switch screens FIRST, then set the
+          // note — setting it before the switch briefly showed it in the wrong place (the
+          // form's own banner slot), which Stephen saw as a flash he couldn't read.
+          if(fresh){
+            this.galleryGenus=this.genusOf(fresh);
+            await this.openDetail(fresh);
+            const sc=document.querySelector('.appscroll'); if(sc)sc.scrollTop=0;
+          } else this.screen='list';
           this.savedNote='✓ Added ×'+add+' to this plant — now ×'+newQty+(withPhotos?', photo added':'');
           clearTimeout(this._savedNoteTimer);
-          this._savedNoteTimer=setTimeout(()=>{this.savedNote='';},8000);
-          if(fresh){ this.galleryGenus=this.genusOf(fresh); await this.openDetail(fresh); const sc=document.querySelector('.appscroll'); if(sc)sc.scrollTop=0; }
-          else this.screen='list';
+          this._savedNoteTimer=setTimeout(()=>{this.savedNote='';},20000);
         }catch(e){
           this.formError=(e&&e.message)||'Could not update the plant.';
         }finally{this.dupBusyId=null;this.dupAskId=null;}
