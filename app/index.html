@@ -268,6 +268,28 @@
   .vbar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:rgba(0,0,0,.5);color:#fff;font-size:13px}
   .vbar button{background:none;border:0;color:#bfe3cf;cursor:pointer;font-size:13px;font-family:inherit;padding:0}
   .vbar button.del{color:#ff9d9d}
+  /* NOTE: must be a class, not inline style — Alpine's x-show toggles the element's inline
+     display directly, which would clobber an inline display:flex on the same element. */
+  .vbar-actions{margin-left:auto;display:flex;align-items:center;gap:30px}
+  .vbar-actions button{padding:6px 4px}
+  /* ===== crop overlay (ported from the catalog app's proven touch cropper) ===== */
+  .thumb .crop-btn{position:absolute;right:3px;bottom:38px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(20,24,17,.72);color:#fff;display:grid;place-items:center;cursor:pointer;padding:0;z-index:2}
+  .thumb .crop-btn svg{width:13px;height:13px}
+  .crop-overlay{position:fixed;inset:0;z-index:70;background:#10130d;display:none;flex-direction:column}
+  .crop-overlay.show{display:flex}
+  .crop-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;background:rgba(8,10,6,.85);flex-shrink:0}
+  .crop-top span{color:#f4f0e6;font-size:15px;font-weight:600}
+  .crop-top .crop-x{background:rgba(255,255,255,.16);color:#fff;border:0;width:38px;height:38px;border-radius:50%;font-size:17px;cursor:pointer;line-height:1}
+  .crop-top .crop-ok{background:var(--pine);color:#fff;border:0;padding:9px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer}
+  .crop-top .crop-ok:disabled{opacity:.6}
+  .crop-stage{flex:1;min-height:0;position:relative;overflow:hidden;touch-action:none}
+  .crop-stage img{position:absolute;max-width:100%;max-height:100%;top:50%;left:50%;transform:translate(-50%,-50%);-webkit-user-select:none;user-select:none;-webkit-user-drag:none}
+  .crop-box{position:absolute;border:2px solid #fff;cursor:move;box-shadow:0 0 0 9999px rgba(0,0,0,.55);touch-action:none}
+  .crop-handle{position:absolute;width:24px;height:24px;background:#fff;border-radius:3px;touch-action:none}
+  .crop-handle[data-h="tl"]{top:-8px;left:-8px;cursor:nw-resize}
+  .crop-handle[data-h="tr"]{top:-8px;right:-8px;cursor:ne-resize}
+  .crop-handle[data-h="bl"]{bottom:-8px;left:-8px;cursor:sw-resize}
+  .crop-handle[data-h="br"]{bottom:-8px;right:-8px;cursor:se-resize}
   /* ===== focused journal-entry sheet ===== */
   .sheet-back{position:fixed;inset:0;background:rgba(15,20,16,.45);z-index:60;display:flex;align-items:flex-end;justify-content:center}
   .sheet{background:var(--card);width:100%;max-width:680px;border-radius:18px 18px 0 0;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 -6px 26px rgba(0,0,0,.2);animation:sheetUp .22s ease}
@@ -435,6 +457,7 @@
             <div class="thumb">
               <button type="button" class="rm" @click="removePending(ph.id)">✕</button>
               <span class="cover" x-show="idx===0">cover</span>
+              <button type="button" class="crop-btn" @click="openCropPending(idx)" aria-label="Crop photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14h14"/><path d="M2 6h14v14"/></svg></button>
               <img :src="ph.url" alt="">
               <select x-model="ph.label">
                 <option value="plant">Plant</option><option value="flower">Flower</option>
@@ -1034,11 +1057,30 @@
         <span x-text="viewerPhoto()&&viewerPhoto().photo_date"></span>
         <span x-text="viewerPhoto()?('· '+photoLabel(viewerPhoto().label)):''"></span>
         <button x-show="viewerPhoto()&&viewerPhoto().journal_entry_id" @click="toggleGalleryPhoto()" style="color:#bfe3cf;margin-left:14px" x-text="(viewerPhoto()&&viewerPhoto().in_gallery===false)?'Show in plant photos':'Hide from plant photos'"></button>
-        <span style="margin-left:auto;display:flex;gap:14px" x-show="!viewerReadonly">
+        <span class="vbar-actions" x-show="!viewerReadonly">
+          <button x-show="detailPlant&&viewerPhoto()" @click="openCropSaved()">Crop</button>
           <button x-show="detailPlant&&viewerPhoto()&&viewerPhoto().id!==detailPlant.cover_photo_id" @click="setCoverFromViewer()">Set cover</button>
-          <button class="del" @click="deleteFromViewer()">Delete</button>
+          <button class="del" @click="deleteFromViewer()" x-text="viewerConfirmDelete?'Tap again to delete':'Delete'"></button>
         </span>
         <button x-show="viewerReadonly&&viewerPhoto()" style="margin-left:auto;color:#bfe3cf" @click="viewPlantFromViewer()">View plant ›</button>
+      </div>
+    </div>
+
+    <!-- crop overlay (imperative, class-toggled; ported from the catalog app) -->
+    <div class="crop-overlay" id="cropOverlay">
+      <div class="crop-top">
+        <button class="crop-x" @click="cropCancel()" aria-label="Cancel crop">✕</button>
+        <span x-text="cropError||'Crop photo'" :style="cropError?'color:#ff9d9d':''"></span>
+        <button class="crop-ok" @click="cropApply()" :disabled="cropBusy||!cropReady" x-text="cropBusy?'Saving…':(cropReady?'Apply':'Loading…')"></button>
+      </div>
+      <div class="crop-stage" id="cropStage">
+        <img id="cropImg" alt="">
+        <div class="crop-box" id="cropBox">
+          <div class="crop-handle" data-h="tl"></div>
+          <div class="crop-handle" data-h="tr"></div>
+          <div class="crop-handle" data-h="bl"></div>
+          <div class="crop-handle" data-h="br"></div>
+        </div>
       </div>
     </div>
 
@@ -2263,6 +2305,80 @@
     return fullPath;
   }
   const thumbOf=path=>path.replace(/\.jpg$/,'_thumb.jpg');
+
+  /* ===================== Crop (ported from the catalog app's proven touch cropper) =====================
+     Same interaction model verbatim (drag box, 4 corner handles, mouse+touch, edges clamped to the
+     image) — only the save half differs, since this app stores photos in Supabase Storage rather
+     than IndexedDB. `onDone(blob)` receives the cropped JPEG; callers decide what happens next. */
+  const cropCtx={handle:null,startX:0,startY:0,startBox:null,boxX:0,boxY:0,boxW:0,boxH:0};
+  function cropOpen(objectUrl,onReady){
+    const img=document.getElementById('cropImg');
+    img.onload=()=>{cropInitBox();if(onReady)onReady();};
+    img.src=objectUrl;
+    document.getElementById('cropOverlay').classList.add('show');
+  }
+  function cropInitBox(){
+    const img=document.getElementById('cropImg');
+    const r=img.getBoundingClientRect(), s=document.getElementById('cropStage').getBoundingClientRect();
+    cropSetBox(r.left-s.left,r.top-s.top,r.width,r.height);
+  }
+  function cropSetBox(x,y,w,h){
+    const b=document.getElementById('cropBox');
+    b.style.left=x+'px';b.style.top=y+'px';b.style.width=w+'px';b.style.height=h+'px';
+    cropCtx.boxX=x;cropCtx.boxY=y;cropCtx.boxW=w;cropCtx.boxH=h;
+  }
+  const cropPt=e=>e.touches?e.touches[0]:e;
+  function cropDown(e){
+    e.preventDefault();e.stopPropagation();
+    const pt=cropPt(e);
+    cropCtx.handle=e.target.dataset.h||'move';
+    cropCtx.startX=pt.clientX;cropCtx.startY=pt.clientY;
+    cropCtx.startBox={x:cropCtx.boxX,y:cropCtx.boxY,w:cropCtx.boxW,h:cropCtx.boxH};
+  }
+  function cropMove(e){
+    if(!cropCtx.handle)return;
+    e.preventDefault();
+    const pt=cropPt(e);
+    const dx=pt.clientX-cropCtx.startX,dy=pt.clientY-cropCtx.startY;
+    const img=document.getElementById('cropImg').getBoundingClientRect(), s=document.getElementById('cropStage').getBoundingClientRect();
+    const ix=img.left-s.left,iy=img.top-s.top,iw=img.width,ih=img.height;
+    const MIN=40;
+    let{x,y,w,h}=cropCtx.startBox;
+    if(cropCtx.handle==='move'){
+      x=Math.max(ix,Math.min(ix+iw-w,x+dx));
+      y=Math.max(iy,Math.min(iy+ih-h,y+dy));
+    } else {
+      if(cropCtx.handle.includes('r')){w=Math.max(MIN,Math.min(ix+iw-x,w+dx));}
+      if(cropCtx.handle.includes('l')){const nw=Math.max(MIN,Math.min(w+x-ix,w-dx));x=x+w-nw;w=nw;}
+      if(cropCtx.handle.includes('b')){h=Math.max(MIN,Math.min(iy+ih-y,h+dy));}
+      if(cropCtx.handle.includes('t')){const nh=Math.max(MIN,Math.min(h+y-iy,h-dy));y=y+h-nh;h=nh;}
+    }
+    cropSetBox(x,y,w,h);
+  }
+  function cropUpHandler(){cropCtx.handle=null;}
+  function cropClose(){document.getElementById('cropOverlay').classList.remove('show');cropCtx.handle=null;}
+  async function cropExtractBlob(){
+    const img=document.getElementById('cropImg');
+    const s=document.getElementById('cropStage').getBoundingClientRect();
+    const r=img.getBoundingClientRect();
+    const scaleX=img.naturalWidth/r.width, scaleY=img.naturalHeight/r.height;
+    const cx=(cropCtx.boxX-(r.left-s.left))*scaleX;
+    const cy=(cropCtx.boxY-(r.top-s.top))*scaleY;
+    const cw=cropCtx.boxW*scaleX, ch=cropCtx.boxH*scaleY;
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.round(cw);canvas.height=Math.round(ch);
+    canvas.getContext('2d').drawImage(img,cx,cy,cw,ch,0,0,canvas.width,canvas.height);
+    return await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.92));
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    const box=document.getElementById('cropBox'); if(!box)return;
+    box.addEventListener('mousedown',cropDown);
+    box.addEventListener('touchstart',cropDown,{passive:false});
+    document.addEventListener('mousemove',e=>{if(cropCtx.handle)cropMove(e);});
+    document.addEventListener('touchmove',e=>{if(cropCtx.handle)cropMove(e);},{passive:false});
+    document.addEventListener('mouseup',cropUpHandler);
+    document.addEventListener('touchend',cropUpHandler);
+  });
   // Wake the scan-tag Edge Function while the user is still framing their photo — a cold
   // (idle) function adds ~1-2s to the first scan of a session. The bodyless POST boots the
   // function and fails fast server-side (400, no model call); throttled so reopening the
@@ -2717,7 +2833,8 @@
       tileEdit:'', tileQty:1, tileStatus:'in_collection', tileCause:'', tileSpot:'', tileAddingSpot:false, tileNewSpot:'',
       detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
-      photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false,
+      photoSort:'new', photoLabelFilter:'all', viewerOpen:false, viewerList:[], viewerI:0, viewerUrl:'', viewerReadonly:false, viewerConfirmDelete:false,
+      cropTarget:null, cropBusy:false, cropObjUrl:'', cropError:'', cropReady:false,
       mainMenuOpen:false, exportDialogOpen:false, exportFileName:'',
       backupOpen:false, backupBusy:false, backupError:'', backupResult:'', backupLink:null, backupMissing:false, backupLinkKnown:false,
       syncOpen:false, syncStep:'overview', syncBusy:false, syncError:'', syncNote:'', syncResult:'',
@@ -3250,8 +3367,10 @@
               // Stay on the form for the next plant (batch entry after a buying trip).
               if(fresh)this.galleryGenus=this.genusOf(fresh);
               const keepVendor=this.form.vendorId; // buying-trip batches are usually one vendor
+              const keepLoc=this.form.growingLocationId; // same shelf across a scanning batch (Stephen 2026-07-21)
               this.resetForm();
               this.form.vendorId=keepVendor;
+              this.form.growingLocationId=keepLoc;
               this.savedNote='Saved '+(fresh?this.displayName(fresh):'plant')+' ✓';
               clearTimeout(this._savedNoteTimer);
               this._savedNoteTimer=setTimeout(()=>{this.savedNote='';},15000);
@@ -4101,12 +4220,80 @@
       closePhotos(){this.screen='detail';},
       viewerPhoto(){return this.viewerList[this.viewerI]||null;},
       async _viewerLoad(){const i=this.viewerI;const ph=this.viewerList[i];if(!ph){this.viewerUrl='';return;}this.viewerUrl=ph.thumbUrl||'';/* show cached thumb instantly */ const full=await signFull(ph.storage_path); if(this.viewerI===i&&full)this.viewerUrl=full;/* upgrade if still on this photo */},
-      async openViewer(list,i,readonly){this.viewerReadonly=!!readonly;this.viewerList=list;this.viewerI=i;this.viewerOpen=true;this.viewerUrl=(list[i]&&list[i].thumbUrl)||'';await this._viewerLoad();},
-      closeViewer(){this.viewerOpen=false;},
-      async viewerNext(){if(this.viewerList.length<2)return;this.viewerI=(this.viewerI+1)%this.viewerList.length;await this._viewerLoad();},
-      async viewerPrev(){if(this.viewerList.length<2)return;this.viewerI=(this.viewerI-1+this.viewerList.length)%this.viewerList.length;await this._viewerLoad();},
+      async openViewer(list,i,readonly){this.viewerReadonly=!!readonly;this.viewerConfirmDelete=false;this.viewerList=list;this.viewerI=i;this.viewerOpen=true;this.viewerUrl=(list[i]&&list[i].thumbUrl)||'';await this._viewerLoad();},
+      closeViewer(){this.viewerOpen=false;this.viewerConfirmDelete=false;clearTimeout(this._viewerDelTimer);},
+      async viewerNext(){if(this.viewerList.length<2)return;this.viewerConfirmDelete=false;this.viewerI=(this.viewerI+1)%this.viewerList.length;await this._viewerLoad();},
+      async viewerPrev(){if(this.viewerList.length<2)return;this.viewerConfirmDelete=false;this.viewerI=(this.viewerI-1+this.viewerList.length)%this.viewerList.length;await this._viewerLoad();},
       async setCoverFromViewer(){const ph=this.viewerPhoto();if(ph)await this.setCover(ph);},
-      async deleteFromViewer(){const ph=this.viewerPhoto();if(!ph)return;this.viewerOpen=false;await this.removeDetailPhoto(ph);},
+      // Delete is one tap from "Set cover" on a small phone bar — arm-then-confirm so a
+      // mis-tap can't permanently delete a photo (mirrors sheetDelete). First tap arms
+      // (label → "Tap again to delete", 3s); second tap actually removes it.
+      async deleteFromViewer(){
+        const ph=this.viewerPhoto();if(!ph)return;
+        if(!this.viewerConfirmDelete){this.viewerConfirmDelete=true;clearTimeout(this._viewerDelTimer);this._viewerDelTimer=setTimeout(()=>{this.viewerConfirmDelete=false;},3000);return;}
+        this.viewerConfirmDelete=false;clearTimeout(this._viewerDelTimer);
+        this.viewerOpen=false;await this.removeDetailPhoto(ph);
+      },
+
+      /* ---- crop (touch UI ported from the catalog app; this layer owns save/reload) ---- */
+      openCropPending(idx){
+        const ph=this.pendingPhotos[idx]; if(!ph)return;
+        this.cropError=''; this.cropReady=false;
+        this.cropTarget={kind:'pending',idx};
+        this.cropObjUrl=URL.createObjectURL(ph.full); // crop the full 1600px copy, not the thumb
+        cropOpen(this.cropObjUrl,()=>{this.cropReady=true;});
+      },
+      async openCropSaved(){
+        const ph=this.viewerPhoto(); if(!ph||!this.detailPlant)return;
+        this.detailError='';
+        try{
+          // Fetch via the authenticated Storage client (same RLS boundary as upload/remove) —
+          // NOT an <img src=signedUrl>, which would taint the canvas on drawImage/toBlob.
+          const {data,error}=await sb.storage.from('photos').download(ph.storage_path);
+          if(error)throw error;
+          this.cropError=''; this.cropReady=false;
+          this.cropTarget={kind:'saved',photoId:ph.id};
+          this.cropObjUrl=URL.createObjectURL(data);
+          cropOpen(this.cropObjUrl,()=>{this.cropReady=true;});
+        }catch(e){
+          this.detailError=e.message||'Could not load the photo to crop.';
+        }
+      },
+      cropCancel(){ this._cropTeardown(); },
+      async cropApply(){
+        if(!this.cropTarget||this.cropBusy||!this.cropReady)return;
+        this.cropBusy=true;
+        try{
+          const blob=await cropExtractBlob();
+          if(!blob)throw new Error('Crop failed — try again.');
+          const thumb=await resizeImage(blob,420,.72);
+          if(this.cropTarget.kind==='pending'){
+            const ph=this.pendingPhotos[this.cropTarget.idx];
+            if(!ph)throw new Error('That photo is no longer in the list.');
+            try{URL.revokeObjectURL(ph.url);}catch(e){}
+            ph.full=blob; ph.thumb=thumb; ph.url=URL.createObjectURL(thumb);
+          } else {
+            const {photoId}=this.cropTarget;
+            await uploadPhoto(this.userId,photoId,blob,thumb); // upsert — overwrites the same stored file (mirrors onReplacePhoto)
+            if(this.detailPlant){
+              await this.loadDetailPhotos(this.detailPlant.id);
+              const fresh=this.detailPhotos.find(p=>p.id===photoId);
+              const i=this.viewerList.findIndex(p=>p.id===photoId);
+              if(fresh&&i>=0){ this.viewerList[i]=Object.assign({},this.viewerList[i],fresh); await this._viewerLoad(); }
+            }
+          }
+          this._cropTeardown();
+        }catch(e){
+          this.cropError=e.message||'Could not save the cropped photo.'; // shown IN the overlay — it covers the screen below
+        }finally{
+          this.cropBusy=false;
+        }
+      },
+      _cropTeardown(){
+        cropClose();
+        try{ if(this.cropObjUrl)URL.revokeObjectURL(this.cropObjUrl); }catch(e){}
+        this.cropObjUrl=''; this.cropTarget=null; this.cropError=''; this.cropReady=false;
+      },
 
       /* ---- CSV export ---- */
       _buildCsv(){
