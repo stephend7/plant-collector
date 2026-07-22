@@ -4,6 +4,129 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-07-21 — Photo cropping shipped (ported from the catalog app); real x-show/inline-flex bug found + fixed along the way
+
+Backlog #12. Stephen recalled the Plant Catalog app (`~/Documents/1- Plant Catalog/index.html`)
+already has a proven, iPhone-tested touch crop tool — he gave me access rather than have me design
+one from scratch. Read it, confirmed it fully settles the architecture question from the earlier
+plan (hand-rolled canvas, drag box + 4 corner handles, mouse+touch, `touch-action:none`), and ported
+it verbatim for the interaction layer. Only the SAVE half is new, because this app stores photos in
+Supabase Storage, not IndexedDB.
+
+**What shipped:**
+- Crop overlay (`#cropOverlay`/`#cropImg`/`#cropBox`, imperative class-toggled, ported byte-for-byte
+  from the catalog's `openCrop`/`cropDown`/`cropMove`/`applyCrop`) + matching CSS.
+- **Two entry points, per the plan:** a ✂ button on each pending photo thumbnail in the add-plant
+  form (`openCropPending`), and a "Crop" button in the full-photo viewer next to Set cover/Delete
+  (`openCropSaved`), both wired to the same crop screen.
+- **Save behavior = replace, per Stephen's answer to the earlier AskUserQuestion** (not keep-both):
+  cropping a pending photo re-resizes the cropped blob and swaps it into `pendingPhotos` in place
+  (nothing uploaded yet — the normal save path picks it up unchanged); cropping an already-saved
+  photo re-uploads over the SAME storage path via the existing `uploadPhoto` upsert — the exact
+  mechanism `onReplacePhoto` already used live, not new machinery.
+- **Cross-origin-safe by construction:** `openCropSaved` loads the photo via
+  `sb.storage.from('photos').download(path)` (the authenticated client, same RLS boundary as
+  upload/remove) — NOT `<img src=signedSignedUrl>`, which would taint the canvas and silently break
+  `toBlob`. This is the one genuinely new call shape (download() wasn't used anywhere before), but
+  it's the same client/bucket/RLS boundary as every other Storage call in the app.
+- **Race hardened, not just tested around:** the crop image loads asynchronously; a `cropReady`
+  flag (set only once the ported `onload`→`cropInitBox` has actually run) gates the Apply button
+  AND `cropApply()` itself, so a very fast tap before the photo is visible is a safe no-op instead
+  of a confusing failure. Found via testing — see below.
+
+**Real bug found and fixed during verification (not the crop code — an existing, unrelated app-wide
+pattern):** Alpine's `x-show` sets the element's inline `style.display` directly to toggle
+visibility. The 3-button viewer action row (`Crop`/`Set cover`/`Delete`) had `display:flex` written
+**inline** on the same `x-show`'d element (from the earlier same-day #13 fix) — Alpine's toggling
+silently clobbered it, so the row rendered as block-flow with buttons ~4px apart instead of the
+intended 30px, once real layout was measured (not just computed CSS property values). **Fixed** by
+moving the flex layout into a real stylesheet class (`.vbar-actions`), matching the pattern `.vbar`
+itself already used successfully (class-based flex + `x-show`, never inline `display` + `x-show` on
+the same element). **This means the earlier same-day #13 entry's "30px gap, verified" claim was
+incomplete** — it read computed CSS property values correctly but never got a real rendered-geometry
+measurement (the Browser pane was hidden at the time, returning zeroed rects), so the clobber went
+undetected until this session re-measured with the pane frontmost. Corrected now; both #13 and #12
+share the same `.vbar-actions` class and are confirmed at real phone width (375px): gaps measured
+**exactly 30px** between all three buttons, nothing crowds the 359px right edge.
+
+**Verified live (local worktree file, real canvas/pixel checks, not proxies):**
+- Pending-photo path: real 400×300 test image (white corner + red corner) → dragged the actual
+  crop-box handle via a real pointer drag → Applied → decoded the resulting blob and sampled pixels:
+  cropped to 286×197, top-left still exactly white (255,255,255), red corner confirmed GONE
+  (green field color where red used to be) — proves real pixel cropping, not just dimension math.
+- Saved-photo path: same real-canvas rigor, network boundary stubbed (`storage.download`,
+  `uploadPhoto`, `loadDetailPhotos`, `_viewerLoad` — same stubbing discipline as the #13 delete
+  test earlier this session): confirmed `uploadPhoto` called with the correct existing `photoId`
+  (no cross-photo mixup), `detailPhotos`/`viewerList` refreshed with new signed thumbnail token,
+  viewer reload fired exactly once.
+- Race guard: calling Apply before the image's `onload` fires is a safe no-op (no error, nothing
+  mutated, overlay stays open) — proven by deliberately racing it, then confirming normal apply
+  works once `cropReady` flips true.
+- Cancel: closes cleanly, photo untouched, target cleared.
+- Full inline script (2,941 lines) parses clean end-to-end (jsc, control-file-proven instrument)
+  after every edit in this session.
+
+**Security (Lite, inline):** no new egress destination (same Supabase project/bucket), no new
+auth/RLS surface (crop only touches the signed-in user's own photo rows/paths, same boundary as
+every existing photo call), no untrusted input (the only new call shape, `storage.download()`, is
+the officially supported client method for fetching a Storage object the user already owns).
+
+**Not yet done:** live end-to-end on the real test account, and the iPhone/WebKit tap-through
+(inherited catalog code was iPhone-proven there, but this integration is new and untested on
+device) — same standing gap noted for #13/#14. No commit yet.
+
+---
+
+## 2026-07-21 — Two small entry/photo fixes from Stephen's testing (skip/Lite tier)
+
+Two of a three-item batch Stephen flagged while testing (the third, photo cropping, is a real
+feature getting its own Opus-architected plan — not built here). Both below mirror patterns already
+shipped, so per the playbook they skip the full ceremony; built directly with inline security.
+
+**1) Sticky Growing Location across a scanning batch** (backlog #14). Scanning a buying-trip batch
+via **Save & add another**, the growing location ("Garage, second shelf") reset to blank on every
+plant. Now it carries to the next form exactly like the vendor already does — captured before
+`resetForm()` and re-applied after, in the `addAnother` branch of `savePlant()` (app/index.html
+~L3252). **In-memory only, scoped to the save-and-add batch** — NOT persisted to localStorage like
+`lastGenusId`, so a plain "Save plant" / a fresh form still starts with no location and next
+session doesn't silently inherit last session's shelf (same deliberate scoping as sticky-vendor,
+2026-07-18). Verified: replayed the exact capture→`resetForm()`→re-apply sequence live against the
+loaded app — `growingLocationId` survives while species/notes/quantity reset to blank/1.
+
+**2) Photo viewer: "Set cover" and "Delete" were one mis-tap apart, and Delete had NO confirm**
+(backlog #13). Stephen: the two are "dangerously close." Reading the code, the real hazard was
+worse than spacing: the viewer's Delete (`deleteFromViewer` → `removeDetailPhoto`) deleted the
+photo **and its storage files immediately, no confirmation** — a fat-thumb mis-tap 14px from "Set
+cover" permanently destroyed a photo. Fixed both: (a) spacing — gap 14px→30px and real tap padding
+(6px 4px) on both buttons, which had `padding:0`; (b) **arm-then-confirm** on Delete, mirroring the
+existing `sheetDelete` pattern — first tap arms (label → "Tap again to delete", 3s auto-disarm),
+second tap deletes. Honors the standing "confirm before hard-to-reverse actions" rule
+([[feedback-ui-affordances]]). **Scope note surfaced, not silently expanded:** Stephen only asked
+to move the buttons apart; the confirm was added because the underlying danger is the unconfirmed
+delete, not just proximity — flagged to him rather than slipped in.
+- Verified live (local worktree file in the browser, real code, network call stubbed only for the
+  destructive `removeDetailPhoto`): computed CSS PROPERTY values showed 30px gap + 6px/4px padding +
+  red Delete at the time; **first tap** arms without deleting and keeps the viewer open, **second
+  tap** deletes exactly once and closes, and an armed Delete **auto-disarms after 3.1s with zero
+  deletes**. Inline JS parse of the whole 2,806-line script clean (jsc, instrument proven with a
+  failing control first).
+  **Correction, same day, found while building #12:** that spacing check read computed CSS
+  properties, not actual rendered geometry (the Browser pane was hidden at the time, so
+  `getBoundingClientRect()` returned zeroed rects and wasn't retried after the pane was frontmost
+  again). The real rendered gap was only ~4px, not 30 — Alpine's `x-show` toggles inline
+  `style.display` and had clobbered the inline `display:flex` on that span. Fixed by moving to a
+  stylesheet class (`.vbar-actions`); real measured gap is now confirmed 30px. Full story in the
+  2026-07-21 photo-cropping entry above (backlog #12), which is where this was caught.
+
+**Both: inline security PASS (Lite).** No new egress, no new data leaving the device, no auth/RLS
+surface. #13 strictly ADDS a confirmation gate before an already-existing owner-scoped delete
+(risk goes down); #14 writes `growing_location_id` (already in `formRow()`) to the user's own
+RLS-scoped plant row, in-memory only. **Not yet done:** end-to-end run on the live test account and
+the iPhone/WebKit tap-through (the standing device gate) — neither exercised here; both wanted before
+this is called fully shipped. No commit yet (house rule: commit/push when Stephen asks).
+
+---
+
 ## 2026-07-18 — Duplicate check on entry: notice existing plants, offer "add to count" (Lite)
 
 Stephen's need (first-time collection entry): the same plant may be spread around the
