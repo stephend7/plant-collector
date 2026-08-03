@@ -274,6 +274,117 @@ could not be recorded"*; `runSecondary`'s grouped sentence renders *"…could no
 Same intent, and ruling 3 governs the required semantics rather than exact wording — flagged
 here so the reviewer sees it rather than discovering it.
 
+---
+
+# Round 2 — Codex Gate A FAIL findings, fixed and re-verified (2026-08-02)
+
+Codex returned **FAIL** with one P0 and three P1s. **All four were confirmed real against
+the code. No rebuttals were offered.** Fixes and targeted evidence below; the previously
+passing boundaries were re-run because the fixes restructured shared code.
+
+## P0 — ambiguous photo-row response could DELETE committed photos
+
+**Confirmed.** Any `photo` insert error triggered deletion of both Storage objects. If the
+row had actually committed and only its response was lost, the images belonging to a real
+row were destroyed; retry re-uploaded, hit `23505`, deleted them again, and never
+converged — duplicate-as-success existed only for events.
+
+**Fix:** never delete on an unresolved outcome. A same-id conflict now *proves* the row is
+present; otherwise the code **asks the database** which world it is in before touching
+Storage. If the row exists → keep the files and mark it done. If provably absent → clean up.
+If the check itself fails → leave the files (a stray file is recoverable; a row pointing at
+deleted images is not) and report `unknown`.
+
+**Targeted evidence — the exact injection Codex demanded** (photo row commits, response
+lost, via `await` the real request then throw):
+
+```
+afterAmbiguousPhotoRow: photoRowCommittedOnServer: 1     ← it really did commit
+                        fullFileStillPresent:  true      ← NOT deleted
+                        thumbFileStillPresent: true      ← NOT deleted
+                        storageDeletesIssued:  0
+afterRetry:             photoRows: 1   fullPresent: true   thumbPresent: true
+                        coverSet: true  events: 1  plantsWithDescriptor: 1
+                        storageDeletesDuringRetry: 0   noticeCleared: true
+```
+
+Note: **no notice appeared at all** — the ambiguity resolved itself during the first save,
+because the row check found the committed row. Convergence to one row, one full image, one
+thumbnail and the intended cover is proven above.
+
+## P1 — "add to existing" bypassed Phase A for photo failures
+
+**Confirmed.** Only the event was protected; photo/cover failures escaped to the red
+`Could not update the plant.` for a plant whose quantity had **already** increased — so a
+re-tap would have counted it twice.
+
+**Fix:** photos, cover and the note event all go through the resumable pipeline after the
+quantity boundary; presentation moved to its own `try`.
+
+```
+qtyBefore: 1  qtyAfter: 3  increasedOnce: true
+formError: ""                       ← was "Could not update the plant."
+notice: "Count updated, but a photo could not be saved."
+retry:  qtyUnchangedByRetry: true  plantWritesDuringRetry: 0  photoRows: 1  noticeCleared: true
+```
+
+## P1 — a successful status event erased an unresolved category failure
+
+**Confirmed.** `secondaryOrWarn` cleared the shared notice unconditionally on success, so a
+category failure and its retry vanished when the status event succeeded.
+
+**Fix:** `secondaryOrWarn` has been **deleted**. There is now exactly one notice builder
+(`runSecondary`); the edit branch routes both secondaries through a single `_resume`, so
+every unfinished item is named together and cleared together. `saveTileStatus` was migrated
+too, removing the cross-operation clobbering risk entirely. A `force` flag was added so an
+edit that clears *all* categories still writes the change.
+
+```
+statusPersisted: true   statusEventWritten: 1   categoryLinks: 0
+noticeStillNamesCategories: true
+notice: "Changes saved, but its categories could not be saved."
+retry:  categoryLinks: 2   diedEvents: 1 (not duplicated)   noticeCleared: true
+```
+
+## P1 — post-boundary work still fed the total-save catch
+
+**Confirmed.** `rememberPicks`, reload and navigation remained inside the outer `try`, so any
+throw there produced `Could not save the plant` for a committed row.
+
+**Fix:** presentation runs in its own `try` in both `savePlant` branches and in
+`addToExisting`; its catch reports a partial success, never a save failure.
+
+```
+plantExists: true   formError: ""   saysCouldNotSave: false
+```
+
+**Additional gap closed while verifying:** `reloadPlant()` returns `null` on failure rather
+than throwing, so the isolated catch never fired and the user silently landed on the list
+with no explanation — the empty-vs-broken ambiguity in miniature. The `null` branch now
+shows *"Plant saved, but the app could not refresh the view."* with a retry.
+
+## Regression re-run of the affected boundaries
+
+| Boundary | Result |
+|---|---|
+| A.1 event fails after new plant | PASS — notice correct, retry: same id, 1 event, **0** plant writes |
+| A.3 thumbnail fails | PASS — full image removed; *"a photo could not be saved; the cover photo was not attempted"* |
+| A.4 photo row **provably rejected** (server answers) | PASS — **both** objects removed, 0 photo rows |
+| A.5 cover fails | PASS — photo + objects intact, **0** Storage deletes; retry sets cover |
+| Normal path (no injection) | PASS — 1 photo row, cover set, 2 categories, `acquired`, both objects, **no notice** |
+
+`formError` was empty in every post-boundary case — the hard rule holds across all paths.
+
+**One harness artifact, disclosed:** the batched A.1 reading initially showed only the
+stray-file sentence. Cause was the *test*, not the app: the notice element reference was
+captured before the retry and `.innerText` read after the DOM had changed. Re-run in
+isolation, A.1 renders *"Plant saved, but the history event could not be saved."* with the
+stray span hidden (`shown: false`) and `partial.stray` false. Same "doubt the instrument"
+trap recorded in the testing-setup notes; the app behaviour was never wrong.
+
+**Post-round-2 state:** baseline restored exactly — **16 plants, 26 journal entries**,
+0 test Storage objects, 0 notices visible, `loaded: true`, `loadError: ""`.
+
 ## Deviations from the spec, and open questions for the reviewer
 
 1. **A.1.5 vs A.6.7 (raised before implementation, unresolved).** A.1.5 says "Any Storage
