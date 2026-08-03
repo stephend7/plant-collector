@@ -7,6 +7,10 @@
 - **Working summary:** the `feedback-dev-method` memory (auto-loaded each session).
 - **Project brain:** read `architecture.md` (design) + `decisions.md` (dated decision log) at the
   start of any non-trivial task, and write decisions back into them in the same change.
+- **ACTIVE PLAN (2026-08-02 → ):** `docs/stabilization-plan.md` — approved, in execution.
+  Read it before any build work; it defines the phase order, the blocking gates, the
+  forbidden-file rules, and the **cross-model review gates** where Codex reviews Claude's
+  work. `AGENTS.md` points non-Claude agents back here; this file stays canonical.
 
 ## The three pillars
 1. **Markdown as the shared brain** — durable docs, not chat. Read before acting; write after.
@@ -30,8 +34,13 @@ Switch models in the model picker after the architecture plan is agreed and befo
 
 ## House rules
 - **Source control:** stage specific files (never `git add -A`); one logical change per commit;
-  co-author tag; commit/push only when Stephen asks. **Deploy = `git push`** (GitHub Pages rebuilds;
-  bump the `<meta name="app-build">` marker so the in-app updater offers it).
+  co-author tag; commit/push only when Stephen asks. Precise vocabulary: **commit** = local
+  history only; **push a phase branch** = visible for CI/review, does NOT deploy;
+  **merge/push to `main` = DEPLOY** (GitHub Pages rebuilds; bump the `<meta name="app-build">`
+  marker — and the `?v=` on any extracted `lib/` script — so the in-app updater offers it).
+- **The repo must stay PUBLIC.** GitHub Pages will not serve a private repo on the Free plan —
+  flipping it private unpublishes the site and 404s the live app (learned 2026-08-02, see
+  `decisions.md`). Want it private? Buy GitHub Pro *first*, confirm Pages still serves, then flip.
 - **Verify in a real browser** before claiming UI works (Claude-in-Chrome + the throwaway
   test account — address is in Claude's private memory; replaced `test@test.com` 2026-07-18;
   Chrome is Blink, so WebKit-specific bugs still need Stephen's iPhone).

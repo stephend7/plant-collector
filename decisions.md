@@ -4,6 +4,74 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-08-02 — Independent audit → stabilization plan approved; cross-model review adopted; two live security facts
+
+A three-way review cycle (ChatGPT audit → Claude verification → ChatGPT Gate 0 → Claude
+disposition → ChatGPT confirmation) ended with **Gate 0 PASSED and `docs/stabilization-plan.md`
+v4 APPROVED for execution.** This entry records what was decided and the two things that
+changed in the live system today.
+
+**Why any of this happened.** ChatGPT was given read-only access to the repo and produced an
+independent audit (2026-07-24). Claude verified it *against the code* rather than accepting it:
+**8 of its 9 core claims confirmed**, one (database reproducibility) overstated — all 11
+migration files are committed; the real defect is that the *ledger* stops at 004 and two headers
+still say "do not run". Claude also found **two bugs the audit missed**: `syncCategories` throws
+outside any catch, so a plant that saved reports "Could not save the plant" (user re-saves →
+duplicate); and `loadData` is not single-flighted, so every cold start loads the collection twice.
+
+**What we're doing about it.** One stabilization effort, not two: safety fixes → test harness →
+gradual extraction out of the 5,210-line `index.html`, each step gated. Sequence:
+**A0 → A → B → C → D1 → D2 → T → first tester → E → F2…F6.** Full detail lives in the plan;
+it is the operative document, not this entry.
+
+**Decisions worth carrying forward:**
+- **Stability and long-run manageability is the goal** (Stephen, 2026-07-29), *not* getting
+  sale-ready. Selling remains a real someday-goal; it does not drive this work.
+- **Testers are coming soon** (Stephen, 2026-08-02), which promoted two things from "someday"
+  to blocking: two-user RLS isolation, and a per-user scanner rate limit (**Phase T**) that must
+  ship *before any tester account exists*.
+- **Cross-model review adopted.** Claude Code builds; **Codex is the independent reviewer** with
+  blocking gates (A, C, D1, D2, T, E, F4, F5); ChatGPT does plan-level oversight and milestone
+  audits; Stephen decides. Reviewer ≠ author is now *sandbox-enforced* — Codex's `.git` access is
+  read-only, verified by probe, so it literally cannot commit here.
+- **Ceremony deliberately raised in one place, lowered in two** (Stephen): Gates A and C are hard
+  blockers (stricter than our own tier rule requires); A3's docs-only fix is skip-tier and Phase B
+  skips browser verification (nothing ships to the app).
+- **Deferred ≠ done.** Phase A adds *visible partial-success handling*, not atomicity. Server-side
+  transactions, integrity diagnostics, schema-version detection, the richer load-error taxonomy,
+  and photo-inclusive backup/restore are recorded in the plan's "Deferred stabilization work"
+  table so banners are never mistaken for fixes.
+
+**Two live-system facts established today (both verified, not assumed):**
+1. **Public signup is now DISABLED.** It had been open — anyone finding the URL could register,
+   and the scanner still has no per-user cost limit. Stephen disabled it in the Supabase
+   dashboard; Claude verified independently via the public read-only endpoint
+   `GET /auth/v1/settings` → `disable_signup: true`, `external.anonymous_users: false`.
+   Both doors shut. **Phase T re-verifies this flag** before any tester is invited — a dashboard
+   toggle can be flipped back by accident.
+2. **GitHub Pages will not serve a private repo on the Free plan.** The repo was flipped to
+   private and the live app went to **404** — Pages was unpublished outright, not merely hidden.
+   Restored the same day: repo public, Pages site recreated (`main` / root), verified serving
+   build `2026-07-21a` over HTTPS. **Data was never at risk** (it all lives in Supabase).
+   If repo privacy is wanted later: **buy GitHub Pro first, confirm Pages still serves, then
+   flip** — that order has no downtime. Repository privacy is *not* a substitute for signup
+   lockdown, rate limits, or RLS verification.
+
+**Process lesson worth keeping.** Across two review rounds and ~25 findings, Claude rebutted
+none — every one was a real gap, and most were contradictions introduced by amending the plan
+faster than its surrounding sections were reconciled. The most valuable single catch was
+circular: the schema manifest was to be generated *from* the rebuilt database and then compared
+*against* it, proving nothing. It is now two artifacts — an **expected** manifest derived from
+`schema.sql` + migrations *before* seeing the result, and an **actual** export — with the gate
+comparing them. A different model caught what self-review structurally cannot.
+
+**`AGENTS.md` replaced.** The old one was a near-verbatim fork of `CLAUDE.md` that had diverged
+(it pointed agents at the `test@test.com` account retired 2026-07-18, invented "Codex-in-Chrome",
+and carried a stale model-rotation section) — exactly the "two divergent instruction sets" failure
+the audit warns about. It is now a short pointer file: CLAUDE.md is canonical, AGENTS.md adds only
+the rules specific to non-Claude agents. Pulled forward from Phase B because Codex is needed at
+Gate A, which comes first.
+
 ## 2026-07-21 — Photo cropping shipped (ported from the catalog app); real x-show/inline-flex bug found + fixed along the way
 
 Backlog #12. Stephen recalled the Plant Catalog app (`~/Documents/1- Plant Catalog/index.html`)
