@@ -1,9 +1,12 @@
 -- ============================================================================
 --  Plant Collector Database — schema & security rules (Supabase / Postgres)
 --  See ../architecture.md for the plain-language model. See ../decisions.md.
---  Status: DRAFT, revised after security review 2026-06-17. NOT yet run against
---  a database. Now includes (1) parent-ownership checks on every FK write, and
---  (2) owner-only Storage policies for the photo files (bottom of file).
+--  Status: APPLIED 2026-06-17 — this file is the baseline of the live database
+--  (migration "000"). Later changes live in migrations/ (see the README ledger
+--  there); this file is deliberately NOT re-edited to match them — the migration
+--  files are canonical for everything after day one. Includes (1) parent-ownership
+--  checks on every FK write, and (2) owner-only Storage policies (bottom of file).
+--  [Header corrected 2026-08-02, Phase A3 — it wrongly said "DRAFT, NOT yet run".]
 --
 --  Security model (the important part):
 --   * Every table that holds a user's data has a `user_id` column.

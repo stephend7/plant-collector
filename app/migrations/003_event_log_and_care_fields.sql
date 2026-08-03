@@ -1,6 +1,8 @@
 -- Migration 003 — the Event Log spine + species care fields
--- STATUS: PENDING SIGN-OFF. Do NOT run until the design is approved and the
--- RLS change has had its adversarial security check (full-tier, per project method).
+-- STATUS: APPLIED 2026-06-18 (after the full-tier adversarial security check —
+-- see decisions.md "2026-06-18 — Event Log spine"). Do not run again.
+-- [Header corrected 2026-08-02, Phase A3 — it still said "PENDING SIGN-OFF. Do NOT
+--  run" long after it was applied, which could mislead a future agent or session.]
 -- Safe & non-destructive (adds optional columns; widens the journal into an event log).
 -- Wrapped in a transaction so it's all-or-nothing; DDL is transactional in Postgres, and
 -- while the policy is briefly dropped the table stays RLS-enabled = deny-all (fails CLOSED).
