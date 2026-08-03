@@ -385,6 +385,116 @@ trap recorded in the testing-setup notes; the app behaviour was never wrong.
 **Post-round-2 state:** baseline restored exactly — **16 plants, 26 journal entries**,
 0 test Storage objects, 0 notices visible, `loaded: true`, `loadError: ""`.
 
+---
+
+# Round 3 — Codex round-2 FAIL findings, fixed and re-verified (2026-08-02)
+
+Codex confirmed the P0 fix and the combined category/status fix, then returned **FAIL** on
+four further P1s. **All four were confirmed real. No rebuttals.** The root cause of two of
+them was architectural, so it was fixed at the root rather than patched.
+
+## Root-cause change: one shared notice → a KEYED LIST
+
+`partial` (one global slot) + `_resume` (one global object) meant every operation
+overwrote its predecessor, so a later success silently discarded an earlier unresolved
+warning and its retry. Replaced with `partials: []` — each operation owns a key
+(`save:<id>`, `edit:<id>`, `add:<id>`, `tile:<id>`, `refresh:<id>`, `detail:<id>`) and can
+only ever replace or clear **its own** entry. `runSecondary(resume, label, key)` now takes
+its state as parameters instead of reading shared fields. The UI renders one notice per
+entry, each with its own Retry/Dismiss.
+
+## P1 #1 — refresh Retry cleared the warning even when refresh failed again
+
+**Confirmed.** Retry callbacks cleared `partial` *before* attempting, and
+`refreshAfterResume()` treated a `null` reload as success.
+
+**Fix:** `refreshAfterResume()` now returns **true only when a row actually came back**
+(and never throws). `warnRefresh()` owns the notice: its retry clears the entry only on a
+proven reload, otherwise it re-posts the same warning. The edit branch's silent
+`null`-reload landing is also covered.
+
+```
+warningAfterSave:                  ["Plant saved, but the app could not refresh the view."]
+warningRemainsAfterFailedRetry:    true      ← was false
+clearedAfterSuccessfulRetry:       true
+formError:                         ""
+editNullRefresh: formError "" · ["Changes saved, but the app could not refresh the view."]
+```
+
+## P1 #2 — "add to existing" could still report total failure after quantity was saved
+
+**Confirmed.** The photo-count read sat after the quantity boundary but inside the catch
+that writes `Could not update the plant.` The comment calling that catch "pre-boundary"
+was inaccurate.
+
+**Fix:** the pre-boundary `try` now contains **only** the quantity update. Everything
+after it — count read, resume, `runSecondary` — is secondary, with its own notice and a
+retry that reuses a stable event id.
+
+```
+qtyBefore: 1  qtyAfter: 3  increasedOnce: true
+formError: ""                                   ← was "Could not update the plant."
+notice: ["Count updated, but the photo could not be added."]
+```
+
+## P1 #3 — status-tile presentation failures crossed the hard boundary
+
+**Confirmed.** `runSecondary` and the timeline reload sat in the same catch that writes
+`Could not update status.`
+
+**Fix:** the pre-boundary `try` contains only the status update; the event write and
+timeline reload are isolated. Retry never re-applies the status.
+
+```
+statusPersisted: true   detailError: ""          ← was "Could not update status."
+notice: ["Status saved, but the timeline could not be refreshed."]
+clearedAfterRetry: true
+```
+
+## P1 #4 — a later successful operation erased an earlier unresolved warning
+
+**Confirmed.** Fixed by the keyed list above.
+
+```
+earlierWarning:        ["Plant saved, but the history event could not be saved."]
+afterLaterSuccess:     ["Plant saved, but the history event could not be saved."]
+earlierStillPresent:   true      ← was false
+keys after a fully successful second save: ["save:b52ed9ba-…"]   (only its own cleared)
+```
+
+## Deeper bug found while fixing #3 (not in Codex's findings)
+
+`loadDetailEvents()` **discarded its error** (`const {data}=…; data||[]`), so a failed
+timeline read rendered as an **empty timeline** — "this plant has no history" and "we
+couldn't read its history" are different facts. That is the same empty-vs-broken defect as
+A4, in the journal. It now throws, and callers surface it.
+
+**Regression risk this created was audited, not assumed.** Making it throw would have made
+three existing callers report a *false* failure for work that had already succeeded:
+`saveEvent` → *"Could not save the entry"*, `deleteEvent` → *"Could not delete the event"*,
+and `refreshDetail` (unhandled). All three now isolate the post-write reload and report a
+partial instead. `openDetail` also guards its loads, so a tap can no longer produce an
+unhandled rejection or a silently empty timeline.
+
+## Regression after the refactor
+
+| Boundary | Result |
+|---|---|
+| A.1 event fails | PASS — same id, 1 event, **0** plant writes during retry, notice cleared |
+| A.3 thumbnail fails | PASS — full image removed; *"a photo could not be saved; the cover photo was not attempted"* |
+| A.4 photo row provably rejected | PASS — both objects removed, 0 photo rows |
+| P0 ambiguous photo row | PASS — **files preserved**, `storageDeletes: 0`, row present |
+| Normal path | PASS — 1 photo row, cover set, 2 categories, `acquired`, both objects, **no notice** |
+
+`formError` empty in every post-boundary case.
+
+**Post-round-3 state:** baseline exact — **16 plants, 26 journal entries, 22 photo rows,
+44 Storage objects** (2 per photo), 0 notices, `loaded: true`.
+
+*(A stray test event initially survived cleanup because the sweep filtered on the UTC date
+while the app writes the local date — found by comparing against the 26-event baseline
+rather than trusting the sweep, then removed.)*
+
 ## Deviations from the spec, and open questions for the reviewer
 
 1. **A.1.5 vs A.6.7 (raised before implementation, unresolved).** A.1.5 says "Any Storage
