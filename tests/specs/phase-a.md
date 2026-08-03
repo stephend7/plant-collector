@@ -1,5 +1,19 @@
 # Phase A acceptance specification — safety fixes A1, A2, A4
 
+> **SUPERSEDED IN PART, 2026-08-02 — write-Retry removed from scope.** This document is
+> preserved **verbatim as originally authored** (the historical record of what Gate A
+> reviewed through round 4). Every clause below that requires a `retry` callback, an
+> idempotent-event *Retry* action, "Retry attempts only…", or a resumable pipeline
+> describes a feature that was **built, reviewed, found fragile across 8 findings in
+> Codex Gate A rounds 3–4, and removed** by Stephen's decision (see `decisions.md`,
+> 2026-08-02). It does not describe current behavior. **Current contract:** every
+> assertion about *what must be saved*, *what must not be saved*, *the amber notice's
+> truthful text*, *Storage compensation*, and *no false "could not save" after the hard
+> boundary* still holds exactly as written and is still Gate A's bar. Only the *Retry
+> mechanism* itself — and any assertion that depends on a retry actually running — is
+> superseded; those notices are now Dismiss-only and simply persist until the user
+> clears them. See `tests/evidence/phase-a-gate-a.md` "Round 4" for the full account.
+
 **Status:** Assertions-first specification for Claude Code implementation and Gate A review.
 **Checkout reviewed:** `/Users/stephendavis/Documents/2- Plant Collector DB`, branch `main`.
 **Scope:** Outcomes for Phase A1 (event failures), A2 (post-plant partial failures and photo compensation), and A4 (load errors and single-flight startup). A3 is out of scope.

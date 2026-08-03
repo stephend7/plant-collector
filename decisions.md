@@ -4,6 +4,51 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-08-02 — Phase A write-Retry REMOVED from scope (Stephen, after Codex Gate A rounds 3–4)
+
+**Context.** Phase A's original design (`tests/specs/phase-a.md`, `docs/stabilization-plan.md`
+Phase A) gave every partial-success notice a **Retry** button: a resumable pipeline that
+re-attempted only the unfinished secondary work (event write, photo upload, cover, categories)
+using a stable client-generated id, so a lost-response retry couldn't duplicate a row. Codex's
+Gate A review went through four rounds:
+
+- **Round 1–2:** found and closed a real P0 (an ambiguous photo-row response could delete a
+  committed photo's files) and several P1s in the retry/compensation logic.
+- **Round 3:** four more P1s — every one in code written *during round 2's fixes*.
+- **Round 4:** four more P1s — every one in code written *during round 3's fixes*.
+
+Across rounds 3–4, **8 findings, 0 of them in the safety fixes themselves** (events no longer
+fail silently, photos are never orphaned or wrongly deleted, no false "could not save" for a
+plant that saved, a failed load never looks like an empty collection — none of these were ever
+reversed by any round). Every finding lived in the *retry machinery wrapped around* those
+fixes: stable-id collisions across repeated attempts, a later operation's success erasing an
+earlier operation's unresolved warning, a retry's own refresh silently failing, a `throw` added
+to fix one caller creating false failures in others.
+
+**Decision (Stephen, 2026-08-02):** keep every safety guarantee; **remove Retry as a feature**
+for Phase A. The guarantee that matters is *never lie about what was saved*. Retry is a
+convenience whose correctness is combinatorial (attempt × failure-point × subsequent-failure)
+and was not verifiable by hand — it was consuming the entire risk budget of the phase while the
+underlying safety fixes were already solid.
+
+**What shipped instead (commit `dce0601`, refined round 5):** partial-success notices are
+**append-only** — each carries a unique key, nothing replaces or clears another, and every
+notice persists until the user's own **Dismiss**. No retry callback exists anywhere in Phase A.
+The one exception: the **load-error** notice keeps Retry, because re-fetching data is read-only
+and carries none of the risk that made write-retries fragile.
+
+**Documentation:** `tests/specs/phase-a.md` and the Phase A section of
+`docs/stabilization-plan.md` are **preserved verbatim** as the historical record of the
+original design and why it changed — each carries a superseding banner rather than being
+silently rewritten. `tests/evidence/phase-a-gate-a.md` keeps every round's evidence in place,
+with "Round 4" documenting the removal and later rounds appended after it.
+
+**Where Retry returns:** Phase D, once Playwright can hold the failure-combination space that
+defeated manual, hand-written verification. Tracked in the stabilization plan's "Deferred
+stabilization work" table.
+
+---
+
 ## 2026-08-02 — Independent audit → stabilization plan approved; cross-model review adopted; two live security facts
 
 A three-way review cycle (ChatGPT audit → Claude verification → ChatGPT Gate 0 → Claude

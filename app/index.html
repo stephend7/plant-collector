@@ -2914,8 +2914,9 @@
       view:'loading', mode:'signin', email:'', password:'', message:'', ok:false, busy:false, userEmail:'', userId:'',
       genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[], products:[], pests:[],
       /* ---- Phase A (docs/stabilization-plan.md + tests/specs/phase-a.md) ----
-         partial: a truthful "the main thing saved, this bit didn't" notice. Amber, never
-         auto-hides, always offers Retry + Dismiss. NEVER used for a real primary failure.
+         partials: truthful "the main thing saved, this bit didn't" notices. Amber, never
+         auto-hide, Dismiss-only (write-Retry was removed — see decisions.md 2026-08-02).
+         NEVER used for a real primary failure.
          loaded: proves a collection load actually SUCCEEDED — without it, a failed load
          is indistinguishable from a genuinely empty collection (the whole point of A4). */
       partials:[], detailEventsFailed:false,
@@ -3449,9 +3450,9 @@
             const {error}=await sb.from('plant').update(this.formRow()).eq('id',id);
             if(error)throw error;
             // ---- hard boundary: the edit IS saved. Nothing below may claim otherwise. ----
-            // Both secondaries go through ONE _resume so the notice names everything that
-            // is unfinished — previously a successful status event cleared a still-unresolved
-            // category failure, losing the user's retry (Codex Gate A P1).
+            // Both secondaries go through ONE resume object so the notice names everything
+            // that is unfinished (previously a successful status event could clear a
+            // still-unresolved category failure's notice — Codex Gate A round 2/3).
             const catsChanged=!sameSet(origCats,this.form.categoryIds);
             const statusChanged=!!(oldStatus && newStatus!==oldStatus);
             const resume={
@@ -3481,14 +3482,15 @@
             /* ================= HARD BOUNDARY (Phase A) =================
                The plant row now EXISTS. From here on, nothing may tell the user the
                plant failed to save — later failures are partial successes, handled by
-               runSecondary() and reported in the amber notice with a working Retry. */
+               runSecondary() and reported in a truthful, Dismiss-only amber notice. */
             // Photos to save = manually-added, then (optionally) the scanned tag photo last.
             const photos=[...this.pendingPhotos];
             if(this.keepTagPhoto && this.scannedTagPhoto) photos.push({...this.scannedTagPhoto,label:'tag'});
             // Cover = the first clean (non-tag) photo; a tag photo is for reading, not display,
             // so it's only the cover if it's the only photo.
             const cover=photos.find(p=>p.label!=='tag')||photos[0];
-            // The blobs live on in _resume, so Retry never asks the user to re-pick the image.
+            // The blobs live on in `resume` for this call's duration (runSecondary continues
+            // past a photo failure to attempt the event/categories — see below).
             const resume={
               plantId,
               photos:photos.map((ph,i)=>({id:ph.id,label:ph.label,sort:i,full:ph.full,thumb:ph.thumb,rowed:false})),
@@ -3589,25 +3591,32 @@
            sit inside the pre-boundary catch and could still announce "Could not update
            the plant" for a quantity that had already changed (Codex round 2 P1). */
         const photosForResume=(withPhotos&&this.pendingPhotos.length)?[...this.pendingPhotos]:[];
-        try{
-          let base=0;
-          if(photosForResume.length){
+        let photos=[], coverId=null, precheck=[];
+        if(photosForResume.length){
+          try{
             const {count,error:cErr}=await sb.from('photo').select('id',{count:'exact',head:true}).eq('plant_id',p.id);
-            if(cErr)throw cErr;      // a failed COUNT is a partial success, never a save failure
-            base=count||0;
+            if(cErr)throw cErr;
+            const base=count||0;
+            photos=photosForResume.map((ph,i)=>({id:ph.id,label:ph.label,sort:base+i,full:ph.full,thumb:ph.thumb,rowed:false}));
+            coverId=(!p.cover_photo_id)?photosForResume[0].id:null;
+          }catch(e){
+            /* Without the count we cannot pick a safe sort_order, so the photo is not
+               attempted at all \u2014 but that must not silently cancel the history event too
+               (Codex Gate A round 5: the notice previously named only the photo while the
+               event was never even tried). Mark it 'skipped' and let runSecondary proceed
+               to the event below regardless. */
+            precheck=[{what:'a photo',how:'skipped'}];
           }
-          const resume={
-            plantId:p.id,
-            photos:photosForResume.map((ph,i)=>({id:ph.id,label:ph.label,sort:base+i,full:ph.full,thumb:ph.thumb,rowed:false})),
-            coverId:(!p.cover_photo_id&&photosForResume.length)?photosForResume[0].id:null, coverDone:false,
-            event:{id:uid(), label:'the history event', done:false,
-              run:(eid)=>this.logEvent(p.id,'note',{eventId:eid,body:'Count +'+add+' (now \u00d7'+newQty+') \u2014 matched an existing plant during entry'})},
-            cats:{ids:[],done:true}
-          };
-          await this.runSecondary(resume,'Count updated');
-        }catch(e){
-          this.showPartial('Count updated, but the photo could not be added.');
         }
+        const resume={
+          plantId:p.id,
+          photos, coverId, coverDone:!coverId,
+          event:{id:uid(), label:'the history event', done:false,
+            run:(eid)=>this.logEvent(p.id,'note',{eventId:eid,body:'Count +'+add+' (now \u00d7'+newQty+') \u2014 matched an existing plant during entry'})},
+          cats:{ids:[],done:true},
+          precheck
+        };
+        await this.runSecondary(resume,'Count updated');
         // ---- presentation: never a save failure ----
         try{
           this.rememberPicks();
@@ -3638,7 +3647,17 @@
       },
 
       /* ---- detail view ---- */
-      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.sheetOpen=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.tileEdit='';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
+      async openDetail(p){
+        // loadDetailEvents() KEEPS old data on screen when its read fails, so a refresh
+        // of the SAME plant doesn't blank out on a blip. But that means switching to a
+        // DIFFERENT plant must clear the old plant's events/photos FIRST — otherwise a
+        // failed load for the new plant leaves the previous plant's history rendered
+        // under the new plant's name (Codex Gate A round 5).
+        const switching=!this.detailPlant||this.detailPlant.id!==p.id;
+        this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.sheetOpen=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.tileEdit='';
+        if(switching){ this.detailEvents=[]; this.detailPhotos=[]; this.detailEventsFailed=false; }
+        this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);
+      },
       closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;this.sheetOpen=false;this.tileEdit='';},
       async loadDetailPhotos(plantId){
         const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date,comment,journal_entry_id,in_gallery').eq('plant_id',plantId).order('sort_order');
@@ -3729,7 +3748,10 @@
       async runSecondary(r,savedLabel){
         if(!r)return true;
         // each entry: {what:'a photo', how:'failed'|'unknown'|'skipped'}
-        const unfinished=[]; let stray=false;
+        // r.precheck seeds items that were never attempted at all — e.g. a photo whose
+        // required setup (the existing-photo count) failed before upload could even
+        // start (Codex Gate A round 5). The event/cats steps below still run regardless.
+        const unfinished=[...(r.precheck||[])]; let stray=false;
         const note=(what,how)=>unfinished.push({what,how});
         // 1) photos: upload both objects, then the row. A failure at either point must
         //    leave NO object without an accepted row (Gate A.3 / A.4).
@@ -3765,7 +3787,7 @@
             else ph.rowed=true;
           }catch(e){
             if(e&&e.strayFile)stray=true;      // thumbnail-stage cleanup couldn't confirm
-            note('a photo',outcomeOf(e)); break; // stop photo work; keep blobs for Retry
+            note('a photo',outcomeOf(e)); break; // stop photo work here; other steps still run
           }
         }
         // 2) cover — only meaningful once its photo row exists
@@ -3816,18 +3838,6 @@
       warnRefresh(plantId,savedLabel){
         this.showPartial(savedLabel+', but the app could not refresh the view — reopen the plant to see it.');
       },
-      // Returns TRUE only when a fresh row really came back. Never throws.
-      async refreshAfterResume(plantId){
-        let fresh=null;
-        try{ fresh=await this.reloadPlant(plantId); }catch(e){ return false; }
-        if(!fresh)return false;
-        if(this.detailPlant&&this.detailPlant.id===plantId){
-          this.detailPlant=fresh;
-          try{ await Promise.all([this.loadDetailPhotos(plantId),this.loadDetailEvents(plantId)]); }
-          catch(e){ return false; }
-        }
-        return true;
-      },
       // Single source of truth for "status changed" → dated journal event (used by the
       // full Edit form AND the tap-to-edit Status tile, so they can never drift apart).
       async logStatusChange(id,oldStatus,newStatus,cause,eventId){
@@ -3872,7 +3882,8 @@
         /* ===== HARD BOUNDARY: the status IS saved. =====
            The event write and the timeline reload used to sit in the same catch, so a
            problem with either announced "Could not update status" for a status that had
-           already been persisted (Codex round 2 P1). Retry never re-applies the status. */
+           already been persisted (Codex round 2 P1). Isolated below; nothing here can
+           re-apply the status. */
         this.detailPlant.lifecycle_status=newStatus;
         const resume={
           plantId:id, photos:[], coverId:null, coverDone:true,
@@ -4328,12 +4339,23 @@
       // open from the whole-collection Journal tab (load that plant's detail data first)
       async openJournalEntry(kind,id,plantId){
         const p=this.plants.find(x=>x.id===plantId); if(!p)return;
+        let eventsLoadedOk=true;
         if(!this.detailPlant || this.detailPlant.id!==plantId){
+          // Same cross-plant guard as openDetail() — never show a different plant's
+          // retained history under this plant's name if the new load then fails.
+          this.detailEvents=[]; this.detailPhotos=[]; this.detailEventsFailed=false;
           this.detailPlant=p; this.timelineFilter='all'; this.loggingEvent=false; this.editEventId=null;
           this.eventDeleteId=null; this.careEditing=false;
-          await this.loadDetailPhotos(plantId); await this.loadDetailEvents(plantId);
+          await this.loadDetailPhotos(plantId);
+          eventsLoadedOk=await this.loadDetailEvents(plantId);
         }
-        if(kind==='event'){ const ev=this.detailEvents.find(e=>e.id===id); if(ev)this.openEntrySheet('event',ev); }
+        if(kind==='event'){
+          const ev=this.detailEvents.find(e=>e.id===id);
+          if(ev)this.openEntrySheet('event',ev);
+          // Previously this silently did nothing when the read failed — the tap looked
+          // like a dead button rather than a load problem (Codex Gate A round 5).
+          else if(!eventsLoadedOk)this.showPartial("Couldn't open this entry — its plant's history could not be loaded.");
+        }
         else{ const ph=this.detailPhotos.find(x=>x.id===id); if(ph)this.openEntrySheet('photo',ph); }
       },
       sheetPhoto(){ return this.sheet ? this.sheet.ph : null; },

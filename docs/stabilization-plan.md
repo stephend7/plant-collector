@@ -131,6 +131,19 @@ later: buy GitHub Pro *first*, verify Pages still serves, *then* flip — no dow
 
 ## Phase A — Four safety fixes (Lite tier, ship first)
 
+> **SUPERSEDED 2026-08-02 — write-Retry removed from scope.** Every mention of "Retry"
+> below (A1's banner text, the A1 matrix, Gate A's boundary list, the idempotent-event
+> language) describes the **original design**, built and then removed after Codex Gate A
+> rounds 3 and 4 found 8 findings — every one inside the retry/notice machinery, none in
+> the safety fixes themselves. Stephen's call (recorded in `decisions.md`, 2026-08-02):
+> keep the truthful-notice guarantee, drop Retry as a feature until Phase D can hold it
+> under automated tests. **This text is preserved as the historical record of what was
+> built and why it changed — it does not describe current behavior.** Current contract:
+> partial-success notices are **append-only, Dismiss-only**, and never disappear except
+> by the user's own Dismiss. Load-error notices are the one exception and **keep Retry**
+> (a read-only re-fetch carries none of the risk that made write-retries fragile). See
+> "Deferred stabilization work" below for when write-Retry returns.
+
 Small, independent, high-value. Each one is a separate commit; together they can be one
 deploy. These go first because they protect data *today* and don't depend on tooling.
 
@@ -528,7 +541,7 @@ or an explicit deferral → ChatGPT helps interpret genuine disagreement → Ste
 | Gate | Reviewer | Blocking? | Focus |
 |---|---|---|---|
 | 0 — plan review | ChatGPT | Yes, before approval | Omissions, weakened recommendations, disproportionate ceremony |
-| A — safety fixes | Codex | **Yes** (Stephen, 2026-08-02) | Every changed failure/retry/cleanup/startup path: what saved, what didn't, what the user sees, can a retry duplicate |
+| A — safety fixes | Codex | **Yes** (Stephen, 2026-08-02) | Every changed failure/cleanup/startup path: what saved, what didn't, what the user sees — write-Retry was reviewed through round 4, then removed from scope; see the superseding note at the top of Phase A |
 | C — extraction | Codex | **Yes** (Stephen, 2026-08-02) | Verbatim-move proof, export completeness, script order, CSP, cache markers, Node-vs-browser, parser test gaps |
 | D1 — clean room | Codex | Yes | Performs the rebuild from a clean export of one named commit; schema manifest; local isolation |
 | D2 — prod parity | Codex reviews evidence | Yes, before testers | Live schema/policy diff vs manifest; production two-account spot-check (Stephen/Claude execute; Codex needs no credentials) |

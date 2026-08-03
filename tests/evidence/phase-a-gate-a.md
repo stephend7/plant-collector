@@ -567,6 +567,90 @@ because it is the clearest argument yet for Phase D's automated tests.
 Retry-on-partial-failure returns in **Phase D**, once Playwright can hold the failure
 combinations that defeated manual verification. Logged in the plan's deferred table.
 
+---
+
+# Round 5 — Codex round-4 findings, fixed and re-verified (2026-08-02)
+
+Codex's round-4 review accepted the write-Retry removal permanently, found **0 P0s**, and
+returned 3 P1s + non-blocking cleanup. **All three P1s confirmed real. No rebuttals.**
+
+## P1 — durable contract still described write-Retry
+
+**Fix:** `tests/specs/phase-a.md`, the Phase A section of `docs/stabilization-plan.md`,
+and this evidence file's earlier rounds are **preserved verbatim** — each carries a
+superseding banner marking write-Retry clauses as historical rather than rewriting them.
+`decisions.md` now has a dated entry recording the full round-1-through-5 arc and
+Stephen's decision. `GATE-A-HANDOFF.md` is rewritten fresh for this commit (see below).
+
+## P1 — one plant's history could appear under another plant's name
+
+**Confirmed and reproduced exactly as described.** `loadDetailEvents()` deliberately
+*keeps* old data on a same-plant refresh failure (so a blip doesn't blank the screen) —
+but `openDetail()` didn't clear that state when switching to a genuinely *different*
+plant, so a failed load for Plant B could leave Plant A's events rendered under Plant B's
+name. `openJournalEntry()` had the same gap, plus it silently ignored `loadDetailEvents`'s
+boolean return — a collection-Journal tap on a plant whose history failed to load just
+did nothing, indistinguishable from a dead button.
+
+**Fix:** both functions now clear `detailEvents`/`detailPhotos`/`detailEventsFailed`
+**before** loading, but only when actually switching plants (`this.detailPlant.id !==
+p.id`) — a same-plant refresh still correctly preserves old data on failure.
+`openJournalEntry` also checks the boolean return and posts a truthful notice instead of
+silently doing nothing.
+
+**Reproduced and verified (exact boundary Codex demanded):**
+
+```
+Open Plant A (1 real event) → inject journal_entry GET failure → open Plant B:
+  detailPlantIsB: true
+  detailEventsShowsOldPlantAEvents: false   ← the leak, closed
+  detailEventsCount: 0
+  detailEventsFailed: true
+  bannerVisible: true   ("Couldn't load this plant's history — what's shown may be out of date.")
+
+Collection-Journal tap on a real event belonging to a plant whose history load fails:
+  sheetOpened: false
+  noticeAppeared: true
+  lastNotice: "Couldn't open this entry — its plant's history could not be loaded."
+```
+
+## P1 — add-to-existing's notice named only the photo, hiding the untried event
+
+**Confirmed.** The photo-count read and the history-event write shared one `try`, so a
+count-read failure skipped the event entirely while the notice claimed only the photo
+was unfinished — the event's fate went unmentioned in either direction.
+
+**Fix:** `runSecondary` now accepts a `precheck` list — items that were never attempted
+because their own setup failed before the resumable pipeline could run (the existing
+"not attempted" outcome, reused rather than reinvented). The count-read failure now
+marks the photo `skipped` via `precheck` and proceeds to the event independently.
+
+**Reproduced and verified:**
+
+```
+Quantity 1→2 (increased exactly once) · photo rows: 0 (never attempted, correctly)
+event WAS written (proceeded independently) · formError: ""
+notice: "Count updated, but a photo was not attempted."   (event absent — it succeeded)
+```
+
+## Non-blocking cleanup, done
+
+- `refreshAfterResume` deleted — verified zero callers before removal (`grep` showed only
+  its own definition).
+- Six stale comments referencing the removed retry mechanism (`_resume`, "with a working
+  Retry", "Retry never re-applies…") rewritten to describe current behavior.
+
+## Regression + cleanup
+
+A.1, P0-ambiguous, and the normal path (with 2 pre-existing unresolved notices left
+untouched by a fully successful save) all re-verified passing. One test artifact —
+a note event + quantity bump on a **real, non-prefixed** plant from the add-to-existing
+test — was found by comparing against the 26-event baseline (not assumed clean), then
+reverted precisely (event deleted, quantity restored to its original value).
+
+**Post-round-5 state:** baseline exact — **16 plants, 26 journal entries, 22 photo rows,
+44 Storage objects**, 0 notices, `loaded: true`.
+
 ## Deviations from the spec, and open questions for the reviewer
 
 1. **A.1.5 vs A.6.7 (raised before implementation, unresolved).** A.1.5 says "Any Storage
