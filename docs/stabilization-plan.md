@@ -636,6 +636,7 @@ following remain open, with their trigger conditions:
 | Integrity diagnostics (orphaned files, missing thumbnails, invalid covers, plants missing acquired events) | With F6, same machinery |
 | Schema-version detection in the app | With D2's manifest tooling in place |
 | Richer load-error taxonomy (offline vs auth-expired vs DB failure vs schema mismatch vs photo-signing) | After Phase A's generic state ships and real failures are observed |
+| **Retry-on-partial-failure** — removed from Phase A by Stephen 2026-08-02 after Codex rounds 3+4 produced 8 findings, all inside the retry/notice machinery and none in the safety fixes themselves. Notices are now truthful but append-only, with no Retry. | Phase D, once Playwright can hold the failure combinations that defeated manual verification |
 | Full photo-inclusive backup + proven restore drill | Explicitly deferred by Stephen (stability-first scope, 2026-07-29); revisit before selling |
 | CSP tightening (removing `'unsafe-inline'` once the component leaves index.html) | End of Phase F |
 

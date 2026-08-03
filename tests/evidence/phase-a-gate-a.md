@@ -495,6 +495,78 @@ unhandled rejection or a silently empty timeline.
 while the app writes the local date — found by comparing against the 26-event baseline
 rather than trusting the sweep, then removed.)*
 
+---
+
+# Round 4 — scope decision: RETRY REMOVED (Stephen, 2026-08-02)
+
+Codex's round-3 review returned four more P1s, **all four in code written during round 3**.
+Rounds 3 and 4 together produced eight findings, and every one lived in the *retry and
+notice machinery* wrapped around the safety fixes — not in the safety fixes themselves,
+which no round has reversed.
+
+**Stephen's decision: keep every safety guarantee, remove the Retry feature.**
+
+The safety guarantee is *never lie about what was saved*. Retry is a convenience, and its
+machinery — stable ids, resumable state, which notice supersedes which, what a retry does
+when the subsequent refresh fails — is combinatorial and cannot be verified by hand. It was
+consuming the entire risk budget of the effort.
+
+## What changed
+
+| Before | After |
+|---|---|
+| Keyed notices that replace/clear each other | **Append-only** notices, unique key each, cleared only by the user |
+| `retry` callback per notice + `retryPartial()` | removed |
+| `clearPartial()` / success-clears-notice | removed — a success posts nothing and clears nothing |
+| `runSecondary(r,label,key)` | `runSecondary(r,label)` |
+| `warnRefresh` with a self-reposting retry | plain truthful notice |
+| `loadDetailEvents` **throws** | records `detailEventsFailed`, returns false, keeps events on screen |
+
+This directly resolves Codex's round-3 findings without new machinery: **#1** (key
+collisions) — keys are unique per notice and nothing replaces anything; **#2** (post-retry
+refresh ignored) and **#3** (timeline notice replaces event notice) — no retry exists;
+**#4** (unisolated `loadDetailEvents` callers) — the throw is reverted, so all eight
+callers behave exactly as before and the three round-3 guards were removed as dead code.
+
+The empty-vs-broken guarantee is preserved: the timeline shows *"Couldn't load this
+plant's history — what's shown may be out of date."* when a read fails, instead of an
+empty timeline. The **load-error** notice keeps its Retry, because re-reading data is a
+read-only operation with none of the risk that made secondary-write retries fragile.
+
+## Verification after simplification
+
+| Check | Result |
+|---|---|
+| A.1 event fails | `"Plant saved, but the history event could not be saved."` · `formError: ""` · 0 events · Dismiss only |
+| P0 ambiguous photo row | photo row present, **both files preserved**, `storageDeletes: 0` |
+| A.3 thumbnail fails | full image removed · `"a photo could not be saved; the cover photo was not attempted"` |
+| Normal path | cover set, 2 categories, `acquired` event, `formError: ""` |
+| **Notices accumulate** | 2 unresolved notices before a *fully successful* save → still **2** after (`earlierSurvived: true`) |
+| Timeline read fails | `returnedFalse: true`, `detailEventsFailed: true`, existing events kept, **`detailError: ""`** (no false failure), flag clears on success |
+
+Baseline exact: **16 plants, 26 journal entries, 22 photo rows, 44 Storage objects,
+0 notices**, `loaded: true`.
+
+*(`retryButtons: 2` in the raw A.1 output counts hidden DOM nodes — the load-error
+notice's Retry, which is retained deliberately. The rendered partial-success notice text
+ends in "Dismiss" with no Retry, which is the behavioural proof.)*
+
+## Near-miss during this change, disclosed
+
+An over-broad replacement while simplifying `openDetail` **deleted six working methods**
+(`closeDetail`, `loadDetailPhotos`, `loadDetailEvents`, `eventPhotos`, `eventPhotoUrl`,
+`refreshDetail`). It was caught immediately by the browser verification step
+(`loadDetailEvents is not a function`), restored from the previous commit, and confirmed
+by diffing the full method inventory against `HEAD` — only `clearPartial` and
+`retryPartial` differ, which is the intended removal. No behaviour was lost. Recorded
+because it is the same class of self-inflicted regression this round exists to stop, and
+because it is the clearest argument yet for Phase D's automated tests.
+
+## Deferred (not lost)
+
+Retry-on-partial-failure returns in **Phase D**, once Playwright can hold the failure
+combinations that defeated manual verification. Logged in the plan's deferred table.
+
 ## Deviations from the spec, and open questions for the reviewer
 
 1. **A.1.5 vs A.6.7 (raised before implementation, unresolved).** A.1.5 says "Any Storage

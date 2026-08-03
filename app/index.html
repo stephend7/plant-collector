@@ -442,8 +442,8 @@
         an inline display style or a :style binding here: x-transition rewrites the style
         attribute and wipes it, leaving an empty banner on screen — the same x-show/inline
         display trap recorded in decisions.md 2026-07-21. x-show alone is correct. -->
-   <!-- One entry per unresolved operation: a later success can never discard an earlier
-        warning, so each keeps its own Retry until the user acts on it. -->
+   <!-- Append-only: one entry per problem, each surviving until the user dismisses it.
+        No Retry — see showPartial() for why that was deliberately removed. -->
    <template x-for="pn in partials" :key="pn.key">
      <div class="pa-notice" x-transition x-cloak>
        <div class="pa-row">
@@ -451,9 +451,7 @@
          <span x-show="pn.stray" x-text="' A stray photo file may remain in storage.'"></span>
        </div>
        <div class="pa-actions">
-         <button type="button" class="pa-btn" @click="retryPartial(pn.key)" :disabled="pn.busy"
-                 x-text="pn.busy ? 'Retrying…' : 'Retry'"></button>
-         <button type="button" class="pa-btn pa-link" @click="dismissPartial(pn.key)">Dismiss</button>
+         <button type="button" class="pa-btn" @click="dismissPartial(pn.key)">Dismiss</button>
        </div>
      </div>
    </template>
@@ -1045,7 +1043,11 @@
                   </template>
                 </div>
               </template>
-              <div x-show="timeline().length===0" class="hint" style="padding:10px 0">Start this plant's story — tap <strong>＋ Log event</strong> to add the first note or photo.</div>
+              <!-- "no history" and "couldn't read the history" are different facts. -->
+              <div x-show="detailEventsFailed" class="pa-notice pa-slim" style="margin:8px 0">
+                <div class="pa-row"><span>Couldn't load this plant's history — what's shown may be out of date.</span></div>
+              </div>
+              <div x-show="!detailEventsFailed && timeline().length===0" class="hint" style="padding:10px 0">Start this plant's story — tap <strong>＋ Log event</strong> to add the first note or photo.</div>
             </div>
           </div>
         </div>
@@ -2916,7 +2918,7 @@
          auto-hides, always offers Retry + Dismiss. NEVER used for a real primary failure.
          loaded: proves a collection load actually SUCCEEDED — without it, a failed load
          is indistinguishable from a genuinely empty collection (the whole point of A4). */
-      partials:[], _resume:null,
+      partials:[], detailEventsFailed:false,
       loadError:'', loaded:false, loadBusy:false, _loadFlight:null,
       addingProduct:false, newProductName:'', addingPest:false, newPestName:'',
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'', lastAcquisitionType: localStorage.getItem('lastAcquisitionType')||'',
@@ -3460,7 +3462,7 @@
                 : {done:true},
               cats: catsChanged ? {ids:[...this.form.categoryIds],done:false,force:true} : {ids:[],done:true}
             };
-            if(catsChanged||statusChanged) await this.runSecondary(resume,'Changes saved','edit:'+id);
+            if(catsChanged||statusChanged) await this.runSecondary(resume,'Changes saved');
             // Post-boundary presentation, isolated for the same reason as the new-plant branch.
             try{
               this.rememberPicks();
@@ -3494,7 +3496,7 @@
               event:{id:uid(),type:'acquired',opt:{date:this.form.acquisitionDate||todayLocal()},done:false},
               cats:{ids:[...this.form.categoryIds],done:false}
             };
-            await this.runSecondary(resume,'Plant saved','save:'+plantId);
+            await this.runSecondary(resume,'Plant saved');
             /* Everything below is presentation: remembering picks, reloading, navigating.
                It runs in its OWN try so a failure here can never reach the outer catch and
                announce "Could not save the plant" for a plant that exists (Codex Gate A P1). */
@@ -3586,31 +3588,26 @@
            EVERYTHING below is secondary — including the photo-count read, which used to
            sit inside the pre-boundary catch and could still announce "Could not update
            the plant" for a quantity that had already changed (Codex round 2 P1). */
-        const key='add:'+p.id;
         const photosForResume=(withPhotos&&this.pendingPhotos.length)?[...this.pendingPhotos]:[];
-        const eventId=uid();   // stable across every retry, so the note can't duplicate
-        const runAdd=async()=>{
-          try{
-            let base=0;
-            if(photosForResume.length){
-              const {count,error:cErr}=await sb.from('photo').select('id',{count:'exact',head:true}).eq('plant_id',p.id);
-              if(cErr)throw cErr;      // a failed COUNT is a partial success, never a save failure
-              base=count||0;
-            }
-            const resume={
-              plantId:p.id,
-              photos:photosForResume.map((ph,i)=>({id:ph.id,label:ph.label,sort:base+i,full:ph.full,thumb:ph.thumb,rowed:false})),
-              coverId:(!p.cover_photo_id&&photosForResume.length)?photosForResume[0].id:null, coverDone:false,
-              event:{id:eventId, label:'the history event', done:false,
-                run:(eid)=>this.logEvent(p.id,'note',{eventId:eid,body:'Count +'+add+' (now \u00d7'+newQty+') \u2014 matched an existing plant during entry'})},
-              cats:{ids:[],done:true}
-            };
-            await this.runSecondary(resume,'Count updated',key);
-          }catch(e){
-            this.showPartial(key,'Count updated, but the photo could not be added.',{stray:false,retry:runAdd});
+        try{
+          let base=0;
+          if(photosForResume.length){
+            const {count,error:cErr}=await sb.from('photo').select('id',{count:'exact',head:true}).eq('plant_id',p.id);
+            if(cErr)throw cErr;      // a failed COUNT is a partial success, never a save failure
+            base=count||0;
           }
-        };
-        await runAdd();
+          const resume={
+            plantId:p.id,
+            photos:photosForResume.map((ph,i)=>({id:ph.id,label:ph.label,sort:base+i,full:ph.full,thumb:ph.thumb,rowed:false})),
+            coverId:(!p.cover_photo_id&&photosForResume.length)?photosForResume[0].id:null, coverDone:false,
+            event:{id:uid(), label:'the history event', done:false,
+              run:(eid)=>this.logEvent(p.id,'note',{eventId:eid,body:'Count +'+add+' (now \u00d7'+newQty+') \u2014 matched an existing plant during entry'})},
+            cats:{ids:[],done:true}
+          };
+          await this.runSecondary(resume,'Count updated');
+        }catch(e){
+          this.showPartial('Count updated, but the photo could not be added.');
+        }
         // ---- presentation: never a save failure ----
         try{
           this.rememberPicks();
@@ -3641,15 +3638,7 @@
       },
 
       /* ---- detail view ---- */
-      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.sheetOpen=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.tileEdit='';this.detailPlant=p;this.screen='detail';
-        // loadDetailEvents now throws on a read failure; surface it instead of silently
-        // showing an empty timeline (and instead of an unhandled rejection on a tap).
-        const key='detail:'+p.id;
-        const load=async()=>{ await this.loadDetailPhotos(p.id); await this.loadDetailEvents(p.id); };
-        try{ await load(); this.clearPartial(key); }
-        catch(e){ this.showPartial(key,"Couldn't load this plant's photos or history.",{
-          retry:async()=>{ try{ await load(); this.clearPartial(key); }catch(_){ } }}); }
-      },
+      async openDetail(p){this.detailError='';this.confirmingDelete=false;this.loggingEvent=false;this.editEventId=null;this.eventDeleteId=null;this.careEditing=false;this.sheetOpen=false;this.timelineFilter='all';this.viewerOpen=false;this.photoSort='new';this.photoLabelFilter='all';this.tileEdit='';this.detailPlant=p;this.screen='detail';await this.loadDetailPhotos(p.id);await this.loadDetailEvents(p.id);},
       closeDetail(){this.screen='list';this.detailPlant=null;this.detailPhotos=[];this.detailEvents=[];this.loggingEvent=false;this.editEventId=null;this.detailError='';this.confirmingDelete=false;this.sheetOpen=false;this.tileEdit='';},
       async loadDetailPhotos(plantId){
         const {data}=await sb.from('photo').select('id,storage_path,label,sort_order,photo_date,comment,journal_entry_id,in_gallery').eq('plant_id',plantId).order('sort_order');
@@ -3664,10 +3653,14 @@
         const {data,error}=await sb.from('journal_entry')
           .select('id,entry_date,event_type,body,measure_label,measure_value,measure_unit,cause,photo_id,product_id,dose_note')
           .eq('plant_id',plantId).order('entry_date',{ascending:false}).order('created_at',{ascending:false});
-        // Phase A: this used to discard `error`, so a FAILED timeline load rendered as an
-        // EMPTY timeline — "this plant has no history" and "we couldn't read its history"
-        // are different facts. Callers decide how to surface it.
-        if(error)throw error;
+        /* Phase A: this used to DISCARD `error`, so a failed read rendered as an empty
+           timeline — "no history" and "couldn't read the history" are different facts.
+           It briefly THREW instead, but that made eight existing callers report a FALSE
+           failure for writes that had already succeeded ("Could not replace the photo"
+           when only the refresh failed). So it records the failure, keeps the events
+           already on screen, and returns false. No caller has to change. */
+        if(error){ this.detailEventsFailed=true; return false; }
+        this.detailEventsFailed=false;
         const events=(data||[]).map(e=>({...e,pestIds:[]}));
         try{
           const ids=events.map(e=>e.id);
@@ -3677,6 +3670,7 @@
           }
         }catch(_){}
         this.detailEvents=events;
+        return true;
       },
       eventPhotos(ev){ return this.detailPhotos.filter(p=>p.journal_entry_id===ev.id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||((a.photo_date||'')<(b.photo_date||'')?-1:1)); },
       eventPhotoUrl(ev){ const ps=this.eventPhotos(ev); if(ps.length)return ps[0].thumbUrl||null; if(ev.photo_id){const p=this.detailPhotos.find(x=>x.id===ev.photo_id);return p?p.thumbUrl:null;} return null; },
@@ -3686,12 +3680,7 @@
         try{ await this.loadPlants(); }
         catch(e){ this.loadError='Saved, but the collection list could not be refreshed.'; this.loadErrorDismissed=false; return; }
         const fresh=this.plants.find(x=>x.id===this.detailPlant.id);
-        if(fresh){
-          this.detailPlant=fresh;
-          try{ await this.loadDetailPhotos(fresh.id); await this.loadDetailEvents(fresh.id); }
-          catch(_){ this.showPartial('detail:'+fresh.id,"Couldn't refresh this plant's photos or history.",{
-            retry:async()=>{ try{ await this.loadDetailPhotos(fresh.id); await this.loadDetailEvents(fresh.id); this.clearPartial('detail:'+fresh.id); }catch(__){ } }}); }
-        }
+        if(fresh){this.detailPlant=fresh;await this.loadDetailPhotos(fresh.id);await this.loadDetailEvents(fresh.id);}
       },
       /* ---- event log ---- */
       eventTypeLabel(t){return{note:'Note',acquired:'Acquired',flowered:'Flowered',fruited:'Fruited / set seed',divided:'Divided',repotted:'Repotted',fed:'Fertilize',pest_treated:'Pest / disease treated',dormant:'Went dormant',woke:'Woke from dormancy',measured:'Measured',died:'Died',sold:'Sold',traded:'Traded',given_away:'Given away',crossed:'Crossed'}[t]||t;},
@@ -3720,42 +3709,24 @@
         return row.id;
       },
       /* ---- Phase A partial-success notices (tests/specs/phase-a.md) ----
-         A KEYED LIST, not one shared slot. A single global notice meant any later
-         operation silently discarded an earlier unresolved warning and its retry —
-         the spec requires a notice to survive until the user chooses Retry or Dismiss
-         (Codex Gate A round 2 P1). Each operation owns its own key and can only ever
-         replace or clear its OWN entry. */
-      showPartial(key,text,opts){
+         DELIBERATELY SIMPLE (Stephen's call 2026-08-02, after Codex rounds 3 and 4).
+         The safety guarantee is "never lie about what was saved". A Retry button is a
+         convenience, and the retry machinery — stable ids, resumable state, which notice
+         supersedes which, what a retry does when the refresh then fails — produced eight
+         of the last eight review findings and cannot be verified by hand.
+         So: notices are APPEND-ONLY and carry no retry. Each posts under a unique key,
+         never replaces or clears another, and survives until the user dismisses it.
+         Retry returns in Phase D, once automated tests exist to hold it. */
+      showPartial(text,opts){
         opts=opts||{};
-        const entry={key,text,stray:!!opts.stray,busy:false,retry:opts.retry||null};
-        const i=this.partials.findIndex(p=>p.key===key);
-        if(i>=0)this.partials.splice(i,1,entry); else this.partials.push(entry);
+        this.partials.push({key:uid(),text,stray:!!opts.stray});
       },
-      clearPartial(key){
+      // Dismiss performs NO writes of any kind — it only stops showing that one notice.
+      dismissPartial(key){
         const i=this.partials.findIndex(p=>p.key===key);
         if(i>=0)this.partials.splice(i,1);
       },
-      // Dismiss performs NO writes of any kind — it only stops showing that one notice.
-      dismissPartial(key){ this.clearPartial(key); },
-      async retryPartial(key){
-        const e=this.partials.find(p=>p.key===key);
-        if(!e||e.busy||!e.retry)return;
-        e.busy=true;
-        try{ await e.retry(); }
-        catch(err){ /* the entry stays; its own handler rewrites it truthfully */ }
-        finally{ const s=this.partials.find(p=>p.key===key); if(s)s.busy=false; }
-      },
-      /* secondaryOrWarn was removed (Codex Gate A P1): having a second, independent
-         notice-setter meant a SUCCESS in one path unconditionally cleared a still-unresolved
-         warning from another (e.g. a status event succeeding wiped a category failure and
-         its retry). There is now exactly ONE notice builder — runSecondary — so every
-         unfinished item in an operation is named together and cleared together. */
-      /* ---- Phase A: resumable secondary work after a plant row exists ----
-         Everything below the "hard boundary" in savePlant runs through here. Each step
-         records its own done-flag, so Retry redoes ONLY what failed — it never re-inserts
-         the plant, re-uploads a finished photo, or duplicates an event. Never throws:
-         after the plant exists, a failure is a partial success, not a save failure. */
-      async runSecondary(r,savedLabel,key){
+      async runSecondary(r,savedLabel){
         if(!r)return true;
         // each entry: {what:'a photo', how:'failed'|'unknown'|'skipped'}
         const unfinished=[]; let stray=false;
@@ -3827,7 +3798,7 @@
             catch(e){ note('its categories',outcomeOf(e)); }
           }
         }
-        if(!unfinished.length){ this.clearPartial(key); return true; }   // clears only ITS OWN
+        if(!unfinished.length)return true;   // nothing to report
         // Name EVERY unfinished item — saying only "a photo failed" would let the user
         // assume the rest succeeded — and keep the three outcomes distinct, because
         // "definitely not saved" and "might be saved" call for different user reactions.
@@ -3838,21 +3809,12 @@
         if(failed.length) parts.push(join(failed)+' could not be saved');
         if(unknown.length)parts.push(join(unknown)+' could not be confirmed (it may or may not have been saved)');
         if(skipped.length)parts.push(join(skipped)+' was not attempted');
-        this.showPartial(key,savedLabel+', but '+parts.join('; ')+'.',{
-          stray, retry:async()=>{ if(await this.runSecondary(r,savedLabel,key))await this.refreshAfterResume(r.plantId); }
-        });
+        this.showPartial(savedLabel+', but '+parts.join('; ')+'.',{stray});
         return false;
       },
-      /* Refresh-failure notice with a retry that only clears itself once a row was ACTUALLY
-         reloaded. Previously the retry cleared the warning up front and treated a null
-         reload as success, so a still-failing refresh looked resolved (round 2 P1). */
+      // Refresh failed after a successful save. Truthful, no retry (see showPartial).
       warnRefresh(plantId,savedLabel){
-        const key='refresh:'+plantId;
-        const attempt=async()=>{
-          if(await this.refreshAfterResume(plantId))this.clearPartial(key);
-          else this.showPartial(key,savedLabel+', but the app could not refresh the view.',{retry:attempt});
-        };
-        this.showPartial(key,savedLabel+', but the app could not refresh the view.',{retry:attempt});
+        this.showPartial(savedLabel+', but the app could not refresh the view — reopen the plant to see it.');
       },
       // Returns TRUE only when a fresh row really came back. Never throws.
       async refreshAfterResume(plantId){
@@ -3912,20 +3874,14 @@
            problem with either announced "Could not update status" for a status that had
            already been persisted (Codex round 2 P1). Retry never re-applies the status. */
         this.detailPlant.lifecycle_status=newStatus;
-        const key='tile:'+id;
         const resume={
           plantId:id, photos:[], coverId:null, coverDone:true,
           event:{id:uid(), label:'the history event', done:false,
             run:(eid)=>this.logStatusChange(id,oldStatus,newStatus,this.tileCause,eid)},
           cats:{ids:[],done:true}
         };
-        try{
-          await this.runSecondary(resume,'Status saved',key);
-          await this.loadDetailEvents(id); // surface the new status event in the timeline
-        }catch(e){
-          this.showPartial(key,'Status saved, but the timeline could not be refreshed.',{
-            retry:async()=>{ try{ await this.loadDetailEvents(id); this.clearPartial(key); }catch(_){ } }});
-        }
+        await this.runSecondary(resume,'Status saved');
+        await this.loadDetailEvents(id); // surface the new status event in the timeline
         this.cancelTileEdit();
         this.detailBusy=false;
       },
@@ -4072,12 +4028,8 @@
           if(uerr)throw uerr;
           await this.syncPests(evId, e.type==='pest_treated'?e.pestIds:[]);
 
-          // ---- the entry IS written; the reloads below must not claim otherwise ----
-          try{
-            await this.loadDetailEvents(pid); await this.loadDetailPhotos(pid);
-            if(this.tab==='journal'){ this.allPhotosLoaded=false; await this.loadAllEvents(); if(this.journalFilter==='photos')await this.loadAllPhotos(); }
-          }catch(_){ this.showPartial('detail:'+pid,'Entry saved, but the timeline could not be refreshed.',{
-            retry:async()=>{ try{ await this.loadDetailEvents(pid); await this.loadDetailPhotos(pid); this.clearPartial('detail:'+pid); }catch(__){ } }}); }
+          await this.loadDetailEvents(pid); await this.loadDetailPhotos(pid);
+          if(this.tab==='journal'){ this.allPhotosLoaded=false; await this.loadAllEvents(); if(this.journalFilter==='photos')await this.loadAllPhotos(); }
           this.loggingEvent=false; this.editEventId=null; this.newEvent=this._blankEvent();
         }catch(err){this.detailError=err.message||'Could not save the entry.';}
         finally{this.detailBusy=false;}
@@ -4088,11 +4040,7 @@
         try{
           const {error}=await sb.from('journal_entry').delete().eq('id',ev.id);if(error)throw error;
           this.eventDeleteId=null;
-          // ---- deleted; a failed refresh is not a failed delete ----
-          const pid=this.detailPlant.id;
-          try{ await this.loadDetailEvents(pid); }
-          catch(_){ this.showPartial('detail:'+pid,'Event deleted, but the timeline could not be refreshed.',{
-            retry:async()=>{ try{ await this.loadDetailEvents(pid); this.clearPartial('detail:'+pid); }catch(__){ } }}); }
+          await this.loadDetailEvents(this.detailPlant.id);
         }
         catch(e){this.detailError=e.message||'Could not delete the event.';}
         finally{this.detailBusy=false;}
