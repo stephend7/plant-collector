@@ -2367,6 +2367,24 @@
   // response collides on the primary key. That collision means the row IS there — which
   // is success, not failure (Gate A.8: converge to exactly one event).
   const isDupKey=e=>!!e&&(e.code==='23505'||/duplicate key|already exists/i.test((e&&e.message)||''));
+  /* Why a secondary step didn't complete. The three cases are genuinely different to the
+     user and must not be flattened into one message (Codex Gate A ruling 3):
+       'failed'  — the server answered and rejected it. It is definitely NOT saved.
+       'unknown' — no verdict came back (connection dropped mid-flight). It MAY be saved;
+                   this is the lost-response case, so we must not claim it failed.
+       'skipped' — never attempted, because a step it depends on failed first. */
+  // Discriminator verified against the real supabase-js error shapes (2026-08-02):
+  //   server rejection → code:'XX000'/'23505' (non-empty), i.e. PostgREST/Storage ANSWERED
+  //   connection drop  → code:'' and the stack trace dumped into `details`
+  // So `code`/HTTP status is the signal; `details`/`hint` are NOT (both are populated in
+  // the network case too, which is what made an earlier version misclassify drops).
+  const outcomeOf=e=>{
+    if(!e)return 'unknown';
+    const code=(e.code==null?'':String(e.code)).trim();
+    if(code)return 'failed';
+    if(e.status||e.statusCode)return 'failed';
+    return 'unknown';
+  };
   const thumbOf=path=>path.replace(/\.jpg$/,'_thumb.jpg');
 
   /* ===================== Crop (ported from the catalog app's proven touch cropper) =====================
@@ -3659,7 +3677,12 @@
         };
         try{ await attempt(); return true; }
         catch(e){
-          this.showPartial(savedLabel+', but the history event could not be recorded.',{retry:attempt});
+          // A dropped connection is NOT the same as a rejection: the event may already be
+          // recorded, so say "could not be confirmed" rather than asserting it failed.
+          const tail=outcomeOf(e)==='unknown'
+            ? 'the history event could not be confirmed (it may or may not have been recorded)'
+            : 'the history event could not be recorded';
+          this.showPartial(savedLabel+', but '+tail+'.',{retry:attempt});
           return false;
         }
       },
@@ -3670,7 +3693,9 @@
          after the plant exists, a failure is a partial success, not a save failure. */
       async runSecondary(savedLabel){
         const r=this._resume; if(!r)return true;
+        // each entry: {what:'a photo', how:'failed'|'unknown'|'skipped'}
         const unfinished=[]; let stray=false;
+        const note=(what,how)=>unfinished.push({what,how});
         // 1) photos: upload both objects, then the row. A failure at either point must
         //    leave NO object without an accepted row (Gate A.3 / A.4).
         for(const ph of r.photos){
@@ -3686,7 +3711,7 @@
             ph.rowed=true;
           }catch(e){
             if(e&&e.strayFile)stray=true;      // thumbnail-stage cleanup couldn't confirm
-            unfinished.push('a photo'); break; // stop photo work; keep blobs for Retry
+            note('a photo',outcomeOf(e)); break; // stop photo work; keep blobs for Retry
           }
         }
         // 2) cover — only meaningful once its photo row exists
@@ -3695,31 +3720,38 @@
           if(!r.coverId){ r.coverDone=true; }
           else if(cov&&cov.rowed){
             const {error}=await sb.from('plant').update({cover_photo_id:r.coverId}).eq('id',r.plantId);
-            if(error)unfinished.push('the cover photo'); else r.coverDone=true;
+            if(error)note('the cover photo',outcomeOf(error)); else r.coverDone=true;
           }
+          else note('the cover photo','skipped');   // its photo never landed
         }
         // 3) the dated history event (stable id → retry can't duplicate it)
         if(!r.event.done){
           try{ await this.logEvent(r.plantId,r.event.type,{...r.event.opt,eventId:r.event.id}); r.event.done=true; }
-          catch(e){ unfinished.push('the history event'); }
+          catch(e){ note('the history event',outcomeOf(e)); }
         }
         // 4) categories
         if(!r.cats.done){
           if(!r.cats.ids.length)r.cats.done=true;
           else{
             try{ await this.syncCategories(r.plantId,r.cats.ids); r.cats.done=true; }
-            catch(e){ unfinished.push('its categories'); }
+            catch(e){ note('its categories',outcomeOf(e)); }
           }
         }
         if(!unfinished.length){
           this._resume=null; this.partial=null; this._partialRetry=null;
           return true;
         }
-        // Name EVERY unfinished item: saying only "a photo failed" would let the user
-        // assume the event and categories succeeded when they were never attempted.
-        const list=unfinished.length===1?unfinished[0]
-          :unfinished.slice(0,-1).join(', ')+' and '+unfinished[unfinished.length-1];
-        this.showPartial(savedLabel+', but '+list+' could not be saved.',{
+        // Name EVERY unfinished item — saying only "a photo failed" would let the user
+        // assume the rest succeeded — and keep the three outcomes distinct, because
+        // "definitely not saved" and "might be saved" call for different user reactions.
+        const join=a=>a.length===1?a[0]:a.slice(0,-1).join(', ')+' and '+a[a.length-1];
+        const pick=how=>unfinished.filter(u=>u.how===how).map(u=>u.what);
+        const failed=pick('failed'), unknown=pick('unknown'), skipped=pick('skipped');
+        const parts=[];
+        if(failed.length) parts.push(join(failed)+' could not be saved');
+        if(unknown.length)parts.push(join(unknown)+' could not be confirmed (it may or may not have been saved)');
+        if(skipped.length)parts.push(join(skipped)+' was not attempted');
+        this.showPartial(savedLabel+', but '+parts.join('; ')+'.',{
           stray, retry:async()=>{ if(await this.runSecondary(savedLabel))await this.refreshAfterResume(r.plantId); }
         });
         return false;

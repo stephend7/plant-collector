@@ -172,6 +172,108 @@ null — the same `x-show`/inline-`display` trap recorded in `decisions.md` 2026
 Fixed by using the project's existing `x-cloak` convention (CSS line 37) and letting
 `x-show` alone control visibility. Re-verified: all three notices hidden at rest.
 
+---
+
+# Addendum — Codex Gate A rulings (2026-08-02), implemented and re-verified
+
+Codex approved all four interpretations and added requirements. Everything below was
+implemented AFTER the first evidence pass and re-verified; nothing was weakened.
+
+## Ruling 1 — Storage: "no mutation; reads permitted" — CONFIRMED, and re-measured
+
+Evidence now counts Storage **mutations** (`POST`/`PUT` to `/object/photos/…`, `DELETE`)
+separately from **reads**. Every non-GET request during a startup load was logged and
+classified:
+
+```
+nonGetRequestsDuringStartup: [ { method: "POST", path: "/storage/v1/object/sign/photos" } ]
+classification:              [ "signed-URL generation = READ (permitted by ruling 1)" ]
+```
+
+So the one non-GET call during startup is signed-URL generation, not a mutation. Event-only
+failures and retries recorded **0** Storage mutations (Gate A.1, A.5 above).
+
+## Ruling 3 — three-way outcome distinction — IMPLEMENTED (this was NOT in the first pass)
+
+The first implementation flattened every unfinished item into "could not be saved". That is
+wrong for a dropped connection, where the work **may already be saved**. The notice now
+distinguishes three genuinely different situations, verified by three separate injections:
+
+| Situation | Injection | Observed banner |
+|---|---|---|
+| **Known failed** — server answered and rejected | `journal_entry` POST → 500 with `code:"XX000"` | *"Plant saved, but the history event could not be saved."* |
+| **Outcome unknown** — no verdict returned | real insert committed, then `TypeError('Failed to fetch')` | *"Plant saved, but the history event could not be confirmed (it may or may not have been saved)."* |
+| **Not attempted** — depends on a step that failed | thumbnail upload → 500 (cover depends on the photo row) | *"Plant saved, but a photo could not be saved; the cover photo was not attempted."* |
+
+**Classifier derived from measured fact, not assumption.** The real supabase-js error
+shapes were probed first:
+
+```
+network drop   → { message:"TypeError: Failed to fetch", code:"", hint:"", details:<stack trace> }
+server reject  → { message:"injected reject",            code:"XX000", hint:"h", details:"d" }
+```
+
+`code` (or an HTTP status) is therefore the only reliable discriminator. An earlier version
+of the classifier also keyed on `details`/`hint` — which are populated in **both** cases —
+and consequently mislabelled dropped connections as "failed". Found by probing the actual
+error objects rather than trusting the first implementation; fixed and re-verified.
+
+## Ruling 5 — A.8 must be proven, not assumed. All six proofs:
+
+| Required proof | Evidence |
+|---|---|
+| First request reached the server and committed | `eventCommittedOnServer: 1` — queried directly while the client still believed it had failed |
+| App received a simulated failure, not the success | banner shown: *"…could not be confirmed (it may or may not have been saved)"* |
+| Initial and retry requests carry the identical UUID | `uuids: ["61750047-…6a77", "61750047-…6a77"]`, `identicalEventUuid: true` |
+| Retry does not replay the plant mutation | **`plantWriteRequestsDuringRetry: 0`** — request-log count, not an outcome inference |
+| Final database has exactly one event | `finalEventRows: 1` |
+| Reloaded timeline displays exactly one event | `uiTimelineItems: 1` |
+
+A `plantRowsWithDescriptor: 2` reading was investigated rather than accepted: `created_at`
+showed `04:29:57` and `04:32:23` — two separate test runs 2.5 minutes apart, i.e. leftover
+data from the pre-fix run, **not** a retry duplicating a plant. The request-log count of
+`0` plant writes during retry is the actual proof. All such rows were then deleted.
+
+## Ruling 4 — single-flight on an established account
+
+Re-run on the established test account so first-run product seeding cannot obscure counts:
+
+```
+sharedPromise: true      plantSelectRequests: 1      referenceSelectRequests: 5
+productWriteRequests: 0  otherMutations: 1 (= the permitted signed-URL POST above)
+```
+
+## Implementation-commit line numbers (ruling 4)
+
+Cite these, not the pre-implementation `main` line numbers. In `app/index.html`:
+
+| Item | Location |
+|---|---|
+| `removeObjects` compensation helper | after `photoPaths`, just above `uploadPhoto` |
+| `uploadPhoto` thumbnail-failure compensation + `strayFile` flag | inside `uploadPhoto` |
+| `isDupKey` (conflict-as-success) | immediately after `uploadPhoto` |
+| `outcomeOf` (three-way classifier) | immediately after `isDupKey` |
+| Phase A state (`partial`, `loaded`, `_resume`, `_loadFlight`) | top of the Alpine `app` component |
+| `logEvent` client-generated id | in the component, `logEvent` |
+| `showPartial` / `dismissPartial` / `retryPartial` / `secondaryOrWarn` | immediately after `logEvent` |
+| `runSecondary` / `refreshAfterResume` | immediately before `logStatusChange` |
+| Hard boundary + `_resume` construction | `savePlant`, new-plant branch |
+| `loadData` single-flight + `retryLoad` / `dismissLoadError` | in the component, `loadData` |
+| Notice markup (3 blocks) + `.pa-notice` CSS | top of `x-show="view==='app'"`; CSS near `.savedbar` |
+
+## Post-addendum state
+
+Baseline restored exactly: **16 plants, 26 journal entries**, `0` `GATE-*` rows, `0` `R3-*`
+rows, `0` test Storage objects, `0` notices visible.
+
+## Known wording difference (disclosed, not hidden)
+
+For the **new-plant** row of the A1 matrix the spec's example text is *"…the history event
+could not be recorded"*; `runSecondary`'s grouped sentence renders *"…could not be saved"*
+(the other three matrix rows, which go through `secondaryOrWarn`, do say "recorded").
+Same intent, and ruling 3 governs the required semantics rather than exact wording — flagged
+here so the reviewer sees it rather than discovering it.
+
 ## Deviations from the spec, and open questions for the reviewer
 
 1. **A.1.5 vs A.6.7 (raised before implementation, unresolved).** A.1.5 says "Any Storage
