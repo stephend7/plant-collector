@@ -1,5 +1,17 @@
 # Gate A evidence — Phase A (A1, A2, A4)
 
+> **HISTORICAL-RESULTS NOTICE (added Round 6, 2026-08-02).** Rounds 1–3 below (and the
+> "Deviations" section at the end) describe and test a **write-Retry** feature — a
+> resumable pipeline with a Retry button on every partial-success notice. That feature
+> was **built, reviewed across rounds 1–4, found fragile (8 findings, none in the
+> underlying safety fixes), and removed** by Stephen's decision (`decisions.md`,
+> 2026-08-02). Their PASS results are accurate **for the code as it existed when each
+> round ran** and are kept as the historical record — they do not describe current
+> behavior. **Current contract, verified in Round 4 onward:** partial-success notices
+> are append-only and Dismiss-only; the load-error notice is the sole exception and
+> keeps Retry. Read "Round 4" for the removal and "Round 5"/"Round 6" for the current,
+> operative evidence.
+
 **Implementation:** branch `phase-a-safety-fixes`, worktree
 `/Users/stephendavis/Documents/2- Plant Collector DB/.claude/worktrees/busy-greider-dc4153`
 **Spec:** `tests/specs/phase-a.md` (Codex, committed verbatim at `64a528e`)
@@ -651,6 +663,69 @@ reverted precisely (event deleted, quantity restored to its original value).
 **Post-round-5 state:** baseline exact — **16 plants, 26 journal entries, 22 photo rows,
 44 Storage objects**, 0 notices, `loaded: true`.
 
+---
+
+# Round 6 — Codex round-5 finding, fixed and re-verified (2026-08-02)
+
+Codex's round-5 review found **0 P0s**, confirmed all three round-5 fixes, and returned
+**one P1**: the collection-wide Journal tab couldn't recover after one failed history
+load. **Confirmed real, exactly as reproduced. No rebuttal.**
+
+## P1 — Journal couldn't recover after one failed load
+
+**Root cause.** `openJournalEntry`'s guard (`!this.detailPlant || this.detailPlant.id
+!== plantId`) conflated two different things: *"already viewing this plant"* and
+*"already viewing this plant AND its last load succeeded."* Once the first (failing) tap
+set `this.detailPlant = B`, every subsequent tap on a Plant B entry saw the id already
+match and skipped loading forever — even after the connection recovered. The tap looked
+like a permanently dead button.
+
+**Fix:** the guard now also re-loads when `this.detailEventsFailed` is true — the exact
+flag that already exists to distinguish "no history" from "couldn't read the history."
+A same-plant retry-after-failure does **not** clear `detailEvents`/`detailPhotos` first
+(only a genuine plant-switch does, per Round 5); there is nothing to protect against
+since the prior attempt never populated them.
+
+**Reproduced exactly as specified, with request counts (the harness itself had a bug on
+the first attempt — a fetch wrapper meant to "restore the connection" fully replaced the
+counting wrapper, so the second tap's reads were invisible; corrected by keeping one
+wrapper active throughout and toggling only whether it injects a failure):**
+
+```
+Plant A cached (1 event) → tap a Plant B event, injected failure:
+  reads: 1   sheetOpen: false   detailEventsFailed: true
+  warning: "Couldn't open this entry — its plant's history could not be loaded."
+
+Dismiss, connection restored, tap the SAME Plant B event again:
+  reads: 1   ← a FRESH read, not a no-op          sheetOpen: true
+  detailEventsFailed: false   matchesRequestedEvent: true
+
+Tap a DIFFERENT, already-successfully-cached entry on Plant B:
+  reads: 0   ← correctly uses the cache, no unnecessary re-fetch   sheetOpen: true
+```
+
+**`openDetail` re-checked too** (same guard pattern, same fix applies): switching from
+Plant A to a failing Plant B still shows zero of Plant A's events
+(`showsOldPlantAEvents: false`), and calling `openDetail(B)` again after the connection
+recovers clears `detailEventsFailed` and loads normally.
+
+## Non-blocking cleanup, done
+
+- This evidence file now opens with a historical-results notice (see the top of this
+  file) marking rounds 1–3's write-Retry testing as accurate-for-its-time, not current.
+- The "Deviations" section's structural-choice item is corrected to state plainly that
+  the Retry half is gone; the per-step pipeline itself remains.
+- Three more stale code comments (`app/index.html`, the `isDupKey` doc comment and two
+  others) rewritten to describe the still-real idempotency guarantee without implying a
+  live Retry feature.
+
+## Post-round-6 state
+
+No data-mutating paths were touched this round (`openDetail`/`openJournalEntry` are
+read-only), so no test cleanup was required. Baseline unchanged and confirmed exact:
+**16 plants, 26 journal entries, 22 photo rows, 44 Storage objects**, 0 notices,
+`loaded: true`.
+
 ## Deviations from the spec, and open questions for the reviewer
 
 1. **A.1.5 vs A.6.7 (raised before implementation, unresolved).** A.1.5 says "Any Storage
@@ -663,11 +738,13 @@ reverted precisely (event deleted, quantity restored to its original value).
    names every unfinished item, e.g. *"…but a photo and the history event could not be
    saved."* In the recorded A.3/A.4 runs only the photo was unfinished (the event
    succeeded), so the observed text names one item.
-3. **Structural choice** (spec explicitly delegates structure): the post-plant tail of
-   `savePlant` is now a resumable pipeline (`_resume` + `runSecondary`) with per-step
-   done-flags. Photo **blobs are retained in `_resume`**, so Retry never asks the user to
-   re-pick an image. `clearPendingPhotos()` only revokes preview URLs, which does not
-   affect the retained Blobs.
+3. **Structural choice, PARTIALLY SUPERSEDED (Round 6).** As originally written: the
+   post-plant tail of `savePlant` was a *resumable* pipeline (`_resume` + `runSecondary`)
+   with per-step done-flags, retaining photo blobs so a Retry never asked the user to
+   re-pick an image. **The Retry half is gone** (Round 4). What remains and is still
+   accurate: `runSecondary` still runs as a per-step pipeline with done-flags — it just
+   reports the outcome once and stops, with no retry callback attached. Photo blobs are
+   still held for the duration of that single call (not persisted for a later retry).
 4. **Two extra fixes of the same bug class, found while implementing** — not in the spec,
    both post-boundary misreports: deleting a plant then failing to refresh reported
    *"Could not delete this plant"* for an already-deleted plant; and `refreshDetail()`
