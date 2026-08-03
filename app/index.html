@@ -110,6 +110,18 @@
   .dupnote{margin-top:10px;padding:9px 12px;border-radius:10px;background:rgba(201,154,60,.14);border:1px solid #C99A3C;color:#7d5c14;font-size:13px;cursor:pointer}
   .savedbar{margin-top:12px;padding:9px 12px;border-radius:10px;background:rgba(201,154,60,.14);border:1px solid #C99A3C;color:#7d5c14;font-size:14px;font-weight:600}
   .savedbar a{color:#7d5c14;text-decoration:underline;cursor:pointer;margin-left:6px;font-weight:400}
+  /* Phase A partial-success / load-error notice — same amber family as .savedbar (green
+     is invisible against the sage theme, house rule), but persistent and with buttons. */
+  .pa-notice{margin:8px 12px 0;padding:10px 12px;border-radius:10px;background:rgba(201,154,60,.14);
+    border:1px solid #C99A3C;color:#7d5c14;font-size:14px;display:flex;flex-wrap:wrap;gap:8px;
+    align-items:center;justify-content:space-between}
+  .pa-notice .pa-row{font-weight:600;flex:1 1 auto;min-width:0}
+  .pa-notice .pa-actions{display:flex;gap:8px;flex:0 0 auto}
+  .pa-btn{font:inherit;font-weight:600;color:#7d5c14;background:rgba(201,154,60,.18);
+    border:1px solid #C99A3C;border-radius:8px;padding:5px 12px;cursor:pointer;min-height:32px}
+  .pa-btn:disabled{opacity:.6;cursor:default}
+  .pa-btn.pa-link{background:transparent;border-color:transparent;text-decoration:underline;font-weight:400}
+  .pa-slim{font-size:13px}
   .dupnote u{text-decoration:underline}
   .duplist{margin-top:8px;border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden}
   .duprow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}
@@ -423,6 +435,37 @@
 
   <!-- ===== APP ===== -->
   <div x-show="view==='app'" class="app">
+   <!-- Phase A: truthful, persistent notices. Amber (house rule), never auto-hide, always
+        offer an action. Rendered ABOVE the scroll area so they survive screen changes and
+        can't flash on an intermediate screen mid-navigation (spec: banner contract). -->
+   <!-- x-cloak (project convention, CSS line 37) hides these until Alpine boots. Do NOT add
+        an inline display style or a :style binding here: x-transition rewrites the style
+        attribute and wipes it, leaving an empty banner on screen — the same x-show/inline
+        display trap recorded in decisions.md 2026-07-21. x-show alone is correct. -->
+   <div class="pa-notice" x-show="partial" x-transition x-cloak>
+     <div class="pa-row">
+       <span x-text="partial ? partial.text : ''"></span>
+       <span x-show="partial && partial.stray" x-text="' A stray photo file may remain in storage.'"></span>
+     </div>
+     <div class="pa-actions">
+       <button type="button" class="pa-btn" @click="retryPartial()" :disabled="partial && partial.busy"
+               x-text="(partial && partial.busy) ? 'Retrying…' : 'Retry'"></button>
+       <button type="button" class="pa-btn pa-link" @click="dismissPartial()">Dismiss</button>
+     </div>
+   </div>
+   <div class="pa-notice" x-show="loadError && !loadErrorDismissed" x-transition x-cloak>
+     <div class="pa-row"><span x-text="'Couldn\'t load your collection. '+loadError"></span></div>
+     <div class="pa-actions">
+       <button type="button" class="pa-btn" @click="retryLoad()" :disabled="loadBusy"
+               x-text="loadBusy ? 'Retrying…' : 'Retry'"></button>
+       <button type="button" class="pa-btn pa-link" @click="dismissLoadError()">Dismiss</button>
+     </div>
+   </div>
+   <!-- Dismissed but still not loaded: keep a visible way back (spec A.6.4) -->
+   <div class="pa-notice pa-slim" x-show="loadError && loadErrorDismissed" x-transition x-cloak>
+     <div class="pa-row"><span>Collection not loaded.</span></div>
+     <div class="pa-actions"><button type="button" class="pa-btn" @click="retryLoad()" :disabled="loadBusy">Retry</button></div>
+   </div>
    <div class="appscroll">
 
     <!-- entry / edit form -->
@@ -1419,7 +1462,8 @@
           <input type="search" placeholder="Search plants" x-model="searchQ">
         </div>
 
-        <div x-show="plants.length===0" class="emptybox">
+        <!-- Phase A/A4: only claim "empty" when a load actually SUCCEEDED. -->
+        <div x-show="loaded && plants.length===0" class="emptybox">
           <p style="margin:0 0 6px;font-size:16px;color:var(--ink)">Your collection is empty.</p>
           <p style="margin:0">Tap <strong>＋</strong> to add your first plant.</p>
         </div>
@@ -1539,7 +1583,7 @@
           <span class="fsel"><select x-model="listGenusName"><option value="">Genus: All</option><template x-for="gn in genusNames()" :key="gn"><option :value="gn" x-text="gn"></option></template></select></span>
           <span class="hint" x-show="listCatIds.length>1" style="align-self:center">matching all <span x-text="listCatIds.length"></span> categories</span>
         </div>
-        <div x-show="plants.length===0" class="hint" style="margin-top:16px">No plants yet.</div>
+        <div x-show="loaded && plants.length===0" class="hint" style="margin-top:16px">No plants yet.</div>
         <template x-for="grp in listGroups()" :key="grp.genus">
           <div style="margin-top:14px">
             <p class="lgrouphead"><span x-text="grp.genus"></span><span style="color:var(--muted);font-size:12px;font-style:normal;font-family:-apple-system,sans-serif" x-text="' · '+grp.plants.length"></span></p>
@@ -2296,14 +2340,33 @@
     return{full,thumb};
   }
   // upload one processed photo, returning its storage path
+  const photoPaths=(userId,photoId)=>[userId+'/'+photoId+'.jpg', userId+'/'+photoId+'_thumb.jpg'];
+  // Phase A compensation helper. Returns {ok} — never throws, because cleanup failing must
+  // not mask the real error that triggered it. `ok:false` means a file MAY still be there,
+  // which the user is told about (spec: "A stray photo file may remain in storage").
+  async function removeObjects(paths){
+    try{ const {error}=await sb.storage.from('photos').remove(paths); return {ok:!error}; }
+    catch(e){ return {ok:false}; }
+  }
   async function uploadPhoto(userId,photoId,full,thumb){
-    const fullPath=userId+'/'+photoId+'.jpg', thumbPath=userId+'/'+photoId+'_thumb.jpg';
+    const [fullPath,thumbPath]=photoPaths(userId,photoId);
     const u1=await sb.storage.from('photos').upload(fullPath,full,{contentType:'image/jpeg',upsert:true});
     if(u1.error)throw u1.error;
     const u2=await sb.storage.from('photos').upload(thumbPath,thumb,{contentType:'image/jpeg',upsert:true});
-    if(u2.error)throw u2.error;
+    if(u2.error){
+      // Phase A / Gate A.3: the full image is up but there will never be a photo row for
+      // it — remove it rather than leave an orphan. If the removal itself fails we flag
+      // `strayFile` so the caller can TELL the user instead of hiding it in the console.
+      const rm=await removeObjects([fullPath]);
+      const err=u2.error; try{ err.strayFile=!rm.ok; }catch(_){}
+      throw err;
+    }
     return fullPath;
   }
+  // A retry re-uses the SAME row id, so a first attempt that committed but lost its
+  // response collides on the primary key. That collision means the row IS there — which
+  // is success, not failure (Gate A.8: converge to exactly one event).
+  const isDupKey=e=>!!e&&(e.code==='23505'||/duplicate key|already exists/i.test((e&&e.message)||''));
   const thumbOf=path=>path.replace(/\.jpg$/,'_thumb.jpg');
 
   /* ===================== Crop (ported from the catalog app's proven touch cropper) =====================
@@ -2826,6 +2889,13 @@
     Alpine.data('app', () => ({
       view:'loading', mode:'signin', email:'', password:'', message:'', ok:false, busy:false, userEmail:'', userId:'',
       genera:[], speciesAll:[], vendors:[], locations:[], categories:[], plants:[], products:[], pests:[],
+      /* ---- Phase A (docs/stabilization-plan.md + tests/specs/phase-a.md) ----
+         partial: a truthful "the main thing saved, this bit didn't" notice. Amber, never
+         auto-hides, always offers Retry + Dismiss. NEVER used for a real primary failure.
+         loaded: proves a collection load actually SUCCEEDED — without it, a failed load
+         is indistinguishable from a genuinely empty collection (the whole point of A4). */
+      partial:null, _partialRetry:null, _resume:null,
+      loadError:'', loaded:false, loadBusy:false, _loadFlight:null,
       addingProduct:false, newProductName:'', addingPest:false, newPestName:'',
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'', lastAcquisitionType: localStorage.getItem('lastAcquisitionType')||'',
       screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], scannedTagPhoto:null, keepTagPhoto:true, detectedNote:'', savedNote:'', dupOpen:false, dupAskId:null, dupBusyId:null,
@@ -2921,19 +2991,42 @@
       async signOut(){await sb.auth.signOut();location.reload();},
 
       /* ---- data ---- */
-      async loadData(){
-        const [g,s,v,l,cat] = await Promise.all([
-          sb.from('genus').select('id,name').order('name'),
-          sb.from('species').select('id,name,genus_id').order('name'),
-          sb.from('vendor').select('id,name').order('name'),
-          sb.from('growing_location').select('id,name').order('name'),
-          sb.from('category').select('id,name').order('name'),
-        ]);
-        this.genera=g.data||[]; this.speciesAll=s.data||[]; this.vendors=v.data||[]; this.locations=l.data||[]; this.categories=cat.data||[];
-        await this.loadProducts();
-        this.loadPests();
-        await this.loadPlants();
+      /* Phase A / A4: ONE logical collection load. init() calls this from BOTH the
+         auth-state callback and getSession(), so without the guard every cold start ran
+         the whole pipeline twice. Callers that arrive mid-flight share the same promise.
+         A failure now sets a VISIBLE error instead of silently leaving empty arrays —
+         "your collection is empty" and "we couldn't load it" are different truths. */
+      loadData(){
+        if(this._loadFlight)return this._loadFlight;
+        this.loadBusy=true;
+        this._loadFlight=(async()=>{
+          try{
+            const [g,s,v,l,cat] = await Promise.all([
+              sb.from('genus').select('id,name').order('name'),
+              sb.from('species').select('id,name,genus_id').order('name'),
+              sb.from('vendor').select('id,name').order('name'),
+              sb.from('growing_location').select('id,name').order('name'),
+              sb.from('category').select('id,name').order('name'),
+            ]);
+            // Check EVERY reference query before assigning — the old code coerced a
+            // failed query to [] , which silently emptied a list that had loaded fine.
+            const bad=[g,s,v,l,cat].find(r=>r&&r.error);
+            if(bad)throw bad.error;
+            this.genera=g.data||[]; this.speciesAll=s.data||[]; this.vendors=v.data||[]; this.locations=l.data||[]; this.categories=cat.data||[];
+            await this.loadProducts();
+            this.loadPests();
+            await this.loadPlants();
+            this.loadError=''; this.loadErrorDismissed=false; this.loaded=true;
+          }catch(e){
+            this.loadError=(e&&e.message)||'Could not load your collection.';
+            this.loadErrorDismissed=false;
+          }finally{ this.loadBusy=false; this._loadFlight=null; }
+        })();
+        return this._loadFlight;
       },
+      // Explicit user retry — one new logical load; rapid taps coalesce via _loadFlight.
+      retryLoad(){ if(this._loadFlight)return this._loadFlight; this.loadError=''; return this.loadData(); },
+      dismissLoadError(){ this.loadErrorDismissed=true; },   // collapses the notice; no writes, stays un-loaded
       // single-flight: init() calls loadData() from BOTH onAuthStateChange and getSession,
       // so without this guard the first-run seed inserts the defaults twice.
       loadProducts(){
@@ -2963,7 +3056,10 @@
       },
       async loadPlants(){
         const {data,error}=await sb.from('plant').select(PLANT_SELECT);
-        if(error){console.error(error);return;}
+        // Phase A / A4: was console.error + silent return, which rendered as an empty
+        // collection. Throw so loadData() can show the truth; already-loaded plants are
+        // left untouched rather than being replaced by an asserted-empty list.
+        if(error)throw error;
         this.plants=data||[];
         const withCover=this.plants.filter(p=>p.cover&&p.cover.storage_path);
         if(withCover.length){
@@ -3328,13 +3424,18 @@
             const origCats=(this.detailPlant&&this.detailPlant.plant_category||[]).map(pc=>pc.category_id);
             const {error}=await sb.from('plant').update(this.formRow()).eq('id',id);
             if(error)throw error;
+            // ---- hard boundary: the edit IS saved. Nothing below may claim otherwise. ----
             // only touch categories / log a status event when they actually changed (fewer round-trips)
-            const work=[];
-            if(!sameSet(origCats,this.form.categoryIds))work.push(this.syncCategories(id,this.form.categoryIds));
-            if(oldStatus && newStatus!==oldStatus){
-              work.push(this.logStatusChange(id,oldStatus,newStatus,this.form.cause).catch(()=>{}));
+            const catsChanged=!sameSet(origCats,this.form.categoryIds);
+            if(catsChanged){
+              try{ await this.syncCategories(id,this.form.categoryIds); }
+              catch(e){ this.showPartial('Changes saved, but its categories could not be updated.',{
+                retry:async()=>{ await this.syncCategories(id,this.form.categoryIds); this.partial=null; this._partialRetry=null; await this.refreshAfterResume(id); } }); }
             }
-            if(work.length)await Promise.all(work);
+            if(oldStatus && newStatus!==oldStatus){
+              const eid=uid();
+              await this.secondaryOrWarn(()=>this.logStatusChange(id,oldStatus,newStatus,this.form.cause,eid),'Changes saved',id);
+            }
             this.rememberPicks();
             this.editId=null;
             const fresh=await this.reloadPlant(id);
@@ -3344,22 +3445,25 @@
             const {data:planted,error}=await sb.from('plant').insert(this.formRow()).select('id').single();
             if(error)throw error;
             const plantId=planted.id;
+            /* ================= HARD BOUNDARY (Phase A) =================
+               The plant row now EXISTS. From here on, nothing may tell the user the
+               plant failed to save — later failures are partial successes, handled by
+               runSecondary() and reported in the amber notice with a working Retry. */
             // Photos to save = manually-added, then (optionally) the scanned tag photo last.
             const photos=[...this.pendingPhotos];
             if(this.keepTagPhoto && this.scannedTagPhoto) photos.push({...this.scannedTagPhoto,label:'tag'});
-            for(let i=0;i<photos.length;i++){
-              const ph=photos[i];
-              const path=await uploadPhoto(this.userId,ph.id,ph.full,ph.thumb);
-              const {error:perr}=await sb.from('photo').insert({id:ph.id,plant_id:plantId,storage_path:path,label:ph.label,sort_order:i});
-              if(perr)throw perr;
-            }
             // Cover = the first clean (non-tag) photo; a tag photo is for reading, not display,
             // so it's only the cover if it's the only photo.
             const cover=photos.find(p=>p.label!=='tag')||photos[0];
-            if(cover){const {error:cerr}=await sb.from('plant').update({cover_photo_id:cover.id}).eq('id',plantId);if(cerr)throw cerr;}
-            const after=[ this.logEvent(plantId,'acquired',{date:this.form.acquisitionDate||todayLocal()}).catch(()=>{}) ];
-            if(this.form.categoryIds.length)after.push(this.syncCategories(plantId,this.form.categoryIds));
-            await Promise.all(after);
+            // The blobs live on in _resume, so Retry never asks the user to re-pick the image.
+            this._resume={
+              plantId,
+              photos:photos.map((ph,i)=>({id:ph.id,label:ph.label,sort:i,full:ph.full,thumb:ph.thumb,rowed:false})),
+              coverId:cover?cover.id:null, coverDone:false,
+              event:{id:uid(),type:'acquired',opt:{date:this.form.acquisitionDate||todayLocal()},done:false},
+              cats:{ids:[...this.form.categoryIds],done:false}
+            };
+            await this.runSecondary('Plant saved');
             this.rememberPicks();
             this.clearPendingPhotos();
             const fresh=await this.reloadPlant(plantId);
@@ -3424,7 +3528,11 @@
           const newQty=(p.quantity||1)+add;
           const {error}=await sb.from('plant').update({quantity:newQty}).eq('id',p.id);
           if(error)throw error;
-          await this.logEvent(p.id,'note',{body:'Count +'+add+' (now ×'+newQty+') — matched an existing plant during entry'}).catch(()=>{});
+          // ---- hard boundary: the count IS updated. Later failures are partial. ----
+          const noteId=uid();
+          await this.secondaryOrWarn(
+            ()=>this.logEvent(p.id,'note',{eventId:noteId,body:'Count +'+add+' (now ×'+newQty+') — matched an existing plant during entry'}),
+            'Count updated', p.id);
           // Photos only on request; the scanned tag photo is deliberately NOT offered —
           // a tag shot exists to read a label, and this plant already has its record.
           if(withPhotos&&this.pendingPhotos.length){
@@ -3491,7 +3599,10 @@
       eventPhotos(ev){ return this.detailPhotos.filter(p=>p.journal_entry_id===ev.id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||((a.photo_date||'')<(b.photo_date||'')?-1:1)); },
       eventPhotoUrl(ev){ const ps=this.eventPhotos(ev); if(ps.length)return ps[0].thumbUrl||null; if(ev.photo_id){const p=this.detailPhotos.find(x=>x.id===ev.photo_id);return p?p.thumbUrl:null;} return null; },
       async refreshDetail(){
-        await this.loadPlants();
+        // Phase A: loadPlants() now throws on failure. A refresh failing here must not
+        // abort the caller's already-successful write — surface it and keep going.
+        try{ await this.loadPlants(); }
+        catch(e){ this.loadError='Saved, but the collection list could not be refreshed.'; this.loadErrorDismissed=false; return; }
         const fresh=this.plants.find(x=>x.id===this.detailPlant.id);
         if(fresh){this.detailPlant=fresh;await this.loadDetailPhotos(fresh.id);await this.loadDetailEvents(fresh.id);}
       },
@@ -3507,23 +3618,127 @@
         items.sort((a,b)=>(a.sort<b.sort?1:a.sort>b.sort?-1:0));
         return items;
       },
+      // Phase A: the id is generated by the CLIENT and reused on every retry, so one
+      // logical event can never become two — see isDupKey above (Gate A.8).
       async logEvent(plantId,type,opt){
         opt=opt||{};
-        const row={plant_id:plantId,event_type:type,entry_date:opt.date||todayLocal()};
+        const row={id:opt.eventId||uid(),plant_id:plantId,event_type:type,entry_date:opt.date||todayLocal()};
         if(opt.body)row.body=opt.body;
         if(opt.label)row.measure_label=opt.label;
         if(opt.value!==undefined&&opt.value!==''&&opt.value!==null)row.measure_value=Number(opt.value);
         if(opt.unit)row.measure_unit=opt.unit;
         if(opt.cause)row.cause=opt.cause;
         const {error}=await sb.from('journal_entry').insert(row);
-        if(error)throw error;
+        if(error&&!isDupKey(error))throw error;
+        return row.id;
+      },
+      /* ---- Phase A partial-success notice (tests/specs/phase-a.md) ----
+         Shown ONLY after the primary save succeeded. Amber, no auto-hide, Retry+Dismiss. */
+      showPartial(text,opts){
+        opts=opts||{};
+        this.partial={text,stray:!!opts.stray,busy:false};
+        this._partialRetry=opts.retry||null;
+      },
+      // Dismiss performs NO writes of any kind — it only stops showing the notice.
+      dismissPartial(){ this.partial=null; this._partialRetry=null; this._resume=null; },
+      async retryPartial(){
+        if(!this.partial||this.partial.busy||!this._partialRetry)return;
+        this.partial.busy=true;
+        const fn=this._partialRetry;
+        try{ await fn(); }
+        catch(e){ /* the notice stays; runSecondary/attempt rewrites it truthfully */ }
+        finally{ if(this.partial)this.partial.busy=false; }
+      },
+      // One secondary history write. If it fails the PRIMARY change is still saved, so we
+      // say exactly that and offer a retry bound to the same event identity.
+      async secondaryOrWarn(fn,savedLabel,plantId){
+        const attempt=async()=>{
+          await fn();
+          this.partial=null; this._partialRetry=null;
+          if(plantId&&this.detailPlant&&this.detailPlant.id===plantId)await this.loadDetailEvents(plantId);
+        };
+        try{ await attempt(); return true; }
+        catch(e){
+          this.showPartial(savedLabel+', but the history event could not be recorded.',{retry:attempt});
+          return false;
+        }
+      },
+      /* ---- Phase A: resumable secondary work after a plant row exists ----
+         Everything below the "hard boundary" in savePlant runs through here. Each step
+         records its own done-flag, so Retry redoes ONLY what failed — it never re-inserts
+         the plant, re-uploads a finished photo, or duplicates an event. Never throws:
+         after the plant exists, a failure is a partial success, not a save failure. */
+      async runSecondary(savedLabel){
+        const r=this._resume; if(!r)return true;
+        const unfinished=[]; let stray=false;
+        // 1) photos: upload both objects, then the row. A failure at either point must
+        //    leave NO object without an accepted row (Gate A.3 / A.4).
+        for(const ph of r.photos){
+          if(ph.rowed)continue;
+          try{
+            await uploadPhoto(this.userId,ph.id,ph.full,ph.thumb);
+            const {error}=await sb.from('photo').insert({id:ph.id,plant_id:r.plantId,storage_path:photoPaths(this.userId,ph.id)[0],label:ph.label,sort_order:ph.sort});
+            if(error){
+              const rm=await removeObjects(photoPaths(this.userId,ph.id));  // both objects
+              if(!rm.ok)stray=true;
+              throw error;
+            }
+            ph.rowed=true;
+          }catch(e){
+            if(e&&e.strayFile)stray=true;      // thumbnail-stage cleanup couldn't confirm
+            unfinished.push('a photo'); break; // stop photo work; keep blobs for Retry
+          }
+        }
+        // 2) cover — only meaningful once its photo row exists
+        if(!r.coverDone){
+          const cov=r.coverId?r.photos.find(p=>p.id===r.coverId):null;
+          if(!r.coverId){ r.coverDone=true; }
+          else if(cov&&cov.rowed){
+            const {error}=await sb.from('plant').update({cover_photo_id:r.coverId}).eq('id',r.plantId);
+            if(error)unfinished.push('the cover photo'); else r.coverDone=true;
+          }
+        }
+        // 3) the dated history event (stable id → retry can't duplicate it)
+        if(!r.event.done){
+          try{ await this.logEvent(r.plantId,r.event.type,{...r.event.opt,eventId:r.event.id}); r.event.done=true; }
+          catch(e){ unfinished.push('the history event'); }
+        }
+        // 4) categories
+        if(!r.cats.done){
+          if(!r.cats.ids.length)r.cats.done=true;
+          else{
+            try{ await this.syncCategories(r.plantId,r.cats.ids); r.cats.done=true; }
+            catch(e){ unfinished.push('its categories'); }
+          }
+        }
+        if(!unfinished.length){
+          this._resume=null; this.partial=null; this._partialRetry=null;
+          return true;
+        }
+        // Name EVERY unfinished item: saying only "a photo failed" would let the user
+        // assume the event and categories succeeded when they were never attempted.
+        const list=unfinished.length===1?unfinished[0]
+          :unfinished.slice(0,-1).join(', ')+' and '+unfinished[unfinished.length-1];
+        this.showPartial(savedLabel+', but '+list+' could not be saved.',{
+          stray, retry:async()=>{ if(await this.runSecondary(savedLabel))await this.refreshAfterResume(r.plantId); }
+        });
+        return false;
+      },
+      // After a successful retry, show the now-complete result if we're on that plant.
+      async refreshAfterResume(plantId){
+        const fresh=await this.reloadPlant(plantId);
+        if(fresh&&this.detailPlant&&this.detailPlant.id===plantId){
+          this.detailPlant=fresh;
+          await Promise.all([this.loadDetailPhotos(plantId),this.loadDetailEvents(plantId)]);
+        }
       },
       // Single source of truth for "status changed" → dated journal event (used by the
       // full Edit form AND the tap-to-edit Status tile, so they can never drift apart).
-      async logStatusChange(id,oldStatus,newStatus,cause){
+      async logStatusChange(id,oldStatus,newStatus,cause,eventId){
         if(!newStatus||newStatus===oldStatus)return;
         const t={dead:'died',sold:'sold',traded:'traded',given_away:'given_away',in_collection:'note'}[newStatus]||'note';
         await this.logEvent(id,t,{
+          eventId,   // Phase A: caller-owned identity so a retry can't duplicate the event
           date:todayLocal(),
           body:newStatus==='in_collection'?'Returned to collection':null,
           cause:newStatus==='dead'?((cause||'').trim()||null):null
@@ -3556,8 +3771,10 @@
         this.detailBusy=true; this.detailError='';
         try{
           const {error}=await sb.from('plant').update({lifecycle_status:newStatus}).eq('id',id); if(error)throw error;
-          await this.logStatusChange(id,oldStatus,newStatus,this.tileCause).catch(()=>{});
+          // ---- hard boundary: the status IS saved. A missing event is partial, not failure. ----
           this.detailPlant.lifecycle_status=newStatus;
+          const eid=uid();
+          await this.secondaryOrWarn(()=>this.logStatusChange(id,oldStatus,newStatus,this.tileCause,eid),'Status saved',id);
           await this.loadDetailEvents(id); // surface the new status event in the timeline
           this.cancelTileEdit();
         }catch(e){ this.detailError=e.message||'Could not update status.'; }
@@ -3759,7 +3976,10 @@
           const {error}=await sb.from('plant').delete().eq('id',this.detailPlant.id);
           if(error)throw error;
           this.confirmingDelete=false;
-          await this.loadPlants();
+          // ---- hard boundary: the plant IS deleted. A failed list refresh below must
+          // not report "could not delete" for a plant that is already gone (Phase A). ----
+          try{ await this.loadPlants(); }
+          catch(_){ this.loadError='The plant was deleted, but the collection list could not be refreshed.'; this.loadErrorDismissed=false; }
           this.closeDetail();
         }catch(e){this.detailError=e.message||'Could not delete this plant.';}
         finally{this.detailBusy=false;}
@@ -4368,8 +4588,8 @@
         try{
           if(!GSheet.ready()) await GSheet.ensureScripts();
           await GSheet.getToken();                 // Google popup — must happen inside this tap
-          // Fresh truth before writing anything — fetched with a CHECKED error, never via
-          // loadPlants() (which swallows failures): a failed refresh must abort the run,
+          // Fresh truth before writing anything — fetched with a CHECKED error, kept
+          // independent of loadPlants(): a failed refresh must abort the run,
           // not silently overwrite a good backup with stale or empty data (Security
           // review 2026-07-07, MEDIUM).
           const {data:freshPlants,error:pErr}=await sb.from('plant').select(PLANT_SELECT);
