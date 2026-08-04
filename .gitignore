@@ -11,3 +11,9 @@ docs/ModelPairedDev.pdf
 
 # Local-only folder for secrets/screenshots Claude may read but never publish
 Claude to ignore/
+
+# Dev-side test tooling (Phase B) — never part of the deployed app
+node_modules/
+.env
+test-results/
+playwright-report/

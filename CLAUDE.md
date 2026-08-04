@@ -46,3 +46,12 @@ Switch models in the model picker after the architecture plan is agreed and befo
   Chrome is Blink, so WebKit-specific bugs still need Stephen's iPhone).
 - **Stephen is non-technical** — explain plainly, surface trade-offs with a recommendation, don't
   bury him in jargon.
+- **Worktree coordination.** Claude Code works in hidden worktrees under `.claude/worktrees/`;
+  Codex reads the **main checkout** by default. Every handoff to another agent must name the
+  exact path being reviewed, or that agent reviews stale code. Never edit a branch concurrently
+  with another agent.
+- **Dev tooling stays dev-only (Phase B, 2026-08-03 → ).** `package.json`, `tests/`, and
+  `node_modules/` are for the developer side — unit tests (`npm test`, zero dependencies via
+  Node's built-in `node:test`) and, from Phase D on, Playwright e2e (`npm run e2e`). The deployed
+  app has no build step: `app/index.html` + plain scripts, served as-is from GitHub Pages. Never
+  let the two blur together.

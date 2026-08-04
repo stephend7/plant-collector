@@ -1,0 +1,13 @@
+{
+  "name": "plant-collector-db-tests",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Developer-side test tooling for the Plant Collector DB app. Does not ship — the deployed app is app/index.html served as-is, no build step.",
+  "scripts": {
+    "test": "node --test",
+    "e2e": "playwright test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
