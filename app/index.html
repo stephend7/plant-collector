@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-08-03b">
+<meta name="app-build" content="2026-08-03c">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -899,10 +899,10 @@
               <button type="button" class="padd" @click="$refs.detailInput.click()" :disabled="detailBusy" aria-label="Add photo">＋</button>
             </div>
             <div x-show="detailBusy" class="hint" style="margin-top:6px">Working…</div>
-            <!-- Photo-operation errors only. When the journal editor or the entry sheet is
-                 open they own the message (each has its own slot beside its Save button),
-                 so a journal failure no longer surfaces here under the photo thumbnails. -->
-            <div class="msg err" x-show="detailError && !loggingEvent && !sheetEditing" x-text="detailError"></div>
+            <!-- Photo/plant-field errors only. Journal failures use `journalError` and
+                 render in the journal card or its editor, never here (Stephen, 2026-08-03:
+                 a journal error under the photo thumbnails read as a photo problem). -->
+            <div class="msg err" x-show="detailError" x-text="detailError"></div>
           </div>
         </div>
 
@@ -921,6 +921,10 @@
               </div>
               <button type="button" class="filebtn" @click="startLogEvent()" x-show="!loggingEvent" style="margin-top:0;padding:7px 13px;font-size:13px">＋ Log event</button>
             </div>
+            <!-- Journal errors raised with no journal editor open (e.g. deleting an entry).
+                 When the inline editor OR the entry sheet is editing, that surface owns the
+                 message beside its own Save button — otherwise it renders twice. -->
+            <div class="msg err" x-show="journalError && !loggingEvent && !sheetEditing" x-text="journalError" style="margin:6px 0"></div>
 
             <div class="evform" id="eventEditor" x-show="loggingEvent" x-transition>
               <p class="hint" x-show="editEventId" style="margin:0 0 8px;color:var(--ink);font-weight:600">Edit entry</p>
@@ -1012,7 +1016,7 @@
               <!-- The journal editor had NO error slot: a failed save showed its message
                    up in the PHOTOS card instead, which read as a photo problem and was
                    off-screen while you were looking at Save (Stephen, iPhone, 2026-08-03). -->
-              <div class="msg err" x-show="detailError" x-text="detailError" style="margin:6px 0"></div>
+              <div class="msg err" x-show="journalError" x-text="journalError" style="margin:6px 0"></div>
               <div class="formfoot">
                 <button class="primary" @click="saveEvent()" :disabled="detailBusy" x-text="detailBusy?'Saving…':(editEventId?'Save changes':'Save event')"></button>
                 <button class="ghost" @click="cancelLogEvent()" :disabled="detailBusy">Cancel</button>
@@ -1252,7 +1256,7 @@
                       <div class="thumb"><button type="button" class="rm" @click="removeEventPhoto(ph.id)">✕</button><img :src="ph.url" alt=""></div>
                     </template>
                   </div>
-                  <div class="msg err" x-show="detailError" x-text="detailError" style="margin:6px 0"></div>
+                  <div class="msg err" x-show="journalError" x-text="journalError" style="margin:6px 0"></div>
                   <div class="formfoot">
                     <button class="primary" @click="saveSheetEvent()" :disabled="detailBusy" x-text="detailBusy?'Saving…':'Save'"></button>
                     <button class="ghost" @click="cancelSheetEdit()" :disabled="detailBusy">Cancel</button>
@@ -2951,7 +2955,7 @@
       addingProduct:false, newProductName:'', addingPest:false, newPestName:'',
       lastGenusId: localStorage.getItem('lastGenusId')||'', lastSpeciesId: localStorage.getItem('lastSpeciesId')||'', lastAcquisitionType: localStorage.getItem('lastAcquisitionType')||'',
       screen:'list', editId:null, saving:false, formError:'', photoBusy:false, scanBusy:false, pendingPhotos:[], scannedTagPhoto:null, keepTagPhoto:true, detectedNote:'', savedNote:'', dupOpen:false, dupAskId:null, dupBusyId:null,
-      detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', confirmingDelete:false,
+      detailPlant:null, detailPhotos:[], detailBusy:false, detailError:'', journalError:'', confirmingDelete:false,
       tileEdit:'', tileQty:1, tileStatus:'in_collection', tileCause:'', tileSpot:'', tileAddingSpot:false, tileNewSpot:'',
       detailEvents:[], timelineFilter:'all', loggingEvent:false, editEventId:null, eventDeleteId:null,
       careEditing:false, careForm:{dormancy:'',water:'',feeding:'',light:'',photoperiod:'',humidity:''},
@@ -3996,7 +4000,7 @@
         }catch(e){ this.invError=e.message||'Could not mark that plant seen.'; }
       },
       _blankEvent(){return{type:'note',date:'',note:'',measureLabel:'',measureValue:'',measureUnit:'',productId:'',doseNote:'',pestIds:[],photos:[],existingPhotos:[],removedPhotoIds:[]};},
-      startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.addingProduct=false;this.addingPest=false;this.newEvent=Object.assign(this._blankEvent(),{date:todayLocal()});this.loggingEvent=true;},
+      startLogEvent(){this.eventDeleteId=null;this.editEventId=null;this.journalError='';this.addingProduct=false;this.addingPest=false;this.newEvent=Object.assign(this._blankEvent(),{date:todayLocal()});this.loggingEvent=true;},
       _fillEventForm(ev){
         this.editEventId=ev.id; this.addingProduct=false; this.addingPest=false;
         this.newEvent=Object.assign(this._blankEvent(),{
@@ -4006,13 +4010,13 @@
           existingPhotos:this.eventPhotos(ev).map(p=>({id:p.id,thumbUrl:p.thumbUrl,storage_path:p.storage_path})),
         });
       },
-      startEditEvent(ev){ this.eventDeleteId=null; this.detailError=''; this._fillEventForm(ev); this.loggingEvent=true; },
+      startEditEvent(ev){ this.eventDeleteId=null; this.journalError=''; this._fillEventForm(ev); this.loggingEvent=true; },
       // edit an event inline inside the focused sheet (consistent with photo-entry editing)
-      startSheetEditEvent(){ if(!this.sheet||this.sheet.kind!=='event')return; this.detailError=''; this._fillEventForm(this.sheet.ev); this.sheetEditing=true; },
+      startSheetEditEvent(){ if(!this.sheet||this.sheet.kind!=='event')return; this.journalError=''; this._fillEventForm(this.sheet.ev); this.sheetEditing=true; },
       async saveSheetEvent(){
         const evId=this.editEventId;
         await this.saveEvent();
-        if(this.detailError)return;            // stay in edit if the save failed
+        if(this.journalError)return;           // stay in edit if the save failed
         const ev=this.detailEvents.find(e=>e.id===evId);
         if(ev)this.sheet.ev=ev;
         this.sheetEditing=false;
@@ -4020,7 +4024,7 @@
       // Clear detailError too (cancelSheetEdit already did): otherwise closing the editor
       // leaves a stale journal error behind, which the photos card would then display —
       // the very wrong-section confusion this change exists to fix.
-      cancelLogEvent(){ (this.newEvent.photos||[]).forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}}); this.loggingEvent=false; this.editEventId=null; this.detailError=''; },
+      cancelLogEvent(){ (this.newEvent.photos||[]).forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}}); this.loggingEvent=false; this.editEventId=null; this.journalError=''; },
       async onEventPhoto(ev){
         const files=[...(ev.target.files||[])]; ev.target.value=''; if(!files.length)return;
         this.detailBusy=true; this.detailError='';
@@ -4034,7 +4038,7 @@
       removeExistingEventPhoto(id){ if(!this.newEvent.removedPhotoIds.includes(id))this.newEvent.removedPhotoIds.push(id); },
       keptExistingPhotos(){ return (this.newEvent.existingPhotos||[]).filter(p=>!this.newEvent.removedPhotoIds.includes(p.id)); },
       async saveEvent(){
-        const e=this.newEvent; this.detailBusy=true; this.detailError='';
+        const e=this.newEvent; this.detailBusy=true; this.journalError='';
         try{
           const date=e.date||todayLocal();
           const pid=this.detailPlant.id;
@@ -4075,18 +4079,18 @@
           await this.loadDetailEvents(pid); await this.loadDetailPhotos(pid);
           if(this.tab==='journal'){ this.allPhotosLoaded=false; await this.loadAllEvents(); if(this.journalFilter==='photos')await this.loadAllPhotos(); }
           this.loggingEvent=false; this.editEventId=null; this.newEvent=this._blankEvent();
-        }catch(err){this.detailError=friendlyError(err,'Could not save the entry.');}
+        }catch(err){this.journalError=friendlyError(err,'Could not save the entry.');}
         finally{this.detailBusy=false;}
       },
       async deleteEvent(ev){
         if(this.eventDeleteId!==ev.id){this.eventDeleteId=ev.id;setTimeout(()=>{if(this.eventDeleteId===ev.id)this.eventDeleteId=null;},3000);return;}
-        this.detailBusy=true;this.detailError='';
+        this.detailBusy=true;this.journalError='';
         try{
           const {error}=await sb.from('journal_entry').delete().eq('id',ev.id);if(error)throw error;
           this.eventDeleteId=null;
           await this.loadDetailEvents(this.detailPlant.id);
         }
-        catch(e){this.detailError=friendlyError(e,'Could not delete the event.');}
+        catch(e){this.journalError=friendlyError(e,'Could not delete the event.');}
         finally{this.detailBusy=false;}
       },
       statusLabel(s){return{in_collection:'In collection',dead:'Dead',sold:'Sold',traded:'Traded',given_away:'Given away'}[s]||'In collection';},
@@ -4401,7 +4405,7 @@
         else{ const ph=this.detailPhotos.find(x=>x.id===id); if(ph)this.openEntrySheet('photo',ph); }
       },
       sheetPhoto(){ return this.sheet ? this.sheet.ph : null; },
-      closeSheet(){ this.sheetOpen=false; this.sheetConfirmDelete=false; this.sheetEditing=false; },
+      closeSheet(){ this.sheetOpen=false; this.sheetConfirmDelete=false; this.sheetEditing=false; this.journalError=''; this.detailError=''; },
       startSheetEdit(){
         if(!this.sheet||this.sheet.kind!=='photo')return;
         const ph=this.sheet.ph;
@@ -4409,7 +4413,7 @@
         this.detailError=''; this.sheetEditing=true;
       },
       sheetEditEntry(){ if(!this.sheet)return; if(this.sheet.kind==='event')this.startSheetEditEvent(); else this.startSheetEdit(); },
-      cancelSheetEdit(){ (this.newEvent.photos||[]).forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}}); this.editEventId=null; this.newEvent=this._blankEvent(); this.sheetEditing=false; this.detailError=''; },
+      cancelSheetEdit(){ (this.newEvent.photos||[]).forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}}); this.editEventId=null; this.newEvent=this._blankEvent(); this.sheetEditing=false; this.journalError=''; this.detailError=''; },
       async saveSheetPhoto(){
         if(!this.sheet||this.sheet.kind!=='photo')return;
         const ph=this.sheet.ph; this.detailBusy=true; this.detailError='';
