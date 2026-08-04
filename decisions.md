@@ -4,6 +4,40 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-08-02 — Gate A PASSED (Codex, round 6) — Phase A ready to merge/deploy pending Stephen's approval
+
+**Verdict:** Codex's blocking Gate A review returned **PASS** on branch
+`phase-a-safety-fixes`, commit `f2e663d` (handoff `c81b125`). No remaining P0, P1, or P2
+findings. Six rounds of adversarial review, summarized:
+
+| Round | Result |
+|---|---|
+| 1 (spec) | Codex wrote `tests/specs/phase-a.md` before any code existed (assertions-first) |
+| 2 | 1 P0 fixed (an ambiguous photo-row response could delete a committed photo's files) |
+| 3 | 4 P1s — all in code written *during round 2's fixes* |
+| 4 | 4 P1s — all in code written *during round 3's fixes*; **write-Retry removed from scope** (see the 2026-08-02 entry below) rather than chasing an 8th round of retry-machinery bugs |
+| 5 | 3 P1s (doc reconciliation, cross-plant history leakage, an untried-event notice) |
+| 6 | 1 P1 (Journal tab couldn't recover after one failed load) |
+| **6 (final)** | **PASS** — Codex independently reproduced every claimed fix, including the exact request-count proof for round 6 |
+
+**What Phase A actually ships:** events no longer fail silently; a plant that saves is
+never reported as failed by a later photo/category/event problem; an ambiguous photo-row
+response can no longer delete real files; a failed collection load no longer looks like
+an empty one; the journal tab recovers after a failed history read instead of becoming a
+dead button. Write-Retry (a Retry button on partial-success notices) was built, reviewed,
+found fragile, and deliberately removed — see the retry-removal decision below. The
+load-error notice keeps Retry; it's a read-only re-fetch with none of the risk that made
+write-retries hard to get right.
+
+**Codex's explicit instruction, followed:** do not merge, push, deploy, or bump
+`app-build` from its verdict alone — Stephen's approval is required first. This entry
+records the PASS; it does not itself authorize deployment.
+
+**Evidence:** `tests/evidence/phase-a-gate-a.md` (all 6 rounds) and
+`tests/evidence/GATE-A-HANDOFF.md` (final handoff). Spec: `tests/specs/phase-a.md`.
+
+---
+
 ## 2026-08-02 — Phase A write-Retry REMOVED from scope (Stephen, after Codex Gate A rounds 3–4)
 
 **Context.** Phase A's original design (`tests/specs/phase-a.md`, `docs/stabilization-plan.md`

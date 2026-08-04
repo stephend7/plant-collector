@@ -1,6 +1,9 @@
 # Stabilization Plan — safety fixes, tests, and gradual extraction
 
-> **Status: v4 — Gate 0 confirmation-pass blockers cleared 2026-08-02. Nothing built yet.**
+> **Status: v5 — Phase A BUILT and Gate A PASSED (Codex, round 6, 2026-08-02).**
+> Branch `phase-a-safety-fixes`, commit `f2e663d`, awaiting Stephen's approval to
+> merge/deploy (not yet merged — see `decisions.md` for the full 6-round arc). Phase B
+> onward have not started.
 > Round 1: ChatGPT's Gate 0 review found 6 High + 9 Medium + 4 Low; all six High fixed
 > (clean-export Gate D, D1/D2 split, fail-closed network rules, named Phase T,
 > runner-local CI, idempotent retry). Round 2 (confirmation pass) confirmed 5 of 6
@@ -17,9 +20,8 @@
 > queried the project's live auth-settings endpoint: `disable_signup: true`,
 > `anonymous_users: false`) — no longer a caveat for the reviewer. See A0 below.
 >
-> **Not yet committed to the repo.** This plan, `docs/codex-access-map.md`, and the
-> replacement `AGENTS.md` should land together so Codex reads them from committed
-> history rather than from hand-passed files.
+> **This plan, `docs/codex-access-map.md`, and `AGENTS.md` are committed** (merged to
+> `main` 2026-08-02, commit `0cb333e`) — Codex reads them from committed history.
 > Architect: Fable 5, 2026-08-01 (Stephen chose to stay on Fable 5 for this effort).
 > Origin: ChatGPT's independent audit (2026-07-24) + our line-by-line verification of it
 > (`~/Downloads/Plant_Collector_Second_Opinion_by_Claude.docx`). 8 of its 9 core claims
