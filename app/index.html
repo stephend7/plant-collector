@@ -24,7 +24,7 @@
      gstatic.com appears in img/style ONLY (the Picker dialog shell pulls its css/icons
      from there — 2026-07-07 Security review) — NEVER in script-src. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://*.gstatic.com; img-src 'self' data: blob: https://levevlvmdtieddzhkcdy.supabase.co https://*.gstatic.com; connect-src 'self' https://levevlvmdtieddzhkcdy.supabase.co https://accounts.google.com https://apis.google.com https://sheets.googleapis.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="app-build" content="2026-08-03a">
+<meta name="app-build" content="2026-08-03b">
 <title>Plant Collector</title>
 <style>
   :root{
@@ -899,7 +899,10 @@
               <button type="button" class="padd" @click="$refs.detailInput.click()" :disabled="detailBusy" aria-label="Add photo">＋</button>
             </div>
             <div x-show="detailBusy" class="hint" style="margin-top:6px">Working…</div>
-            <div class="msg err" x-text="detailError"></div>
+            <!-- Photo-operation errors only. When the journal editor or the entry sheet is
+                 open they own the message (each has its own slot beside its Save button),
+                 so a journal failure no longer surfaces here under the photo thumbnails. -->
+            <div class="msg err" x-show="detailError && !loggingEvent && !sheetEditing" x-text="detailError"></div>
           </div>
         </div>
 
@@ -1006,6 +1009,10 @@
                   <div class="thumb"><button type="button" class="rm" @click="removeEventPhoto(ph.id)">✕</button><img :src="ph.url" alt=""></div>
                 </template>
               </div>
+              <!-- The journal editor had NO error slot: a failed save showed its message
+                   up in the PHOTOS card instead, which read as a photo problem and was
+                   off-screen while you were looking at Save (Stephen, iPhone, 2026-08-03). -->
+              <div class="msg err" x-show="detailError" x-text="detailError" style="margin:6px 0"></div>
               <div class="formfoot">
                 <button class="primary" @click="saveEvent()" :disabled="detailBusy" x-text="detailBusy?'Saving…':(editEventId?'Save changes':'Save event')"></button>
                 <button class="ghost" @click="cancelLogEvent()" :disabled="detailBusy">Cancel</button>
@@ -2374,6 +2381,25 @@
   // second attempt collides on the primary key. That collision means the row IS there —
   // which is success, not failure (Gate A.8: converge to exactly one event).
   const isDupKey=e=>!!e&&(e.code==='23505'||/duplicate key|already exists/i.test((e&&e.message)||''));
+  /* Turn a thrown error into something a person can act on.
+     Callers used to write `e.message || 'Friendly sentence.'` — which is backwards: the
+     friendly sentence only appeared when the error had NO message, so the user almost
+     always got the raw technical text instead. On Stephen's iPhone a dropped connection
+     surfaced as the bare string "TypeError: Load failed" (Safari's wording; Chrome says
+     "Failed to fetch"), which says nothing about what to do (reported 2026-08-03).
+     Now: known technical shapes map to plain language, anything else falls back to the
+     caller's own friendly sentence, and the raw text goes to the console for debugging. */
+  function friendlyError(e,fallback){
+    const raw=String((e&&e.message)||e||'');
+    if(raw)try{console.error('[app]',raw,e);}catch(_){}
+    if(/load failed|failed to fetch|networkerror|network request failed|internet connection|network ?error/i.test(raw))
+      return 'Couldn’t reach the server — check your connection and try again.';
+    if(/row-level security/i.test(raw))
+      return 'That was blocked — your sign-in may have expired. Reload the page and sign in again.';
+    if(/jwt|token is expired|invalid token/i.test(raw))
+      return 'Your sign-in has expired. Reload the page and sign in again.';
+    return fallback;
+  }
   /* Why a secondary step didn't complete. The three cases are genuinely different to the
      user and must not be flattened into one message (Codex Gate A ruling 3):
        'failed'  — the server answered and rejected it. It is definitely NOT saved.
@@ -3872,7 +3898,7 @@
         try{
           const {error}=await sb.from('plant').update({quantity:q}).eq('id',id); if(error)throw error;
           this.detailPlant.quantity=q; this.cancelTileEdit();
-        }catch(e){ this.detailError=e.message||'Could not update quantity.'; }
+        }catch(e){ this.detailError=friendlyError(e,'Could not update quantity.'); }
         finally{ this.detailBusy=false; }
       },
       async saveTileStatus(){
@@ -3882,7 +3908,7 @@
         // ---- PRE-boundary: the only place that may report a total failure ----
         try{
           const {error}=await sb.from('plant').update({lifecycle_status:newStatus}).eq('id',id); if(error)throw error;
-        }catch(e){ this.detailError=e.message||'Could not update status.'; this.detailBusy=false; return; }
+        }catch(e){ this.detailError=friendlyError(e,'Could not update status.'); this.detailBusy=false; return; }
         /* ===== HARD BOUNDARY: the status IS saved. =====
            The event write and the timeline reload used to sit in the same catch, so a
            problem with either announced "Could not update status" for a status that had
@@ -3908,7 +3934,7 @@
           this.detailPlant.growing_location_id=locId;
           this.detailPlant.growing_location = locId ? (this.locations.find(l=>l.id===locId)||null) : null;
           this.cancelTileEdit();
-        }catch(e){ this.detailError=e.message||'Could not update growing spot.'; }
+        }catch(e){ this.detailError=friendlyError(e,'Could not update growing spot.'); }
         finally{ this.detailBusy=false; }
       },
       async addTileSpot(){
@@ -3991,7 +4017,10 @@
         if(ev)this.sheet.ev=ev;
         this.sheetEditing=false;
       },
-      cancelLogEvent(){ (this.newEvent.photos||[]).forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}}); this.loggingEvent=false; this.editEventId=null; },
+      // Clear detailError too (cancelSheetEdit already did): otherwise closing the editor
+      // leaves a stale journal error behind, which the photos card would then display —
+      // the very wrong-section confusion this change exists to fix.
+      cancelLogEvent(){ (this.newEvent.photos||[]).forEach(p=>{try{URL.revokeObjectURL(p.url);}catch(e){}}); this.loggingEvent=false; this.editEventId=null; this.detailError=''; },
       async onEventPhoto(ev){
         const files=[...(ev.target.files||[])]; ev.target.value=''; if(!files.length)return;
         this.detailBusy=true; this.detailError='';
@@ -4046,7 +4075,7 @@
           await this.loadDetailEvents(pid); await this.loadDetailPhotos(pid);
           if(this.tab==='journal'){ this.allPhotosLoaded=false; await this.loadAllEvents(); if(this.journalFilter==='photos')await this.loadAllPhotos(); }
           this.loggingEvent=false; this.editEventId=null; this.newEvent=this._blankEvent();
-        }catch(err){this.detailError=err.message||'Could not save the entry.';}
+        }catch(err){this.detailError=friendlyError(err,'Could not save the entry.');}
         finally{this.detailBusy=false;}
       },
       async deleteEvent(ev){
@@ -4057,7 +4086,7 @@
           this.eventDeleteId=null;
           await this.loadDetailEvents(this.detailPlant.id);
         }
-        catch(e){this.detailError=e.message||'Could not delete the event.';}
+        catch(e){this.detailError=friendlyError(e,'Could not delete the event.');}
         finally{this.detailBusy=false;}
       },
       statusLabel(s){return{in_collection:'In collection',dead:'Dead',sold:'Sold',traded:'Traded',given_away:'Given away'}[s]||'In collection';},
@@ -4105,7 +4134,7 @@
           try{ await this.loadPlants(); }
           catch(_){ this.loadError='The plant was deleted, but the collection list could not be refreshed.'; this.loadErrorDismissed=false; }
           this.closeDetail();
-        }catch(e){this.detailError=e.message||'Could not delete this plant.';}
+        }catch(e){this.detailError=friendlyError(e,'Could not delete this plant.');}
         finally{this.detailBusy=false;}
       },
 
@@ -4145,7 +4174,7 @@
           const {error}=await sb.from('photo').delete().eq('id',ph.id);
           if(error)throw error;
           await this.refreshDetail();
-        }catch(e){this.detailError=e.message||'Could not remove the photo.';}
+        }catch(e){this.detailError=friendlyError(e,'Could not remove the photo.');}
         finally{this.detailBusy=false;}
       },
       async setCover(ph){
@@ -4154,7 +4183,7 @@
           const {error}=await sb.from('plant').update({cover_photo_id:ph.id}).eq('id',this.detailPlant.id);
           if(error)throw error;
           await this.refreshDetail();
-        }catch(e){this.detailError=e.message||'Could not set the cover.';}
+        }catch(e){this.detailError=friendlyError(e,'Could not set the cover.');}
         finally{this.detailBusy=false;}
       },
       async toggleCover(ph){
@@ -4165,7 +4194,7 @@
           const {error}=await sb.from('plant').update({cover_photo_id:next}).eq('id',this.detailPlant.id);
           if(error)throw error;
           await this.refreshDetail();
-        }catch(e){this.detailError=e.message||'Could not update the cover.';}
+        }catch(e){this.detailError=friendlyError(e,'Could not update the cover.');}
         finally{this.detailBusy=false;}
       },
 
@@ -4325,7 +4354,7 @@
           const {error}=await sb.from('photo').update({in_gallery:next}).eq('id',ph.id); if(error)throw error;
           ph.in_gallery=next;
           const orig=this.detailPhotos.find(p=>p.id===ph.id); if(orig)orig.in_gallery=next;
-        }catch(e){ this.detailError=e.message||'Could not update this photo.'; }
+        }catch(e){ this.detailError=friendlyError(e,'Could not update this photo.'); }
       },
 
       /* ---- focused journal-entry sheet ---- */
@@ -4391,7 +4420,7 @@
           if(this.detailPlant){ await this.loadDetailPhotos(this.detailPlant.id); await this.loadDetailEvents(this.detailPlant.id); const fresh=this.detailPhotos.find(x=>x.id===ph.id); if(fresh)this.sheet.ph=fresh; }
           if(this.tab==='journal'){ this.allPhotosLoaded=false; if(this.journalFilter==='photos')await this.loadAllPhotos(); await this.loadAllEvents(); }
           this.sheetEditing=false;
-        }catch(e){ this.detailError=e.message||'Could not save the photo.'; }
+        }catch(e){ this.detailError=friendlyError(e,'Could not save the photo.'); }
         finally{ this.detailBusy=false; }
       },
       sheetOpenPhoto(){ const ph=this.sheetPhoto(); if(!ph)return; const aug=Object.assign({},ph,{plant_id:this.detailPlant&&this.detailPlant.id,plantName:this.sheet.plantName}); this.openViewer([aug],0,true); },
@@ -4404,7 +4433,7 @@
           await uploadPhoto(this.userId,ph.id,full,thumb); // upsert overwrites the same file
           if(this.detailPlant){ await this.loadDetailPhotos(this.detailPlant.id); await this.loadDetailEvents(this.detailPlant.id); const fresh=this.detailPhotos.find(x=>x.id===ph.id); if(fresh)this.sheet.ph=fresh; }
           if(this.tab==='journal'){ this.allPhotosLoaded=false; if(this.journalFilter==='photos')await this.loadAllPhotos(); }
-        }catch(e){ this.detailError = isHeic(file) ? 'That HEIC can’t be read here — open in Safari or save as JPEG.' : (e.message||'Could not replace the photo.'); }
+        }catch(e){ this.detailError = isHeic(file) ? 'That HEIC can’t be read here — open in Safari or save as JPEG.' : friendlyError(e,'Could not replace the photo.'); }
         finally{ this.detailBusy=false; }
       },
       async sheetViewPlant(){ const p=this.detailPlant; this.closeSheet(); if(p) await this.openDetail(p); },
@@ -4434,7 +4463,7 @@
           this.closeSheet();
           if(this.detailPlant){ await this.loadDetailEvents(this.detailPlant.id); await this.loadDetailPhotos(this.detailPlant.id); }
           if(this.tab==='journal'){ await this.loadAllEvents(); this.allPhotosLoaded=false; if(this.journalFilter==='photos')await this.loadAllPhotos(); }
-        }catch(e){ this.detailError=e.message||'Could not delete the entry.'; }
+        }catch(e){ this.detailError=friendlyError(e,'Could not delete the entry.'); }
         finally{ this.detailBusy=false; }
       },
       /* ---- products (fertilizers / pesticides on fed & pest_treated events) ---- */
@@ -4542,7 +4571,7 @@
           this.closeQuickLog();
           await this.loadAllEvents();
           if(this.detailPlant&&this.detailPlant.id===pid)await this.loadDetailEvents(pid);
-        }catch(e){ this.quickLogError=e.message||'Could not save the entry.'; }
+        }catch(e){ this.quickLogError=friendlyError(e,'Could not save the entry.'); }
         finally{ this.quickLogBusy=false; }
       },
 
@@ -4560,7 +4589,7 @@
           Object.assign(s,row);
           const sa=this.speciesAll.find(x=>x.id===s.id); if(sa)Object.assign(sa,row);
           this.careEditing=false;
-        }catch(e){this.detailError=e.message||'Could not save care info.';}
+        }catch(e){this.detailError=friendlyError(e,'Could not save care info.');}
         finally{this.detailBusy=false;}
       },
       async syncCategories(plantId,categoryIds){
@@ -4620,7 +4649,7 @@
           this.cropObjUrl=URL.createObjectURL(data);
           cropOpen(this.cropObjUrl,()=>{this.cropReady=true;});
         }catch(e){
-          this.detailError=e.message||'Could not load the photo to crop.';
+          this.detailError=friendlyError(e,'Could not load the photo to crop.');
         }
       },
       cropCancel(){ this._cropTeardown(); },
