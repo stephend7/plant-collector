@@ -1,9 +1,14 @@
 # Stabilization Plan — safety fixes, tests, and gradual extraction
 
-> **Status: v5 — Phase A BUILT and Gate A PASSED (Codex, round 6, 2026-08-02).**
-> Branch `phase-a-safety-fixes`, commit `f2e663d`, awaiting Stephen's approval to
-> merge/deploy (not yet merged — see `decisions.md` for the full 6-round arc). Phase B
-> onward have not started.
+> **Status: v6 — Phase A DEPLOYED (merged to `main`, app-build `2026-08-03a`+, 2026-08-02/03).**
+> Phase B (tooling bootstrap) DONE and committed — Node installed, `package.json`/`tests/`
+> scaffolded, `npm test` green with 0 tests, `git status` proved `app/` untouched. **Phase C
+> BUILT** (2026-08-03): `app/lib/pc-util.js` extraction, 36 unit tests, live browser
+> verification (add-plant flow + real-fixture import parsing) — see `decisions.md` for full
+> detail and two pre-existing parsing gaps the new tests surfaced (not fixed here, per the
+> verbatim-move rule; flagged for Codex's Gate C review + a later follow-up commit).
+> **Gate C's Codex review has not yet run** — do not treat Phase C as closed until it does.
+> Phase D onward have not started.
 > Round 1: ChatGPT's Gate 0 review found 6 High + 9 Medium + 4 Low; all six High fixed
 > (clean-export Gate D, D1/D2 split, fail-closed network rules, named Phase T,
 > runner-local CI, idempotent retry). Round 2 (confirmation pass) confirmed 5 of 6
