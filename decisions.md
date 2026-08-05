@@ -4,6 +4,81 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-08-04 — Gate C round 1: Codex returned CONDITIONAL; remediation round 1 (5 P1s)
+
+**Verdict:** Codex's blocking Gate C review returned **CONDITIONAL** on `753e0cf`. It
+confirmed the extraction itself is mechanically sound (all 22 moved function bodies and 4
+dependency constants match the originals; all 24 exports and aliases present; script order,
+CSP, and cache markers correct) but set **six objective conditions** before merge. Every
+finding was verified independently against the code before being acted on — none were
+accepted on assertion, and none were rebutted, because all were real.
+
+**The most valuable catch: the verification was weaker than it claimed.** The v1
+`verify-phase-c-verbatim.js` compared *trimmed, unordered sets of lines* while the handoff
+described it as "byte-for-byte proof." Codex demonstrated 10 adversarial mutations; the
+checker reported PASS on 8 of them, including a statement reorder and dropping one of two
+identical lines — both of which cause real runtime bugs. **This is the second time in this
+phase that a verification instrument, not the code, was the weakest link** (the first was
+the bash-quoting false negatives during the build). The durable lesson is now explicit: *a
+check that has never been shown to fail against a realistic mutation is not evidence.*
+
+**What changed in remediation round 1 (this commit):**
+
+1. **`parseImportDate` now rejects impossible dates (P1-1)** — and the bug was worse than
+   originally disclosed. The ISO branch had **no range validation at all**: `2024-13-40`
+   was accepted as a confident, unwarned date and would have been written to the database.
+   `2/31/2024` likewise. Added a real `daysInMonth` check (leap-year correct) to both the
+   ISO and M/D/Y branches; an impossible date now returns `null` + `warn`, per the approved
+   spec table, instead of falling through to a fabricated year-only guess. The Phase C test
+   that *pinned the buggy behavior* has been corrected to assert the approved contract.
+2. **Browser-branch and export-surface coverage (P1-2)** — `require()` always defines
+   `module`, so the Node tests only ever exercised the CommonJS half of the dual-environment
+   wrapper. Renaming `root.PCUtil` or deleting an export left all 36 tests green while
+   breaking the live app. New `pc-util.browser.test.js` evaluates the real file in a
+   module-less `vm` context and asserts the exact 24-name export set. Both mutations now fail.
+3. **Behavioral-equivalence harness (P1-3), the real fix** — rather than only patching the
+   text checker, added `pc-util.equivalence.test.js`, which **reconstructs the original
+   implementations from the exact lines Phase C deleted** (read from git at `a48e6be`),
+   evaluates them in isolation, and asserts old-vs-new output equality across a corpus
+   drawn from the real spreadsheets. Intentional changes must be declared in an
+   `INTENTIONAL_DIVERGENCE` list *with a reason and a dedicated correctness test* — and the
+   harness **fails if a declared divergence turns out not to diverge**, so the list cannot
+   go stale silently. This proves behavior preservation directly instead of inferring it
+   from text.
+4. **`verify-phase-c-verbatim.js` rewritten (P1-3)** — now reads **git blobs at pinned
+   commits** (never the mutable working tree), uses `-U0` hunks so removed blocks are
+   compared as **contiguous, untrimmed, order-preserving text**, requires **exact** matches
+   for added lines (a prefix regex previously let appended content through), and separately
+   asserts export equality in both branches, script order, CSP, and cache-marker equality.
+
+**A deviation my own new checker found in my own earlier work.** Running the rewritten
+checker against `753e0cf` immediately failed: I had silently **repositioned `STOP`/`RANK`**
+below the functions that use them when writing `pc-util.js`. Harmless at runtime (both are
+`const` in the same closure, and the only consumer is called later), but it was *not* the
+verbatim move that commit claimed, and **neither the v1 checker nor Codex caught it.**
+Fixed forward here rather than by amending the pushed commit (Codex explicitly asked that
+`753e0cf` be preserved as the extraction commit). Consequence to keep in mind: running the
+checker pinned at `a48e6be..753e0cf` still reports this one deviation — that is the correct,
+honest historical record, not a failure to fix.
+
+5. **Leading-`x` hybrid (P2-1 ruling adopted)** — kept as a **legacy characterization test**
+   (proves the extraction did not change it) **plus** a separate `todo`-marked **pending
+   correctness spec** stating the intended `×` normalization. Codex's reasoning, accepted:
+   characterization alone lets a green suite imply correctness. The fix itself stays
+   deferred past Gate C and is recorded here as such.
+
+**Correction to the record:** `753e0cf`'s commit message says "23 functions"; the true count
+is **22 functions + 2 exported constants** (24 exported symbols). The pushed commit message
+cannot be amended, so the correction lives here.
+
+**Still open before Gate C can pass** (conditions 4 and 5, both requiring the live app):
+driving a real spreadsheet through the **full import-preview pipeline** (file input → worker
+parse → mapping → rendered preview — direct parser calls are below the required boundary),
+and capturing **reproducible browser evidence** for the add-plant flow rather than prose
+claims.
+
+---
+
 ## 2026-08-03 — Phase C built: pc-util extraction + 2 pre-existing parsing gaps found by new test coverage
 
 **What shipped.** The pure top-level helpers at `app/index.html`'s inline script (uid, isHeic,

@@ -16,6 +16,8 @@
   function sameSet(a,b){ if(a.length!==b.length)return false; const s=new Set(a.map(String)); return b.every(x=>s.has(String(x))); }
 
   /* ---- name auto-detection from filename + photo metadata (ported from the catalog app) ---- */
+  const STOP=new Set(["photo","img","image","picture","plant","plants","flower","flowers","copy","edit","edited","final","raw","jpg","jpeg","heic","png","the","and","new","sale","show","crop","cropped","scan","version","print","sp","spp","var","with","from","near","wild","seed","seedling","division","clone","form","pot","label","tag","red","green","giant","large","small","for","var.","in"]);
+  const RANK=/^(var|subsp|ssp|f|forma|nothovar|cv)$/i;
   function escapeRe(s){return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}
   function collectStrings(o,depth,out){
     out=out||[];depth=depth||0;
@@ -91,11 +93,6 @@
     return dt.getFullYear()+"-"+p(dt.getMonth()+1)+"-"+p(dt.getDate());
   }
 
-  // STOP/RANK are referenced by extractEpithet above; declared here (verbatim values) so
-  // the function that closes over them keeps working unchanged after the move.
-  const STOP=new Set(["photo","img","image","picture","plant","plants","flower","flowers","copy","edit","edited","final","raw","jpg","jpeg","heic","png","the","and","new","sale","show","crop","cropped","scan","version","print","sp","spp","var","with","from","near","wild","seed","seedling","division","clone","form","pot","label","tag","red","green","giant","large","small","for","var.","in"]);
-  const RANK=/^(var|subsp|ssp|f|forma|nothovar|cv)$/i;
-
   /* ===================== SPREADSHEET IMPORT — pure helpers =====================
    * Deterministic parsing for the import preview. No DOM, no network. Every guess
    * here is surfaced in the preview for the user to confirm (nothing silent). */
@@ -106,16 +103,26 @@
   function normKey(s){ return normQuotes(s).toLowerCase(); }     // dedup key (case+space+quote-insensitive)
   function pad2(n){ return String(n).padStart(2,'0'); }
   function expandYear(y){ y=Number(y); if(y>=100) return y; return y<=49?2000+y:1900+y; }
+  // Last real day of a given month (handles leap years) — the range check parseImportDate
+  // needs so "2/31/2024" and "2024-13-40" fail cleanly instead of being accepted as-is.
+  function daysInMonth(year,month){ return new Date(year,month,0).getDate(); }
   // Parse one acquisition-date cell. Returns {iso, precision:'day'|'month'|'year'|null, warn}.
   // Partial dates (month-only / year-only) get the 1st of the period + a precision marker.
+  // An impossible date (month/day out of range for ANY interpretation) fails straight to
+  // null+warn rather than falling through to a later, less-specific pattern — a partial
+  // regex match on garbage input must never be reported as a confident date (Gate C P1-1).
   function parseImportDate(raw){
     const s=normWS(raw); if(!s) return {iso:null,precision:null,warn:false};
     let m;
-    if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})\b/)))                                  // ISO (from a real date cell)
-      return {iso:`${m[1]}-${m[2]}-${m[3]}`,precision:'day',warn:false};
+    if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})\b/))){                                 // ISO (from a real date cell)
+      const yr=+m[1],mo=+m[2],da=+m[3];
+      if(mo>=1&&mo<=12&&da>=1&&da<=daysInMonth(yr,mo)) return {iso:`${m[1]}-${m[2]}-${m[3]}`,precision:'day',warn:false};
+      return {iso:null,precision:null,warn:true};
+    }
     if((m=s.match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})\b/))){              // M/D/Y (US sheets)
       const mo=+m[1],da=+m[2],yr=expandYear(m[3]);
-      if(mo>=1&&mo<=12&&da>=1&&da<=31) return {iso:`${yr}-${pad2(mo)}-${pad2(da)}`,precision:'day',warn:mo<=12&&da<=12};
+      if(mo>=1&&mo<=12&&da>=1&&da<=daysInMonth(yr,mo)) return {iso:`${yr}-${pad2(mo)}-${pad2(da)}`,precision:'day',warn:mo<=12&&da<=12};
+      return {iso:null,precision:null,warn:true};
     }
     if((m=s.match(/\b([A-Za-z]{3,})\.?\s+(\d{4})\b/))){                            // "August 2020"
       const mo=IMPORT_MONTHS[m[1].slice(0,3).toLowerCase()];

@@ -74,17 +74,40 @@ test('parseImportDate', async (t) => {
     assert.equal(r.warn, true);
   });
 
-  // KNOWN PRE-EXISTING GAP (found by this extraction, not introduced by it — see
-  // decisions.md "Phase C — two pre-existing parsing gaps found by new test coverage").
-  // An invalid M/D/Y (month 13, day 40) fails the M/D/Y branch's range check and falls
-  // through to the bare "any 19xx/20xx number" year-only regex, which still finds "2020"
-  // in the string. Not dangerous (warn stays true, so the import preview still flags it
-  // for the user), but not the "give up entirely" behavior the original design intended.
-  await t.test('invalid M/D/Y falls through to a year-only guess, still warns', () => {
+  // Fixed per the approved spec table (docs/stabilization-plan.md) and Codex's Gate C
+  // P1-1 finding: an impossible date must fail to null+warn, not fabricate a confident
+  // fallback. Originally shipped in 753e0cf with a bug pinned as "known gap" (that test
+  // asserted the wrong, buggy '2020-01-01' result); corrected in the Gate C follow-up.
+  await t.test('invalid M/D/Y (month 13, day 40) → null, warn', () => {
     const r = PCUtil.parseImportDate('13/40/2020');
-    assert.equal(r.iso, '2020-01-01');
-    assert.equal(r.precision, 'year');
+    assert.equal(r.iso, null);
+    assert.equal(r.precision, null);
     assert.equal(r.warn, true);
+  });
+
+  await t.test('invalid ISO (month 13, day 40) → null, warn — was NOT range-checked at all', () => {
+    const r = PCUtil.parseImportDate('2024-13-40');
+    assert.equal(r.iso, null);
+    assert.equal(r.warn, true);
+  });
+
+  await t.test('impossible calendar date (Feb 31) in M/D/Y shape → null, warn', () => {
+    const r = PCUtil.parseImportDate('2/31/2024');
+    assert.equal(r.iso, null);
+    assert.equal(r.warn, true);
+  });
+
+  await t.test('impossible calendar date (Feb 31) in ISO shape → null, warn', () => {
+    const r = PCUtil.parseImportDate('2024-02-31');
+    assert.equal(r.iso, null);
+    assert.equal(r.warn, true);
+  });
+
+  await t.test('Feb 29 valid only in a real leap year', () => {
+    assert.equal(PCUtil.parseImportDate('2024-02-29').iso, '2024-02-29');
+    assert.equal(PCUtil.parseImportDate('2023-02-29').iso, null);
+    assert.equal(PCUtil.parseImportDate('2/29/2024').iso, '2024-02-29');
+    assert.equal(PCUtil.parseImportDate('2/29/2023').iso, null);
   });
 
   await t.test('empty → null, no warn', () => {
@@ -150,10 +173,23 @@ test('matchGenusSpeciesFromString', async (t) => {
   // the x within `after` itself), detection succeeds but the 'x'→'×' normalization never
   // fires. Real-world relevant: this is the exact leading-x pattern the sample Pinguicula
   // sheet uses (see memory: sample-pinguicula-sheet.md).
-  await t.test('leading-x hybrid form (from the Ping sheet) — detected but not normalized', () => {
+  // LEGACY CHARACTERIZATION — asserts what the code does TODAY, so the extraction can be
+  // proven not to have changed it. Green here means "unchanged", NOT "correct". Paired
+  // with the pending correctness spec immediately below (Codex Gate C P2-1 ruling: keep
+  // both forms — characterization alone would let a green suite imply correctness).
+  await t.test('LEGACY: leading-x hybrid is detected but not normalized', () => {
     const r = PCUtil.matchGenusSpeciesFromString('Pinguicula x Tina', GENUS_LIST);
     assert.equal(r.genus, 'Pinguicula');
     assert.equal(r.species, 'x Tina'); // NOT '× Tina' — the gap described above
+  });
+
+  // PENDING CORRECTNESS SPEC — the behavior we actually want. Deliberately deferred out of
+  // the Phase C slice (Gate C P2-1 permits deferral if formally recorded); marked `todo`
+  // so it is visible in every test run without failing the build. Delete the todo flag
+  // when the normalization is fixed. Tracked in decisions.md 2026-08-04.
+  await t.test('INTENDED: leading-x hybrid should normalize to ×', { todo: 'deferred past Gate C — see decisions.md 2026-08-04' }, () => {
+    const r = PCUtil.matchGenusSpeciesFromString('Pinguicula x Tina', GENUS_LIST);
+    assert.equal(r.species, '× Tina');
   });
 
   await t.test('hybrid marker WITH a preceding word normalizes correctly', () => {
