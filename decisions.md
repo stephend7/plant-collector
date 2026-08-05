@@ -71,11 +71,32 @@ honest historical record, not a failure to fix.
 is **22 functions + 2 exported constants** (24 exported symbols). The pushed commit message
 cannot be amended, so the correction lives here.
 
-**Still open before Gate C can pass** (conditions 4 and 5, both requiring the live app):
-driving a real spreadsheet through the **full import-preview pipeline** (file input → worker
-parse → mapping → rendered preview — direct parser calls are below the required boundary),
-and capturing **reproducible browser evidence** for the add-plant flow rather than prose
-claims.
+**Conditions 4 and 5 (live app) — now done, evidence in
+`tests/evidence/gate-c-round1-live-verification.md`:**
+- **Real import-preview pipeline.** No file-picker automation exists in this tooling, so
+  the real bytes of a private-spreadsheet local fixture were assigned to the app's actual
+  `<input type="file">` via a `DataTransfer` (a real browser-supported mechanism, not a
+  bypass — the script already had the exact bytes) and a genuine `change` event dispatched,
+  running the unmodified `onImportFile` handler through the real Web Worker parse and
+  header-inference. The rendered preview (6 plants, 2 new genera, 4 new vendors) matched
+  the real sheet row-for-row; row 2 visibly showed the pre-existing leading-hybrid gap
+  surviving through the *full* pipeline, not just the isolated parser. Not committed to the
+  database, per Codex's own ruling that a preview satisfies the condition. Two earlier
+  attempts produced a false "it didn't work" reading — first from a hand-transcription
+  error that corrupted the test file's bytes (caught by checking decoded length against
+  the real file size), then from checking `input.files.length` *after* dispatch, which the
+  app's own handler always clears to `''` as its first line — the right signal was the
+  app's rendered state, not that property.
+- **Reproducible add-plant evidence.** Exact steps plus raw `get_page_text`/console
+  captures recorded in the evidence file, not prose summary. One console entry appeared
+  (`Failed to load resource: 400`); traced to source (`app/index.html:2506-2517`,
+  `warmScanFn`) rather than dismissed — it is a pre-existing, intentionally-fired,
+  `.catch()`-wrapped warm-up ping to the scan-tag Edge Function that is *designed* to 400,
+  present before Phase C and unrelated to it. Cleanup verified by page-text diff back to
+  the exact pre-test baseline, not assumed.
+
+**Gate C round 1 remediation is complete.** All six of Codex's conditions have been
+addressed; ready for Codex's round 2 review.
 
 ---
 
