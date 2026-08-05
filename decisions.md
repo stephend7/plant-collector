@@ -4,6 +4,44 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-08-04 — Gate C round 2 remediation: PAUSED mid-way, awaiting Codex round 3
+
+**STATE: work paused at Stephen's request. Branch `phase-c-pc-util-extraction`, tip
+`ae440bd`, pushed and clean (working tree has no uncommitted changes). `main` untouched at
+`a48e6be` / app-build `2026-08-03c` — nothing deployed. `npm test`: 49 tests, 48 pass,
+1 expected `todo`, 0 fail, exit 0.**
+
+**Triage rule Stephen set (2026-08-04), now standing:** *only flag defects as must-fix when
+there is a clear path of execution; do not get caught up on theoretical risk that can't be
+reached.* Applied to Codex's round 2 findings below, and to future review rounds.
+
+**Done in this round (committed):**
+- **P0 privacy exposure — fixed, history rewritten, force-pushed.** See the separate
+  "Gate C round 2: Codex returned FAIL" entry below for the full account.
+- **P2-1 invalid M/YYYY** (`13/2020`, `0/2020` → fabricated year-only date) — fixed;
+  same bug class as the already-fixed ISO and M/D/Y branches.
+- **P1-1a whole-function divergence exemption** — `INTENTIONAL_DIVERGENCE` is now keyed by
+  function **and exact input**, so a regression in an undeclared case fails even inside a
+  function that has other declared changes. Verified by re-running Codex's own mutation
+  (break valid `5/2020` while keeping the invalid-date fixes): previously green, now caught.
+
+**Still open — the honest remaining list, with the triage call on each:**
+
+| Finding | Call | Reasoning |
+|---|---|---|
+| **P1-1b** `uid()` only shape-checked on one sample; a constant UUID passes | **MUST FIX** | A constant event id is a real data-integrity failure — Phase A's duplicate-key convergence logic depends on client-generated ids being unique. Fix is a large-sample uniqueness assertion. Clear path, not yet done. |
+| **P1-4** `GATE-C-HANDOFF.md` is stale | **MUST FIX** | Still names `753e0cf` (superseded by `b3f4f00`), says 36 tests (now 49), and describes the import check as an unresolved substitute (now resolved). Actively misleads the next reviewer. Also needs honest expected-results for the verifier: it FAILs at both `a48e6be..b3f4f00` (the disclosed STOP/RANK deviation, deliberately preserved) and `a48e6be..HEAD` (the intentional parser fixes) — there is no "clean PASS" invocation, and the doc must say so rather than imply one. |
+| **P1-2** no pre/post (`d95fdd0` vs final) live preview + add-plant comparison | **DO** | It is the written Gate C acceptance criterion ("results identical to pre-change"). Mechanical: run the same fixture through the preview path on both commits and compare mapping/counts/warnings. Not a suspected defect — the equivalence harness already proves function-level parity — but it is the agreed criterion, so it gets done rather than argued away. |
+| **P1-3** main-page alias initialization not automatically covered | **DEFER** | No current defect: Codex's own VM smoke test confirms the app initializes with all 24 aliases bound, and the browser-branch test covers the export surface. Automating the app's own boot means stubbing Alpine + Supabase + DOM around a 5,400-line inline script — brittle and false-failure-prone. **Phase D (Playwright) covers this properly by actually loading the page**; recorded there rather than bodged here. |
+| GitHub still serves the orphaned pre-rewrite commits by full hash | **NOT ACTIONABLE BY CLAUDE** | Force-push orphans them but GitHub keeps serving them until its own GC runs; closing it needs a GitHub Support request from Stephen. The branch ref, normal browsing, and fresh clones are all clean — verified. |
+| Test-account email + private-sheet **filenames** on `main` | **STEPHEN'S CALL** | Pre-existing on `main` (Phase A evidence files; `docs/spreadsheet-import-plan.md`; `docs/codex-access-map.md`), not from this branch. Cleaning them means rewriting `main`'s history, which affects the deployed site — a bigger decision than tonight's branch rewrite. A background task was already spawned for the two Phase A files. |
+
+**Next session should:** finish the two MUST FIX items and the one DO item above, then
+re-issue the handoff for Codex round 3. Do not re-litigate the DEFER — it has a recorded
+reason and a phase that owns it.
+
+---
+
 ## 2026-08-04 — Gate C round 1: Codex returned CONDITIONAL; remediation round 1 (5 P1s)
 
 **Verdict:** Codex's blocking Gate C review returned **CONDITIONAL** on `753e0cf`. It
