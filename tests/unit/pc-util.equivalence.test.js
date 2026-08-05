@@ -22,13 +22,25 @@ const REPO = path.join(__dirname, '../..');
 const PRE_EXTRACTION = 'a48e6be';   // main, immediately before Phase C
 const EXTRACTION = '753e0cf';       // the verbatim-move commit
 
-// Functions deliberately changed after the extraction, with the reason. Each MUST have
-// its own dedicated correctness test (see pc-util.test.js) — this list only exempts them
-// from the "identical to the original" assertion, it does not exempt them from testing.
+// Inputs whose behavior deliberately changed after the extraction, keyed by function and
+// then by the EXACT input string. Codex's Gate C round 2 (P1-1) rejected the earlier
+// whole-function form of this list: exempting all of `parseImportDate` meant a regression
+// in a perfectly good case (breaking `5/2020`) sailed through green, because the function
+// was already excused wholesale. Per-input means every case NOT listed here must still
+// match the pre-extraction implementation exactly.
+//
+// Each listed input must also be covered by its own correctness test in pc-util.test.js —
+// this list only exempts an input from "identical to the original", never from testing.
 const INTENTIONAL_DIVERGENCE = {
-  parseImportDate: 'Gate C P1-1: impossible dates (2024-13-40, 2/31/2024, 13/40/2020) must ' +
-                   'return null+warn per the approved spec table, instead of being accepted ' +
-                   'or falling through to a fabricated year-only guess.'
+  parseImportDate: {
+    '13/40/2020': 'Gate C P1-1: impossible M/D/Y must return null+warn per the approved spec table, not fall through to a fabricated year-only guess.',
+    '2024-13-40': 'Gate C P1-1: the ISO branch had no range validation at all and accepted this as a confident, unwarned date.',
+    '2/31/2024':  'Gate C P1-1: day-vs-month range was unchecked (Feb has no 31st).',
+    '2024-02-31': 'Gate C P1-1: same impossible calendar date via the ISO branch.',
+    '2023-02-29': 'Gate C P1-1: Feb 29 in a non-leap year is not a real date.',
+    '13/2020':    'Gate C P2-1: impossible month in the M/YYYY shape fell through to a fabricated year-only guess.',
+    '0/2020':     'Gate C P2-1: month 0 is impossible; same M/YYYY fallthrough as 13/2020.',
+  }
 };
 
 function git(...args) {
@@ -84,7 +96,8 @@ const NAME_CORPUS = [
 const DATE_CORPUS = [
   '2024-05-17', '8/9/21', 'August 2020', 'Aug. 2020', '2019', '', '   ',
   '13/40/2020', '2024-13-40', '2/31/2024', '2024-02-31', '2024-02-29', '2023-02-29',
-  '1/2/2020', '12/31/99', '3-4-2021', '2020', 'no date given', 'circa 2015', '5/2020'
+  '1/2/2020', '12/31/99', '3-4-2021', '2020', 'no date given', 'circa 2015', '5/2020',
+  '13/2020', '0/2020', '1/2020', '12/2020'   // M/YYYY: invalid months + both valid boundaries
 ];
 const STATUS_CORPUS = [
   'Died winter 2023', 'SOLD', 'traded to Dave', 'gift', 'still have it', '', '???',
@@ -99,22 +112,37 @@ const HEADER_CORPUS = [
 ];
 
 function compare(t, fnName, inputs, invoke) {
-  const intentional = INTENTIONAL_DIVERGENCE[fnName];
-  const diffs = [];
+  const declared = INTENTIONAL_DIVERGENCE[fnName] || {};
+  const undeclaredDiffs = [];   // changed but NOT declared → regression
+  const declaredThatDiffered = new Set();
+
   for (const input of inputs) {
     const a = JSON.stringify(invoke(original[fnName], input));
     const b = JSON.stringify(invoke(current[fnName], input));
-    if (a !== b) diffs.push({ input, original: a, current: b });
+    const key = typeof input === 'string' ? input : null;
+    const isDeclared = key !== null && Object.prototype.hasOwnProperty.call(declared, key);
+    if (a !== b) {
+      if (isDeclared) declaredThatDiffered.add(key);
+      else undeclaredDiffs.push({ input, original: a, current: b });
+    }
   }
-  if (intentional) {
-    assert.ok(diffs.length > 0,
-      `${fnName} is listed in INTENTIONAL_DIVERGENCE but behaves identically to the original — ` +
-      `either the fix did not land, or the entry is stale and should be removed.\nReason on file: ${intentional}`);
-    return;
+
+  // 1. Anything that changed without being declared is a regression, even in a function
+  //    that has other declared changes. (Codex Gate C round 2, P1-1.)
+  assert.deepEqual(undeclaredDiffs, [],
+    `${fnName} diverged from the pre-extraction implementation on input(s) not listed in ` +
+    `INTENTIONAL_DIVERGENCE. If deliberate, add the exact input with a reason AND a dedicated ` +
+    `correctness test; otherwise this is a regression.`);
+
+  // 2. A declared input that no longer differs means the list is stale (or the fix was
+  //    reverted) — fail loudly rather than let the exemption quietly outlive its reason.
+  for (const key of Object.keys(declared)) {
+    if (!inputs.includes(key)) continue;   // not exercised by this corpus; checked where it is
+    assert.ok(declaredThatDiffered.has(key),
+      `${fnName}(${JSON.stringify(key)}) is declared in INTENTIONAL_DIVERGENCE but now matches ` +
+      `the original — either the fix was reverted, or the entry is stale and should be removed.\n` +
+      `Reason on file: ${declared[key]}`);
   }
-  assert.deepEqual(diffs, [],
-    `${fnName} diverged from the pre-extraction implementation. If this is a deliberate fix, ` +
-    `add it to INTENTIONAL_DIVERGENCE with a reason AND a dedicated correctness test.`);
 }
 
 test('extraction preserved behavior — pure string/utility helpers', async (t) => {

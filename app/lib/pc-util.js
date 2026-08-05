@@ -129,8 +129,11 @@
       if(mo) return {iso:`${m[2]}-${pad2(mo)}-01`,precision:'month',warn:true};
     }
     if((m=s.match(/\b(\d{1,2})[\/.\-](\d{4})\b/))){                                // M/YYYY
-      const mo=+m[1]; if(mo>=1&&mo<=12) return {iso:`${m[2]}-${pad2(mo)}-01`,precision:'month',warn:true};
-    }
+      const mo=+m[1];
+      if(mo>=1&&mo<=12) return {iso:`${m[2]}-${pad2(mo)}-01`,precision:'month',warn:true};
+      return {iso:null,precision:null,warn:true};   // "13/2020"/"0/2020": month is impossible, don't
+    }                                               // fall through and fabricate a year-only guess
+
     if((m=s.match(/\b(19|20)\d{2}\b/)))                                            // year only
       return {iso:`${m[0]}-01-01`,precision:'year',warn:true};
     return {iso:null,precision:null,warn:true};                                    // unparseable → flag, don't block
