@@ -4,6 +4,75 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-08-03 — Phase C built: pc-util extraction + 2 pre-existing parsing gaps found by new test coverage
+
+**What shipped.** The pure top-level helpers at `app/index.html`'s inline script (uid, isHeic,
+thumbOf, todayLocal, sameSet, escapeRe, collectStrings, extractEpithet,
+matchGenusSpeciesFromString, matchGenusSpecies, exifDateOf, the import-parsing block
+IMPORT_MONTHS/normWS/normQuotes/normKey/pad2/expandYear/parseImportDate/parseCombinedName/
+scrapePrice/cleanPrice/guessImportMap/guessStatus/LIFECYCLE_STATUSES) moved **verbatim** to
+`app/lib/pc-util.js`, using the dual-environment UMD-lite wrapper the plan specifies (Node
+`module.exports` / browser `window.PCUtil`). `index.html` loads it via
+`<script src="lib/pc-util.js?v=2026-08-03d">` and aliases every name locally
+(`const {uid, ...} = PCUtil;`) so no call site below changed. `app-build` bumped to
+`2026-08-03d` in the same edit, per the cache-busting rule. 36 unit tests added at
+`tests/unit/pc-util.test.js`, matching the plan's exact spec table.
+
+**Verbatim-move proof:** every removed line from `index.html` was diffed against the new
+file and confirmed byte-for-byte identical (git diff removed-lines vs. `grep -F` against
+`pc-util.js`); the only additions to `index.html` are the script tag, the alias block, and
+the app-build bump.
+
+**Two real, pre-existing bugs found — not introduced by this move, just newly exposed by
+having tests for the first time:**
+1. **`parseImportDate('13/40/2020')`** (an invalid M/D/Y — month 13, day 40) fails the M/D/Y
+   range check and falls through all the way to the bare "any 19xx/20xx number" year-only
+   regex, which still finds "2020" in the string → returns
+   `{iso:'2020-01-01', precision:'year', warn:true}` instead of failing cleanly to `null`.
+   Not dangerous (warn stays true, so the import preview still flags it for the user to
+   fix), but not the "give up entirely" behavior the original design intended.
+2. **`matchGenusSpeciesFromString('Pinguicula x Tina', genusList)`** — the hybrid-boundary
+   check tests a space-padded copy of the string (`" "+after`) but the normalizing
+   `.replace()` runs on the unpadded `after`, so when the hybrid marker is the very first
+   character after the genus (no space before the `x` within `after` itself), the hybrid
+   branch is correctly entered but the `x`→`×` normalization never fires — species survives
+   as literal `"x Tina"` instead of `"× Tina"`. **Real-world relevant:** this is exactly the
+   leading-`x` combined-name pattern the real Pinguicula sample sheet uses (see
+   `sample-pinguicula-sheet` memory) — could affect real import data, though the value is
+   still captured (just not normalized) and nothing is silently dropped.
+
+Per "Conditions for Builder" #3 (extraction slices move code verbatim; fixes are separate,
+later commits), neither bug was fixed here. Both are recorded for Codex's Gate C test-gap
+review and Stephen's disposition — fix candidates for a small follow-up commit once Gate C
+closes, not blocking it.
+
+**Live verification.** Signed into the throwaway test account
+(address kept in Claude's private memory per `CLAUDE.md`, not committed here) via the Browser pane (file:// mode against this worktree).
+Zero console errors at every step; `PCUtil` loads in-browser with all 24 exports matching
+Node exactly.
+- **Add-plant flow:** added a real `Pinguicula esseriana` — acquisition date defaulted to
+  `2026-08-03` (proves `PCUtil.todayLocal()` fires through the alias), duplicate-detection
+  banner fired correctly (`sameSet`), the Acquired journal event was written successfully
+  (proves `PCUtil.uid()` fires through the real Supabase write path). Deleted immediately
+  after (confirm-before-delete pattern fired correctly); Pinguicula count returned to 14,
+  confirming clean removal.
+- **Import parsing:** could not drive the app's native file-picker dialog from this tooling
+  (no file-upload capability in the Browser pane MCP), so — rather than skip the check —
+  pulled real rows from an already-local private-spreadsheet fixture (via the
+  vendored `xlsx.full.min.js`, in Node) and called `PCUtil.guessImportMap` /
+  `PCUtil.parseCombinedName` directly in the live browser session against that real messy
+  data (real combined-name strings exercising the internal-hybrid, quoted-cultivar, and
+  `var.`-rank shapes, plus the sheet's real 8-column header row — contents not reproduced
+  here since the fixture belongs to a third party and this repo is public). All mapped and
+  parsed correctly. This is a substitute for, not identical to, driving the full import-wizard UI —
+  noted here so it isn't mistaken for the complete click-through the plan describes.
+
+**Still open before Gate C is fully closed:** Codex's blocking verbatim-move + test-gap
+review (per `docs/stabilization-plan.md`'s cross-model review gates), and the iPhone
+spot-check after deploy (script loading is the WebKit-sensitive part per that gate).
+
+---
+
 ## 2026-08-02 — Gate A PASSED (Codex, round 6) — Phase A ready to merge/deploy pending Stephen's approval
 
 **Verdict:** Codex's blocking Gate A review returned **PASS** on branch
