@@ -38,6 +38,11 @@ Switch models in the model picker after the architecture plan is agreed and befo
   history only; **push a phase branch** = visible for CI/review, does NOT deploy;
   **merge/push to `main` = DEPLOY** (GitHub Pages rebuilds; bump the `<meta name="app-build">`
   marker — and the `?v=` on any extracted `lib/` script — so the in-app updater offers it).
+- **Branch creation policy (adopted 2026-08-10 — see `decisions.md`):** before creating a new
+  branch, state in chat: (1) why a new branch is needed instead of reusing an existing one,
+  (2) the proposed branch name, (3) its expected lifespan — temporary (deleted after merge),
+  experimental, long-lived, or archival, and (4) its expected end state — merge into `main`,
+  delete, freeze, or archive. Wait for Stephen's approval before creating it.
 - **The repo must stay PUBLIC.** GitHub Pages will not serve a private repo on the Free plan —
   flipping it private unpublishes the site and 404s the live app (learned 2026-08-02, see
   `decisions.md`). Want it private? Buy GitHub Pro *first*, confirm Pages still serves, then flip.

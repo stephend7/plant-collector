@@ -4,6 +4,30 @@ Newest decisions on top. Each entry: what was decided, and why. Companion to `ar
 
 ---
 
+## 2026-08-10 — Branch creation policy adopted
+
+**Decision (Stephen, 2026-08-10):** before creating any new branch, state four things in chat
+and wait for approval — do not create the branch first and explain after:
+1. **Why** a new branch is needed instead of reusing an existing one.
+2. The **proposed branch name**.
+3. Its expected **lifespan** — temporary (deleted after merge), experimental, long-lived, or
+   archival.
+4. Its expected **end state** — merge into `main`, delete, freeze, or archive.
+
+**Why.** Several worktrees/branches were live in this repo at once (`git worktree list` at
+adoption time showed multiple, some detached-HEAD with auto-generated names), each with no
+recorded reason for existing or plan for what happens to it. This policy makes branch creation
+a stated, approved decision instead of an unrecorded side effect, so every branch has a known
+purpose and a known fate.
+
+**Scope:** applies to new branch creation going forward. Does not retroactively rename or prune
+existing branches/worktrees.
+
+**Documented in `CLAUDE.md`** under House rules, alongside the existing source-control
+vocabulary rule.
+
+---
+
 ## 2026-08-02 — Gate A PASSED (Codex, round 6) — Phase A ready to merge/deploy pending Stephen's approval
 
 **Verdict:** Codex's blocking Gate A review returned **PASS** on branch
